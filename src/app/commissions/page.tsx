@@ -59,43 +59,12 @@ export default function CommissionsPage() {
 
   const selectedRep = mockReps.find((r) => r.id === selectedRepId);
 
-  const startQboConnect = async () => {
+  const startQboConnect = () => {
     setConnectError(null);
     try {
-      const res = await fetch("/api/qbo/connect", { redirect: "manual" });
-
-      // Some browsers return opaqueredirect with status 0 when redirect is manual
-      if (res.type === "opaqueredirect" || res.status === 0) {
-        window.location.assign("/api/qbo/connect");
-        return;
-      }
-
-      // Follow 3xx via Location header if present
-      if (res.status >= 300 && res.status < 400) {
-        const loc = res.headers.get("Location");
-        if (loc) {
-          window.location.href = loc;
-          return;
-        }
-        setConnectError("QuickBooks connect did not return a redirect location.");
-        return;
-      }
-
-      if (res.redirected) {
-        window.location.href = res.url;
-        return;
-      }
-
-      const text = await res.text();
-      setConnectError(text || `Unexpected response (${res.status}) starting QuickBooks connect.`);
+      window.location.href = "/api/qbo/connect";
     } catch (error) {
-      // As a fallback, try a full navigation
-      try {
-        window.location.assign("/api/qbo/connect");
-        return;
-      } catch (_) {
-        setConnectError(error instanceof Error ? error.message : "Failed to start QuickBooks connect.");
-      }
+      setConnectError(error instanceof Error ? error.message : "Failed to start QuickBooks connect.");
     }
   };
 
