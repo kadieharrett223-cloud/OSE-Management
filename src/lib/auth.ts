@@ -25,6 +25,20 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user }) {
+      const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS ?? process.env.ALLOWED_EMAIL_DOMAIN ?? "")
+        .split(",")
+        .map((d) => d.trim().toLowerCase())
+        .filter(Boolean);
+
+      if (!allowedDomains.length) return true;
+
+      const email = user?.email?.toLowerCase();
+      const domain = email?.split("@")[1];
+      if (!domain) return false;
+
+      return allowedDomains.includes(domain);
+    },
     async jwt({ token, user }) {
       if (user) {
         token.role = (user as any).role;
