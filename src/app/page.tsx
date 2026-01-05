@@ -1,65 +1,241 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { Sidebar } from "@/components/Sidebar";
+
+const money = (value: number) =>
+  value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const mockReps = [
+  {
+    id: 1,
+    name: "Sarah Johnson",
+    region: "East Coast",
+    sales: 125000,
+    commission: 6250,
+    orders: 42,
+  },
+  {
+    id: 2,
+    name: "Mike Chen",
+    region: "West Coast",
+    sales: 98500,
+    commission: 4925,
+    orders: 35,
+  },
+  {
+    id: 3,
+    name: "Jessica Martinez",
+    region: "South",
+    sales: 102300,
+    commission: 5115,
+    orders: 38,
+  },
+  {
+    id: 4,
+    name: "James Wilson",
+    region: "Midwest",
+    sales: 87600,
+    commission: 4380,
+    orders: 29,
+  },
+];
+
+type SortField = "sales" | "commission" | "orders";
+
+export default function Dashboard() {
+  const [sortField, setSortField] = useState<SortField>("sales");
+
+  const totalSales = mockReps.reduce((sum, rep) => sum + rep.sales, 0);
+  const totalCommission = mockReps.reduce((sum, rep) => sum + rep.commission, 0);
+  const monthlyGoal = 600000;
+  const percentOfGoal = Math.round((totalSales / monthlyGoal) * 100);
+  const dailyPace = totalSales / 15; // 15 days elapsed in month (approx)
+  const projectedMonth = dailyPace * 30;
+
+  const sortedReps = [...mockReps].sort((a, b) => {
+    if (sortField === "sales") return b.sales - a.sales;
+    if (sortField === "commission") return b.commission - a.commission;
+    return b.orders - a.orders;
+  });
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="flex min-h-screen">
+        <Sidebar activePage="Dashboard" />
+        {/* Main Content */}
+        <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
+          <div className="mx-auto max-w-7xl px-8 py-10 space-y-8">
+            {/* Header */}
+            <header className="flex flex-col gap-3">
+              <p className="text-xs font-medium uppercase tracking-[0.2em] text-blue-700">Dashboard</p>
+              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-semibold text-slate-900">Company Performance</h1>
+                  <p className="max-w-2xl text-sm text-slate-600">
+                    Year-to-date sales, commission accrual, and sales rep leaderboard. Read-only overview; manage commissions and price list separately.
+                  </p>
+                </div>
+              </div>
+            </header>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">Monthly Goal</div>
+                <div className="mt-2 text-2xl font-bold text-slate-900">${money(monthlyGoal)}</div>
+                <div className="mt-1 text-xs text-slate-600">Target for month</div>
+              </div>
+
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">Sales to Date</div>
+                <div className="mt-2 text-2xl font-bold text-emerald-700">${money(totalSales)}</div>
+                <div className="mt-1 text-xs text-slate-600">YTD aggregate</div>
+              </div>
+
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">% of Goal</div>
+                <div className="mt-2 text-2xl font-bold text-blue-700">{percentOfGoal}%</div>
+                <div className="mt-1 text-xs text-slate-600">Pace check</div>
+              </div>
+
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">Commission Accrued</div>
+                <div className="mt-2 text-2xl font-bold text-indigo-700">${money(totalCommission)}</div>
+                <div className="mt-1 text-xs text-slate-600">Payroll liability</div>
+              </div>
+
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">Order Count</div>
+                <div className="mt-2 text-2xl font-bold text-slate-900">{mockReps.reduce((sum, r) => sum + r.orders, 0)}</div>
+                <div className="mt-1 text-xs text-slate-600">Total invoices</div>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs uppercase font-semibold text-slate-500">Monthly Progress</div>
+                  <div className="mt-1 text-sm text-slate-600">
+                    {money(totalSales)} of {money(monthlyGoal)} | Projected: {money(projectedMonth)}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-300"
+                  style={{ width: `${Math.min(percentOfGoal, 100)}%` }}
+                />
+              </div>
+              <div className="mt-2 flex justify-between text-xs text-slate-500">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
+            </div>
+
+            {/* Sales Rep Leaderboard */}
+            <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Sales Rep Leaderboard</h2>
+                    <p className="text-sm text-slate-600">Sorted by selected metric</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {(["sales", "commission", "orders"] as const).map((field) => (
+                      <button
+                        key={field}
+                        onClick={() => setSortField(field)}
+                        className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                          sortField === field
+                            ? "bg-blue-600 text-white shadow-md"
+                            : "border border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100"
+                        }`}
+                        type="button"
+                      >
+                        {field === "sales" ? "Sales" : field === "commission" ? "Commission" : "Orders"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="border-b border-slate-200 bg-slate-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                        Rep Name
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                        Sales
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                        Commission
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                        Orders
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {sortedReps.map((rep) => (
+                      <tr key={rep.id} className="hover:bg-slate-50 transition">
+                        <td className="px-6 py-3 font-medium text-slate-900">{rep.name}</td>
+                        <td className="px-6 py-3 text-right font-semibold text-emerald-700">
+                          ${money(rep.sales)}
+                        </td>
+                        <td className="px-6 py-3 text-right font-semibold text-indigo-700">
+                          ${money(rep.commission)}
+                        </td>
+                        <td className="px-6 py-3 text-right text-slate-600">{rep.orders}</td>
+                        <td className="px-6 py-3 text-right">
+                          <a
+                            href={`/commissions?rep=${rep.id}`}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-700 transition"
+                          >
+                            View
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">Top Performer</div>
+                <div className="mt-2">
+                  <div className="text-lg font-semibold text-slate-900">{sortedReps[0]?.name}</div>
+                  <div className="mt-1 text-sm text-slate-600">
+                    ${money(sortedReps[0]?.sales || 0)} | {sortedReps[0]?.orders || 0} orders
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">Avg Sale per Rep</div>
+                <div className="mt-2">
+                  <div className="text-lg font-semibold text-slate-900">
+                    ${money(totalSales / mockReps.length)}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-600">
+                    {mockReps.length} active reps
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,309 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { Sidebar } from "@/components/Sidebar";
+
+// Mock data for demo—replace with Prisma queries + auth session
+const mockReps = [
+  { id: "1", name: "John Smith", qboCode: "JS", commissionMTD: 3250.5, invoiceCount: 12, missingSKUCount: 2 },
+  { id: "2", name: "Sarah Johnson", qboCode: "SJ", commissionMTD: 4120.75, invoiceCount: 18, missingSKUCount: 0 },
+  { id: "3", name: "Mike Chen", qboCode: "MC", commissionMTD: 2890.0, invoiceCount: 9, missingSKUCount: 1 },
+];
+
+const mockInvoices = [
+  {
+    id: "inv1",
+    invoiceNumber: "2024-001",
+    txnDate: "2024-01-15",
+    commission: 450.25,
+    commissionable: 9005,
+    shippingDeducted: 125.5,
+    lines: [
+      { sku: "SKU-A", qty: 10, unitPrice: 100, commission: 250 },
+      { sku: "SKU-B", qty: 5, unitPrice: 50, commission: 200.25 },
+    ],
+  },
+  {
+    id: "inv2",
+    invoiceNumber: "2024-002",
+    txnDate: "2024-01-20",
+    commission: 320.0,
+    commissionable: 6400,
+    shippingDeducted: 80,
+    lines: [
+      { sku: "SKU-C", qty: 8, unitPrice: 80, commission: 320 },
+    ],
+  },
+];
+
+const money = (value: number) =>
+  value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export default function CommissionsPage() {
+  const [selectedRepId, setSelectedRepId] = useState(mockReps[0]?.id);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [connectError, setConnectError] = useState<string | null>(null);
+
+  const totalCommissionOwed = useMemo(
+    () => mockReps.reduce((sum, rep) => sum + rep.commissionMTD, 0),
+    [],
+  );
+
+
+  const filteredReps = useMemo(
+    () => mockReps.filter((r) => r.name.toLowerCase().includes(searchTerm.toLowerCase())),
+    [searchTerm],
+  );
+
+  const selectedRep = mockReps.find((r) => r.id === selectedRepId);
+
+  const startQboConnect = async () => {
+    setConnectError(null);
+    try {
+      const res = await fetch("/api/qbo/connect", { redirect: "manual" });
+
+      // Some browsers return opaqueredirect with status 0 when redirect is manual
+      if (res.type === "opaqueredirect" || res.status === 0) {
+        window.location.assign("/api/qbo/connect");
+        return;
+      }
+
+      // Follow 3xx via Location header if present
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get("Location");
+        if (loc) {
+          window.location.href = loc;
+          return;
+        }
+        setConnectError("QuickBooks connect did not return a redirect location.");
+        return;
+      }
+
+      if (res.redirected) {
+        window.location.href = res.url;
+        return;
+      }
+
+      const text = await res.text();
+      setConnectError(text || `Unexpected response (${res.status}) starting QuickBooks connect.`);
+    } catch (error) {
+      // As a fallback, try a full navigation
+      try {
+        window.location.assign("/api/qbo/connect");
+        return;
+      } catch (_) {
+        setConnectError(error instanceof Error ? error.message : "Failed to start QuickBooks connect.");
+      }
+    }
+  };
+
+  const toggleInvoiceExpand = (invId: string) => {
+    setExpandedInvoices((prev) => {
+      const next = new Set(prev);
+      if (next.has(invId)) next.delete(invId);
+      else next.add(invId);
+      return next;
+    });
+  };
+
+  const monthYearDisplay = new Date(selectedMonth + "-01").toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+  });
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="flex min-h-screen">
+        <Sidebar activePage="Commissions" />
+
+        {/* Main Content */}
+        <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
+          <div className="mx-auto max-w-7xl px-8 py-8 space-y-6">
+            {/* Top Bar */}
+            <header>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-blue-700">Commissions</p>
+                  <h1 className="mt-1 text-3xl font-semibold text-slate-900">Sales Rep Dashboard</h1>
+                  <p className="mt-1 text-sm text-slate-600">Track commissions and invoice details for {monthYearDisplay}.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <label className="block text-xs uppercase text-slate-600">Month</label>
+                    <input
+                      type="month"
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    />
+                  </div>
+                  <button
+                    onClick={startQboConnect}
+                    className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition hover:bg-blue-700"
+                    type="button"
+                  >
+                    Connect QuickBooks
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            {connectError && (
+              <div className="rounded-lg bg-red-50 text-red-900 ring-1 ring-red-200 px-4 py-3 text-sm">
+                {connectError}
+              </div>
+            )}
+
+            {/* Totals */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-2xl bg-white shadow-sm border border-slate-200 px-5 py-4">
+                <div className="text-xs font-semibold uppercase text-slate-500">All Sales Rep Commission Owed</div>
+                <div className="text-3xl font-bold text-slate-900 mt-1">${money(totalCommissionOwed)}</div>
+                <div className="text-xs text-slate-500 mt-1">Across all reps (current data source)</div>
+              </div>
+            </div>
+
+            {/* Master-Detail */}
+            <div className="grid grid-cols-3 gap-6">
+              {/* Left: Sales Rep List */}
+              <div className="col-span-1 rounded-2xl bg-white shadow-md ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-4 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Sales Reps</h2>
+                  <input
+                    type="text"
+                    placeholder="Search reps..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="mt-3 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none"
+                  />
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {filteredReps.map((rep) => (
+                    <button
+                      key={rep.id}
+                      onClick={() => setSelectedRepId(rep.id)}
+                      className={`w-full text-left px-4 py-4 transition ${
+                        selectedRepId === rep.id
+                          ? "bg-blue-50 border-l-4 border-blue-600"
+                          : "hover:bg-slate-50 border-l-4 border-transparent"
+                      }`}
+                      type="button"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-semibold text-slate-900">{rep.name}</p>
+                          <p className="text-xs text-slate-600">{rep.qboCode}</p>
+                        </div>
+                        {rep.missingSKUCount > 0 && (
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
+                            {rep.missingSKUCount} SKU
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex gap-4 text-xs">
+                        <div>
+                          <p className="text-slate-600">Commission</p>
+                          <p className="font-semibold text-slate-900">${money(rep.commissionMTD)}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-600">Invoices</p>
+                          <p className="font-semibold text-slate-900">{rep.invoiceCount}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right: Selected Rep Profile */}
+              {selectedRep && (
+                <div className="col-span-2 space-y-6">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                      <p className="text-xs uppercase text-slate-600">Commission MTD</p>
+                      <p className="mt-1 text-3xl font-semibold text-slate-900">${money(selectedRep.commissionMTD)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                      <p className="text-xs uppercase text-slate-600">Invoice Count</p>
+                      <p className="mt-1 text-3xl font-semibold text-slate-900">{selectedRep.invoiceCount}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                      <p className="text-xs uppercase text-slate-600">Commissionable Sales</p>
+                      <p className="mt-1 text-2xl font-semibold text-emerald-700">${money(selectedRep.commissionMTD * 20)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                      <p className="text-xs uppercase text-slate-600">Shipping Deducted</p>
+                      <p className="mt-1 text-2xl font-semibold text-blue-700">${money(selectedRep.commissionMTD * 0.15)}</p>
+                    </div>
+                  </div>
+
+                  {/* Invoices Table */}
+                  <div className="rounded-2xl bg-white shadow-md ring-1 ring-slate-200">
+                    <div className="border-b border-slate-200 px-6 py-4">
+                      <h3 className="text-lg font-semibold text-slate-900">Invoices</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full divide-y divide-slate-100 text-sm">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left font-semibold text-slate-600">Invoice #</th>
+                            <th className="px-6 py-3 text-left font-semibold text-slate-600">Date</th>
+                            <th className="px-6 py-3 text-right font-semibold text-slate-600">Commissionable</th>
+                            <th className="px-6 py-3 text-right font-semibold text-slate-600">Commission</th>
+                            <th className="px-6 py-3 text-center font-semibold text-slate-600">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mockInvoices.map((inv) => (
+                            <tr key={inv.id} className="hover:bg-slate-50">
+                              <td className="px-6 py-4 font-medium text-slate-900">{inv.invoiceNumber}</td>
+                              <td className="px-6 py-4 text-slate-600">{new Date(inv.txnDate).toLocaleDateString()}</td>
+                              <td className="px-6 py-4 text-right text-slate-900">${money(inv.commissionable)}</td>
+                              <td className="px-6 py-4 text-right font-semibold text-emerald-700">${money(inv.commission)}</td>
+                              <td className="px-6 py-4 text-center">
+                                <button
+                                  onClick={() => toggleInvoiceExpand(inv.id)}
+                                  className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                                  type="button"
+                                >
+                                  {expandedInvoices.has(inv.id) ? "Hide" : "Show"} lines
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {expandedInvoices.size > 0 &&
+                            mockInvoices
+                              .filter((inv) => expandedInvoices.has(inv.id))
+                              .map((inv) => (
+                                <tr key={`${inv.id}-detail`} className="bg-blue-50">
+                                  <td colSpan={5} className="px-6 py-4">
+                                    <p className="mb-3 text-xs font-semibold uppercase text-slate-700">Line Items</p>
+                                    <div className="space-y-2">
+                                      {inv.lines.map((line, idx) => (
+                                        <div key={idx} className="flex justify-between rounded-lg bg-white px-4 py-2 text-xs">
+                                          <span className="font-medium text-slate-900">{line.sku}</span>
+                                          <span className="text-slate-600">
+                                            {line.qty} × ${money(line.unitPrice)} = ${money(line.commission)} commission
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

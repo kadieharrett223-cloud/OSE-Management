@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  email         String   @unique
+  passwordHash  String
+  role          String   @default("REP")
+  rep           Rep?     @relation(fields: [repId], references: [id])
+  repId         String?  @unique
+
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Rep {
+  id                     String   @id @default(cuid())
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  name                   String
+  qboRepCode             String   @unique
+  defaultCommissionRate  Float    @default(0.05)
+  user                   User?
+  userId                 String?
+
+  invoices               Invoice[]
+  commissionSnapshots    CommissionSnapshot[]
+}
+
+model PriceListItem {
+  id                          String   @id @default(cuid())
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+  sku                         String   @unique
+  description                 String?
+  currentSalePricePerUnit     Float
+  shippingIncludedPerUnit     Float
+
+  invoiceLines                InvoiceLine[]
+}
+
+model Invoice {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  qboInvoiceId     String   @unique
+  invoiceNumber    String
+  txnDate          DateTime
+  salesRepCode     String
+  rep              Rep?     @relation(fields: [repId], references: [id])
+  repId            String?
+
+  totalCommissionable Float   @default(0)
+  totalCommission     Float   @default(0)
+  shippingDeducted    Float   @default(0)
+  invoiceCountWeight  Int     @default(1)
+
+  lines             InvoiceLine[]
+}
+
+model InvoiceLine {
+  id                     String   @id @default(cuid())
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  invoice                Invoice  @relation(fields: [invoiceId], references: [id])
+  invoiceId              String
+  sku                    String
+  description            String?
+  quantity               Float
+  unitPrice              Float
+  salePriceUsed          Float
+  shippingIncludedPerUnit Float   @default(0)
+  shippingDeductionLine  Float   @default(0)
+  commissionableLine     Float   @default(0)
+  commissionLine         Float   @default(0)
+  mappingStatus          String   @default("MATCHED")
+
+  priceListItem          PriceListItem? @relation(fields: [priceListItemId], references: [id])
+  priceListItemId        String?
+}
+
+model CommissionSnapshot {
+  id                   String   @id @default(cuid())
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  month                Int
+  year                 Int
+  rep                  Rep      @relation(fields: [repId], references: [id])
+  repId                String
+  totalCommission      Float   @default(0)
+  totalCommissionable  Float   @default(0)
+  shippingDeducted     Float   @default(0)
+  invoiceCount         Int     @default(0)
+  journalEntryId       String?
+  postedAt             DateTime?
+
+  @@unique([repId, year, month])
+}
+
+// NextAuth standard models
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  expires      DateTime
+}
+
+model Account {
+  id                       String  @id @default(cuid())
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String?
+  access_token             String?
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String?
+  session_state            String?
+  oauth_token_secret       String?
+  oauth_token              String?
+  refresh_token_expires_in Int?
+
+  @@unique([provider, providerAccountId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
