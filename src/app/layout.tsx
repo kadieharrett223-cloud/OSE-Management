@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { SessionProvider } from "next-auth/react";
 
 const geistSans = Inter({
   variable: "--font-geist-sans",
@@ -16,16 +17,8 @@ const geistMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OSE | Management",
+  title: "OSE Management | Pricing",
   description: "Tariff, landed cost, and pricing calculator for OSE Management.",
-  icons: {
-    icon: [
-      {
-        url: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%231e293b' rx='6' width='32' height='32'/><text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' fill='%23ffffff' font-size='18' font-weight='900' font-family='system-ui,Arial,sans-serif' letter-spacing='-0.5'>OSE</text></svg>",
-        type: "image/svg+xml",
-      },
-    ],
-  },
 };
 
 export default function RootLayout({
@@ -38,7 +31,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <SessionProvider>
+          {children}
+        </SessionProvider>
         <SpeedInsights />
       </body>
     </html>
