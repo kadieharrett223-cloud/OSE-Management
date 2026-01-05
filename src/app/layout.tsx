@@ -16,8 +16,16 @@ const geistMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OSE Management | Pricing",
+  title: "OSE | Management",
   description: "Tariff, landed cost, and pricing calculator for OSE Management.",
+  icons: {
+    icon: [
+      {
+        url: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%233b82f6' rx='8' width='32' height='32'/><text x='50%' y='50%' dominant-baseline='central' text-anchor='middle' fill='white' font-size='16' font-weight='bold' font-family='system-ui'>OSE</text></svg>",
+        type: "image/svg+xml",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
