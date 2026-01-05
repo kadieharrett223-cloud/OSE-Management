@@ -7,7 +7,6 @@ const navItems = [
   { label: "Commissions", hint: "QBO sync & payouts", href: "/commissions" },
   { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
   { label: "Wholesalers", hint: "Manage clients", href: "/admin/wholesalers" },
-  { label: "Settings", hint: "Account & integrations", href: "/settings" },
 ];
 
 export function Sidebar({ activePage }: { activePage: string }) {
