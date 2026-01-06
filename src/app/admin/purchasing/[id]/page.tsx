@@ -384,6 +384,7 @@ export default function ViewPO() {
           </div>
         </div>
       </div>
+    </div>
 
       <style jsx global>{`
         @media print {
