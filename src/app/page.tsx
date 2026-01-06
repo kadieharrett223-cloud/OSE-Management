@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { Sidebar } from "@/components/Sidebar";
 
 const money = (value: number) =>
@@ -44,12 +45,65 @@ const mockReps = [
 type SortField = "sales" | "commission" | "orders";
 
 export default function Dashboard() {
+  const { data: session } = useSession();
   const [sortField, setSortField] = useState<SortField>("sales");
+  const [monthlyGoal, setMonthlyGoal] = useState<number>(600000);
+  const [goalInput, setGoalInput] = useState<string>("600000");
+  const [goalStatus, setGoalStatus] = useState<string | null>(null);
+  const [updatingGoal, setUpdatingGoal] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch(`/api/goals/monthly`)
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const payload = await res.json().catch(() => null);
+        return payload?.goal ?? null;
+      })
+      .then((goal) => {
+        if (!isMounted || !goal?.goal_amount) return;
+        const value = Number(goal.goal_amount);
+        setMonthlyGoal(value);
+        setGoalInput(String(value));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function handleGoalSave(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setGoalStatus(null);
+    setUpdatingGoal(true);
+    try {
+      const numericGoal = Number(goalInput);
+      const res = await fetch(`/api/goals/monthly`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goalAmount: numericGoal }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.error || "Failed to save goal");
+      }
+      const saved = payload?.goal;
+      if (saved?.goal_amount) {
+        setMonthlyGoal(Number(saved.goal_amount));
+        setGoalInput(String(saved.goal_amount));
+      }
+      setGoalStatus("Saved");
+    } catch (err: any) {
+      setGoalStatus(err?.message || "Save failed");
+    } finally {
+      setUpdatingGoal(false);
+    }
+  }
 
   const totalSales = mockReps.reduce((sum, rep) => sum + rep.sales, 0);
   const totalCommission = mockReps.reduce((sum, rep) => sum + rep.commission, 0);
-  const monthlyGoal = 600000;
-  const percentOfGoal = Math.round((totalSales / monthlyGoal) * 100);
+  const percentOfGoal = monthlyGoal > 0 ? Math.round((totalSales / monthlyGoal) * 100) : 0;
   const dailyPace = totalSales / 15; // 15 days elapsed in month (approx)
   const projectedMonth = dailyPace * 30;
 
@@ -85,6 +139,29 @@ export default function Dashboard() {
                 <div className="text-xs uppercase font-semibold text-slate-500">Monthly Goal</div>
                 <div className="mt-2 text-2xl font-bold text-slate-900">${money(monthlyGoal)}</div>
                 <div className="mt-1 text-xs text-slate-600">Target for month</div>
+                {session && (
+                  <form className="mt-3 flex gap-2" onSubmit={handleGoalSave}>
+                    <input
+                      type="number"
+                      step="1000"
+                      min="0"
+                      value={goalInput}
+                      onChange={(e) => setGoalInput(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      aria-label="Monthly goal"
+                    />
+                    <button
+                      type="submit"
+                      disabled={updatingGoal}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {updatingGoal ? "Saving" : "Save"}
+                    </button>
+                  </form>
+                )}
+                {goalStatus && (
+                  <div className="mt-1 text-xs text-slate-500">{goalStatus}</div>
+                )}
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">

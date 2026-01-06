@@ -1,12 +1,9 @@
 import type { NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { compare } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
   providers: [
     Credentials({
       name: "Credentials",
@@ -24,6 +21,8 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
+  session: { strategy: "jwt" },
+  secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
     async signIn({ user }) {
       const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS ?? process.env.ALLOWED_EMAIL_DOMAIN ?? "")
@@ -41,14 +40,18 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user }) {
       if (user) {
+        token.id = user.id;
         token.role = (user as any).role;
         token.repId = (user as any).repId;
       }
       return token;
     },
     async session({ session, token }) {
-      session.user.role = token.role as any;
-      session.user.repId = token.repId as string | null | undefined;
+      if (session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as any;
+        session.user.repId = token.repId as string | null | undefined;
+      }
       return session;
     },
   },

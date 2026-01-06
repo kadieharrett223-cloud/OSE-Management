@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { signOut } from "next-auth/react";
 
 const navItems = [
-  { label: "Dashboard", hint: "Company overview", href: "/" },
-  { label: "Commissions", hint: "QBO sync & payouts", href: "/commissions" },
-  { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
-  { label: "Wholesalers", hint: "Manage clients", href: "/admin/wholesalers" },
+   { label: "Dashboard", hint: "Company overview", href: "/" },
+   { label: "Commissions", hint: "QBO sync & payouts", href: "/commissions" },
+   { label: "Suppliers", hint: "Manage suppliers", href: "/admin/suppliers" },
+   { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
+   { label: "Wholesalers", hint: "Manage clients", href: "/admin/wholesalers" },
+   { label: "Purchasing", hint: "POs and payments", href: "/admin/purchasing" },
 ];
 
 export function Sidebar({ activePage }: { activePage: string }) {
@@ -61,24 +64,33 @@ export function Sidebar({ activePage }: { activePage: string }) {
       </nav>
 
       {sidebarOpen && (
-        <div className="mt-6 rounded-2xl border border-blue-400/20 bg-blue-900/40 px-4 py-4 text-sm text-blue-50 shadow-inner">
-          <p className="text-xs uppercase tracking-[0.22em] text-blue-200">Sync status</p>
-          <p className="mt-1 text-lg font-semibold text-white">Last synced — pending</p>
-          <p className="text-xs text-blue-100/80">Connect QBO to enable live commission pulls.</p>
-          <div className="mt-3 flex gap-2">
-            <button
-              className="flex-1 rounded-lg bg-blue-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-400"
-              type="button"
-            >
-              Connect QBO
-            </button>
-            <button
-              className="rounded-lg border border-blue-300/40 px-3 py-2 text-sm text-blue-100 transition hover:border-blue-200/60"
-              type="button"
-            >
-              Refresh
-            </button>
+        <div className="mt-6 space-y-3">
+          <div className="rounded-2xl border border-blue-400/20 bg-blue-900/40 px-4 py-4 text-sm text-blue-50 shadow-inner">
+            <p className="text-xs uppercase tracking-[0.22em] text-blue-200">Sync status</p>
+            <p className="mt-1 text-lg font-semibold text-white">Last synced — pending</p>
+            <p className="text-xs text-blue-100/80">Connect QBO to enable live commission pulls.</p>
+            <div className="mt-3 flex gap-2">
+              <button
+                className="flex-1 rounded-lg bg-blue-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-400"
+                type="button"
+              >
+                Connect QBO
+              </button>
+              <button
+                className="rounded-lg border border-blue-300/40 px-3 py-2 text-sm text-blue-100 transition hover:border-blue-200/60"
+                type="button"
+              >
+                Refresh
+              </button>
+            </div>
           </div>
+          <button
+            onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+            className="w-full rounded-lg border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-300 transition hover:border-red-400/60 hover:text-red-400"
+            type="button"
+          >
+            Sign Out
+          </button>
         </div>
       )}
 
