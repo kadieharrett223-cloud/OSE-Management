@@ -1,3 +1,3 @@
-git add -A
-git commit -m "Add month filter to wholesalers, support wholesaler reps in invoice matching"
-git push
+-- 023_test_wholesaler_invoices.sql
+-- Placeholder migration for test wholesaler invoices.
+-- Intentionally left blank; test data is synced from QBO during runtime.
