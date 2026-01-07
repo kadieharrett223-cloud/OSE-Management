@@ -10,10 +10,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface PriceListItem {
+  id?: string;
   sku: string;
   description: string;
   current_sale_price_per_unit: number;
   shipping_included_per_unit: number;
+  qbo_item_id?: string;
+  qbo_item_name?: string;
 }
 
 export interface QboItem {
@@ -26,13 +29,13 @@ export interface QboItem {
 
 /**
  * Fetch all price list items from Supabase
- * Maps by SKU (uppercase) for fast lookup
+ * Maps by SKU, QBO item ID, and item name for flexible lookup
  */
 export async function getPriceList(): Promise<Map<string, PriceListItem>> {
   try {
     const { data, error } = await supabase
       .from("price_list_items")
-      .select("sku, description, current_sale_price_per_unit, shipping_included_per_unit");
+      .select("id, sku, description, current_sale_price_per_unit, shipping_included_per_unit, qbo_item_id, qbo_item_name");
 
     if (error) {
       console.error("Error fetching price list:", error);
@@ -41,7 +44,18 @@ export async function getPriceList(): Promise<Map<string, PriceListItem>> {
 
     const priceMap = new Map<string, PriceListItem>();
     for (const item of data || []) {
+      // Map by SKU (primary key)
       priceMap.set(item.sku.toUpperCase(), item);
+      
+      // Map by QBO item ID if available (for direct matching)
+      if (item.qbo_item_id) {
+        priceMap.set(`QBO:${item.qbo_item_id}`, item);
+      }
+      
+      // Map by QBO item name if available (for fuzzy matching)
+      if (item.qbo_item_name) {
+        priceMap.set(item.qbo_item_name.toUpperCase(), item);
+      }
     }
     return priceMap;
   } catch (err) {
@@ -96,7 +110,26 @@ export function matchItemAndCalculateShipping(
 } {
   const lineTotal = quantity * unitPrice;
 
-  // Try to match by SKU (item name from QBO)
+  // Priority 1: Try to match by QBO item ID (most reliable - direct reference)
+  if (qboItemRefValue) {
+    const qboIdKey = `QBO:${qboItemRefValue}`;
+    const priceListItem = priceListMap.get(qboIdKey);
+    
+    if (priceListItem) {
+      const shippingDeducted = quantity * priceListItem.shipping_included_per_unit;
+      const commissionable = lineTotal - shippingDeducted;
+
+      return {
+        matched: true,
+        matchedSku: priceListItem.sku,
+        shippingPerUnit: priceListItem.shipping_included_per_unit,
+        shippingDeducted,
+        commissionable: Math.max(0, commissionable),
+      };
+    }
+  }
+
+  // Priority 2: Try to match by SKU (item name from QBO)
   const searchKey = qboItemName?.toUpperCase() || qboItemRefValue?.toUpperCase();
   const priceListItem = priceListMap.get(searchKey);
 
@@ -109,7 +142,7 @@ export function matchItemAndCalculateShipping(
       matchedSku: priceListItem.sku,
       shippingPerUnit: priceListItem.shipping_included_per_unit,
       shippingDeducted,
-      commissionable: Math.max(0, commissionable), // Never negative
+      commissionable: Math.max(0, commissionable),
     };
   }
 
