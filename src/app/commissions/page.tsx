@@ -63,8 +63,10 @@ const mockInvoices = [
   },
 ];
 
-const money = (value: number) =>
-  value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (value: number | undefined) => {
+  if (value === undefined || value === null) return "0.00";
+  return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
 export default function CommissionsPage() {
   const [selectedRepId, setSelectedRepId] = useState(mockReps[0]?.id);
@@ -133,7 +135,14 @@ export default function CommissionsPage() {
       .then((data) => {
         if (!isMounted) return;
         if (data.ok && data.invoices) {
-          setRepInvoices(data.invoices);
+          // Ensure all invoices have shippingDeducted field
+          const invoicesWithDefaults = data.invoices.map((inv: any) => ({
+            ...inv,
+            shippingDeducted: inv.shippingDeducted ?? 0,
+            commissionable: inv.commissionable ?? 0,
+            commission: inv.commission ?? 0,
+          }));
+          setRepInvoices(invoicesWithDefaults);
         }
       })
       .catch((err) => {
