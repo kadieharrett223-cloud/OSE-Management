@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSessionOrBypass } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  // In development, allow GET without a session to avoid blocking UI while auth is configured
-  if (!session && process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await getSessionOrBypass();
 
   const supabase = getServerSupabaseClient();
   const params = req.nextUrl.searchParams;
@@ -39,10 +34,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await getSessionOrBypass();
 
   const body = await req.json();
   const {

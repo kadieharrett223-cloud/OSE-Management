@@ -4,13 +4,12 @@ export const fetchCache = "force-no-store";
 
 import { NextRequest, NextResponse } from "next/server";
 import { buildAuthorizeUrl } from "@/lib/qbo";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSessionOrBypass } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
     // Require authenticated admin to start QBO connect
-    const session: any = await getServerSession(authOptions as any);
+    const session: any = await getSessionOrBypass();
     const role = (session?.user?.role ?? "").toString().toLowerCase();
     if (!session) {
       return NextResponse.json({ error: "Login required" }, { status: 401 });

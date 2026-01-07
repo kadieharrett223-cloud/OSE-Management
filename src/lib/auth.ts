@@ -1,4 +1,5 @@
 import type { NextAuthOptions } from "next-auth";
+import { getServerSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
@@ -77,3 +78,18 @@ export const authOptions: NextAuthOptions = {
     signIn: "/auth/signin",
   },
 };
+
+// Helper to bypass auth entirely when AUTH_DISABLED=true (treat as admin)
+export async function getSessionOrBypass() {
+  if (process.env.AUTH_DISABLED === "true") {
+    return {
+      user: {
+        id: "admin",
+        email: process.env.ADMIN_EMAIL || "admin@local",
+        role: "admin",
+        repId: null,
+      },
+    } as any;
+  }
+  return getServerSession(authOptions as any);
+}
