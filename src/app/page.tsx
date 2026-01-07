@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Sidebar } from "@/components/Sidebar";
 
-const money = (value: number) =>
-  value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (value: number | undefined) => {
+  if (value === undefined || value === null || isNaN(value)) return "0.00";
+  return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
 interface RepData {
   repName: string;

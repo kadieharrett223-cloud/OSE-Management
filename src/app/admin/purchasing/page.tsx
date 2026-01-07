@@ -42,8 +42,10 @@ type Supplier = {
 
 const WEIGHT_LIMIT_LBS = 44000;
 
-const money = (value: number) =>
-  value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (value: number | undefined) => {
+  if (value === undefined || value === null || isNaN(value)) return "0.00";
+  return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
 function titleCase(value: string) {
   return (value || "")
@@ -580,7 +582,7 @@ export default function PurchasingPage() {
                           weightPercentage > 90 ? 'text-yellow-600 font-semibold' : 
                           'text-slate-700'
                         }`}>
-                          {totalWeight.toLocaleString()} / 44,000 lbs
+                          {(totalWeight || 0).toLocaleString()} / 44,000 lbs
                         </span>
                         {totalWeight > WEIGHT_LIMIT_LBS && (
                           <span className="ml-2 text-red-600 font-bold">⚠ OVER</span>
@@ -683,7 +685,7 @@ export default function PurchasingPage() {
                       <div className="col-span-3 px-3 py-3 text-right text-sm font-bold ${
                         totalWeight > WEIGHT_LIMIT_LBS ? 'text-red-600' : 'text-slate-900'
                       }">
-                        {totalWeight.toLocaleString()} lbs
+                        {(totalWeight || 0).toLocaleString()} lbs
                       </div>
                       <div className="col-span-2"></div>
                     </div>
