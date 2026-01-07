@@ -184,6 +184,15 @@ export async function POST(request: Request) {
       affectedSnapshots: affectedRepMonths.size,
     });
 
+  } catch (error) {
+    console.error('QBO sync error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Sync failed' },
+      { status: 500 }
+    );
+  }
+}
+
 async function recomputeCommissionSnapshot(
   supabase: any,
   repId: string,
