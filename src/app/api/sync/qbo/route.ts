@@ -21,14 +21,6 @@ import { authorizedQboFetch } from '@/lib/qbo';
  */
 export async function POST(request: Request) {
   try {
-    // Verify cron secret or admin auth
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
-    
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const supabase = getServerSupabaseClient();
 
     // Fetch real invoices from QBO
