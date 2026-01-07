@@ -60,7 +60,25 @@ export async function POST(request: Request) {
     const affectedRepMonths = new Set<string>();
 
     for (const qboInv of qboInvoices) {
-      const salesRepName = qboInv.CustomField?.find((f: any) => f.DefinitionId === 'SalesRep')?.StringValue;
+      let salesRepName = "";
+      
+      if (qboInv.CustomField && Array.isArray(qboInv.CustomField)) {
+        const repField = qboInv.CustomField.find((f: any) => 
+          f.Name === "Sales Rep" || f.Name === "SalesRep" || f.Name === "Rep"
+        );
+        if (repField && repField.StringValue) {
+          salesRepName = repField.StringValue.trim();
+        }
+      }
+      
+      if (!salesRepName && qboInv.CustomerMemo?.value) {
+        const memo = qboInv.CustomerMemo.value;
+        const repMatch = memo.match(/Rep:\s*([A-Za-z\s/]+)/i);
+        if (repMatch) {
+          salesRepName = repMatch[1].trim();
+        }
+      }
+      
       const rep = repByName.get(salesRepName || '');
 
       if (!rep) {
