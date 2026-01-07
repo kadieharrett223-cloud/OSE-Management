@@ -9,10 +9,17 @@ const money = (value: number) =>
 
 interface RepData {
   repName: string;
+  isPrimary: boolean;
   totalSales: number;
   commission: number;
   invoiceCount: number;
   commissionRate: number;
+  bonusProgress?: {
+    salesAmount: number;
+    bonusThreshold: number;
+    percentToThreshold: number;
+    hasEarnedBonus: boolean;
+  };
 }
 
 const mockReps = [
@@ -171,8 +178,12 @@ export default function Dashboard() {
   const totalSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
   
   // Use real rep data if available, otherwise fall back to mock
+  const commissionReps = repSalesData.filter(r => r.isPrimary);
+  const bonusReps = repSalesData.filter(r => !r.isPrimary);
+  
   const displayReps = repSalesData.length > 0 ? repSalesData : mockReps.map(r => ({
     repName: r.name,
+    isPrimary: true,
     totalSales: r.sales,
     commission: r.commission,
     invoiceCount: r.orders,
@@ -184,7 +195,7 @@ export default function Dashboard() {
   const dailyPace = totalSales / 15; // 15 days elapsed in month (approx)
   const projectedMonth = dailyPace * 30;
 
-  const sortedReps = [...displayReps].sort((a, b) => {
+  const sortedReps = [...commissionReps].sort((a, b) => {
     if (sortField === "sales") return b.totalSales - a.totalSales;
     if (sortField === "commission") return b.commission - a.commission;
     return b.invoiceCount - a.invoiceCount;
@@ -313,7 +324,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900">Sales Rep Leaderboard</h2>
-                    <p className="text-sm text-slate-600">Sorted by selected metric</p>
+                    <p className="text-sm text-slate-600">Sorted by sales (commission-eligible reps)</p>
                   </div>
                   <div className="flex gap-2">
                     {(["sales", "commission", "orders"] as const).map((field) => (
@@ -351,7 +362,7 @@ export default function Dashboard() {
                         Orders
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Action
+                        Rate
                       </th>
                     </tr>
                   </thead>
@@ -362,14 +373,18 @@ export default function Dashboard() {
                           Loading sales rep data...
                         </td>
                       </tr>
-                    ) : sortedReps.length === 0 ? (
+                    ) : commissionReps.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                          No sales data available for this month
+                          No commission rep data available
                         </td>
                       </tr>
                     ) : (
-                      sortedReps.map((rep, idx) => (
+                      [...commissionReps].sort((a, b) => {
+                        if (sortField === "sales") return b.totalSales - a.totalSales;
+                        if (sortField === "commission") return b.commission - a.commission;
+                        return b.invoiceCount - a.invoiceCount;
+                      }).map((rep, idx) => (
                         <tr key={rep.repName + idx} className="hover:bg-slate-50 transition">
                           <td className="px-6 py-3 font-medium text-slate-900">{rep.repName}</td>
                           <td className="px-6 py-3 text-right font-semibold text-emerald-700">
@@ -379,10 +394,8 @@ export default function Dashboard() {
                             ${money(rep.commission)}
                           </td>
                           <td className="px-6 py-3 text-right text-slate-600">{rep.invoiceCount}</td>
-                          <td className="px-6 py-3 text-right">
-                            <span className="text-sm text-slate-500">
-                              {(rep.commissionRate * 100).toFixed(1)}%
-                            </span>
+                          <td className="px-6 py-3 text-right text-slate-600">
+                            {(rep.commissionRate * 100).toFixed(1)}%
                           </td>
                         </tr>
                       ))
@@ -392,6 +405,65 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Bonus Reps Section (SC/CR) */}
+            {bonusReps.length > 0 && (
+              <div className="rounded-xl bg-blue-50 shadow-md ring-1 ring-blue-200">
+                <div className="border-b border-blue-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Bonus Tracking (Support/Admin)</h2>
+                  <p className="text-sm text-slate-600">Salary employees tracking toward $150k bonus threshold</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
+                  {bonusReps.map((rep) => (
+                    <div key={rep.repName} className="rounded-lg bg-white p-4 border border-blue-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{rep.repName}</p>
+                          <p className="text-xs text-slate-600">{rep.invoiceCount} invoices processed</p>
+                        </div>
+                        {rep.bonusProgress?.hasEarnedBonus && (
+                          <span className="inline-block rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
+                            Bonus Earned!
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="mb-2">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-slate-600">Bonus Progress</span>
+                          <span className="font-semibold text-slate-900">
+                            ${money(rep.bonusProgress?.salesAmount || 0)} / $150,000
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all ${
+                              rep.bonusProgress?.hasEarnedBonus ? "bg-green-500" : "bg-blue-500"
+                            }`}
+                            style={{
+                              width: `${Math.min(rep.bonusProgress?.percentToThreshold || 0, 100)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-slate-600">
+                        {rep.bonusProgress?.hasEarnedBonus ? (
+                          <span className="text-green-700 font-semibold">
+                            Earning commission on sales above $150k
+                          </span>
+                        ) : (
+                          <span>
+                            ${money(150000 - (rep.bonusProgress?.salesAmount || 0))} more to earn bonus
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Quick Stats */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
@@ -399,11 +471,13 @@ export default function Dashboard() {
                 <div className="mt-2">
                   {loadingReps ? (
                     <div className="text-sm text-slate-400">Loading...</div>
-                  ) : sortedReps.length > 0 ? (
+                  ) : commissionReps.length > 0 ? (
                     <>
-                      <div className="text-lg font-semibold text-slate-900">{sortedReps[0].repName}</div>
+                      <div className="text-lg font-semibold text-slate-900">
+                        {[...commissionReps].sort((a, b) => b.totalSales - a.totalSales)[0]?.repName}
+                      </div>
                       <div className="mt-1 text-sm text-slate-600">
-                        ${money(sortedReps[0].totalSales)} | {sortedReps[0].invoiceCount} orders
+                        ${money([...commissionReps].sort((a, b) => b.totalSales - a.totalSales)[0]?.totalSales || 0)} | {[...commissionReps].sort((a, b) => b.totalSales - a.totalSales)[0]?.invoiceCount} orders
                       </div>
                     </>
                   ) : (
@@ -417,13 +491,13 @@ export default function Dashboard() {
                 <div className="mt-2">
                   {loadingReps ? (
                     <div className="text-sm text-slate-400">Loading...</div>
-                  ) : sortedReps.length > 0 ? (
+                  ) : commissionReps.length > 0 ? (
                     <>
                       <div className="text-lg font-semibold text-slate-900">
-                        ${money(totalSales / sortedReps.length)}
+                        ${money(commissionReps.reduce((s, r) => s + r.totalSales, 0) / commissionReps.length)}
                       </div>
                       <div className="mt-1 text-sm text-slate-600">
-                        {sortedReps.length} active reps
+                        {commissionReps.length} active reps
                       </div>
                     </>
                   ) : (
