@@ -510,7 +510,7 @@ export default function CommissionsPage() {
                                   <tr key={inv.id} className={"hover:bg-slate-50 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white") }>
                                     <td className="px-6 py-4 font-medium text-slate-900">{inv.invoiceNumber}</td>
                                     <td className="px-6 py-4 text-slate-600">{new Date(inv.txnDate).toLocaleDateString()}</td>
-                                    <td className="px-6 py-4 text-right text-slate-600">${money(inv.totalShippingDeducted)}</td>
+                                    <td className="px-6 py-4 text-right text-slate-600">${money(inv.shippingDeducted)}</td>
                                     <td className="px-6 py-4 text-right font-semibold text-emerald-700 text-base">${money(inv.commission)}</td>
                                     <td className="px-6 py-4 text-center">
                                       <button
