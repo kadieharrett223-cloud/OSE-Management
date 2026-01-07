@@ -13,11 +13,29 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials.password) return null;
-        const user = await prisma.user.findUnique({ where: { email: credentials.email } });
-        if (!user) return null;
-        const valid = await compare(credentials.password, user.passwordHash);
-        if (!valid) return null;
-        return { id: user.id, email: user.email, role: user.role, repId: user.repId } as any;
+
+        // 1) Env-based admin login for production (avoids DB in serverless)
+        const adminEmail = process.env.ADMIN_EMAIL;
+        const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH; // bcrypt hash
+        if (adminEmail && adminPasswordHash) {
+          const emailOk = credentials.email.toLowerCase() === adminEmail.toLowerCase();
+          const passOk = await compare(credentials.password, adminPasswordHash);
+          if (emailOk && passOk) {
+            return { id: "admin", email: adminEmail, role: "admin", repId: null } as any;
+          }
+        }
+
+        // 2) Fallback to Prisma-backed users (development/local or when DB configured)
+        try {
+          const user = await prisma.user.findUnique({ where: { email: credentials.email } });
+          if (!user) return null;
+          const valid = await compare(credentials.password, user.passwordHash);
+          if (!valid) return null;
+          return { id: user.id, email: user.email, role: user.role, repId: user.repId } as any;
+        } catch {
+          // If DB is not configured in this environment, treat as invalid credentials
+          return null;
+        }
       },
     }),
   ],
