@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch } from "@/lib/qbo";
 import { parseRepCode, calculateCommission, getBonusProgress } from "@/lib/repCommissionLogic";
-import { canonicalizeRep, aliasesForCanonical } from "@/lib/repAliases";
+import { canonicalizeRep, aliasesForCanonical, isWholesalerName } from "@/lib/repAliases";
 import { getPriceList, matchItemAndCalculateShipping } from "@/lib/shippingDeduction";
 import { getServerSupabaseClient } from "@/lib/supabase";
+import { isSalaryRep, SALARY_BONUS_THRESHOLD } from "@/lib/repTypes";
 
 interface RepSales {
   repName: string;
   isPrimary: boolean;      // true if KLH, false if SC/CR
+  isSalary: boolean;       // true if salary worker (SC/CR)
   totalSales: number;
   totalCommissionable: number;
   totalShippingDeducted: number;
   commission: number;
   invoiceCount: number;
   commissionRate: number;
-  bonusProgress?: {        // Only for SC/CR
+  bonusProgress?: {        // For both salary workers and commissioned assistants
     salesAmount: number;
     bonusThreshold: number;
     percentToThreshold: number;
@@ -130,6 +132,8 @@ export async function GET(req: NextRequest) {
       entry.commissionable += totalCommissionable;
       entry.shipping += totalShippingDeducted;
       entry.count += 1;
+      
+      console.log(`[sales-by-rep] Invoice ${invoice.DocNumber}: rep=${repCode}, paid=$${paidAmount}, commissionable=$${totalCommissionable}, shipping=$${totalShippingDeducted}`);
     }
 
     // Load custom commission rates, defaulting to 5%
@@ -168,13 +172,32 @@ export async function GET(req: NextRequest) {
     for (const [repCode, { total, commissionable, shipping, count }] of repMapFull.entries()) {
       const parsed = parseRepCode(repCode);
       
-      // Add primary rep entry
       const primaryKey = canonicalizeRep(parsed.primaryRep);
+      const assistantKey = parsed.assistantRep ? canonicalizeRep(parsed.assistantRep) : null;
+
+      // Skip wholesalers from commissioned rep aggregation; they belong on the wholesalers tab
+      if (isWholesalerName(primaryKey)) {
+        continue;
+      }
+      if (assistantKey && isWholesalerName(assistantKey)) {
+        // Assistants that are wholesalers should not be treated as reps either
+        continue;
+      }
+      
+      // Determine if assistant is salary worker
+      const assistantIsSalary = assistantKey ? isSalaryRep(assistantKey) : false;
+      const primaryIsSalary = isSalaryRep(primaryKey);
+      
+      // If assistant is salary, commission goes 100% to primary (commissioned rep)
+      // If primary is salary and no assistant, primary gets 0 commission but tracks sales for bonus
+      
+      // Add primary rep entry
       const primaryRate = rateMap.get(primaryKey) ?? 0.05;
       if (!repMapSplit.has(primaryKey)) {
         repMapSplit.set(primaryKey, {
           repName: primaryKey,
           isPrimary: true,
+          isSalary: primaryIsSalary,
           totalSales: 0,
           totalCommissionable: 0,
           totalShippingDeducted: 0,
@@ -189,17 +212,30 @@ export async function GET(req: NextRequest) {
       primaryEntry.totalCommissionable += commissionable;
       primaryEntry.totalShippingDeducted += shipping;
       primaryEntry.invoiceCount += count;
-      // Primary rep gets commission on commissionable amount
-      primaryEntry.commission = primaryEntry.totalCommissionable * primaryEntry.commissionRate;
+      
+      // Commission calculation for primary
+      if (assistantIsSalary) {
+        // Assistant is salary worker helping commissioned primary → 100% commission to primary
+        primaryEntry.commission += commissionable * primaryEntry.commissionRate;
+      } else if (!primaryIsSalary && !assistantKey) {
+        // Solo commissioned rep → gets commission
+        primaryEntry.commission = primaryEntry.totalCommissionable * primaryEntry.commissionRate;
+      } else if (primaryIsSalary) {
+        // Primary is salary → no commission, only bonus tracking
+        primaryEntry.commission = 0;
+      } else {
+        // Standard commission calculation (both commissioned, or no assistant)
+        primaryEntry.commission = primaryEntry.totalCommissionable * primaryEntry.commissionRate;
+      }
 
-      // Add assistant rep entry (if exists)
-      if (parsed.assistantRep) {
-        const assistantKey = canonicalizeRep(parsed.assistantRep);
+      // Add assistant rep entry (if exists and not salary)
+      if (assistantKey && !assistantIsSalary) {
         const assistantRate = rateMap.get(assistantKey) ?? 0.05;
         if (!repMapSplit.has(assistantKey)) {
           repMapSplit.set(assistantKey, {
             repName: assistantKey,
             isPrimary: false,
+            isSalary: false,
             totalSales: 0,
             totalCommissionable: 0,
             totalShippingDeducted: 0,
@@ -233,6 +269,37 @@ export async function GET(req: NextRequest) {
             hasEarnedBonus: bonusProgress.hasEarnedBonus,
           };
         }
+      } else if (assistantKey && assistantIsSalary) {
+        // Track salary worker's contribution for bonus (but no commission)
+        const assistantRate = 0; // No commission rate for salary workers
+        if (!repMapSplit.has(assistantKey)) {
+          repMapSplit.set(assistantKey, {
+            repName: assistantKey,
+            isPrimary: false,
+            isSalary: true,
+            totalSales: 0,
+            totalCommissionable: 0,
+            totalShippingDeducted: 0,
+            commission: 0,
+            invoiceCount: 0,
+            commissionRate: assistantRate,
+          });
+        }
+
+        const assistantEntry = repMapSplit.get(assistantKey)!;
+        assistantEntry.totalSales += total;
+        assistantEntry.totalCommissionable += commissionable;
+        assistantEntry.totalShippingDeducted += shipping;
+        assistantEntry.invoiceCount += count;
+        assistantEntry.commission = 0; // Salary workers don't get commission
+        
+        // Add bonus progress for salary worker
+        assistantEntry.bonusProgress = {
+          salesAmount: assistantEntry.totalCommissionable,
+          bonusThreshold: SALARY_BONUS_THRESHOLD,
+          percentToThreshold: (assistantEntry.totalCommissionable / SALARY_BONUS_THRESHOLD) * 100,
+          hasEarnedBonus: assistantEntry.totalCommissionable >= SALARY_BONUS_THRESHOLD,
+        };
       }
     }
 

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import { authorizedQboFetch } from "@/lib/qbo";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const params = req.nextUrl.searchParams;
   const sql = params.get("q");
   const resource = params.get("resource");

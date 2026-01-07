@@ -19,7 +19,7 @@ const supabase = createClient(
 
 export interface PriceListItem {
   id?: string;
-  sku: string;
+  item_no: string; // Changed from sku to item_no
   description: string;
   current_sale_price_per_unit: number;
   shipping_included_per_unit: number;
@@ -43,27 +43,18 @@ export async function getPriceList(): Promise<Map<string, PriceListItem>> {
   try {
     const { data, error } = await supabase
       .from("price_list_items")
-      .select("id, sku, description, current_sale_price_per_unit, shipping_included_per_unit, qbo_item_id, qbo_item_name");
+      .select("id, item_no, description, current_sale_price_per_unit, shipping_included_per_unit");
 
     if (error) {
       console.error("Error fetching price list:", error);
       return new Map();
     }
 
+    console.log(`[shippingDeduction] Loaded ${data?.length || 0} price list items`);
     const priceMap = new Map<string, PriceListItem>();
     for (const item of data || []) {
-      // Map by SKU (primary key)
-      priceMap.set(item.sku.toUpperCase(), item);
-      
-      // Map by QBO item ID if available (for direct matching)
-      if (item.qbo_item_id) {
-        priceMap.set(`QBO:${item.qbo_item_id}`, item);
-      }
-      
-      // Map by QBO item name if available (for fuzzy matching)
-      if (item.qbo_item_name) {
-        priceMap.set(item.qbo_item_name.toUpperCase(), item);
-      }
+      // Map by item_no (primary key)
+      priceMap.set(item.item_no.toUpperCase(), item);
     }
     return priceMap;
   } catch (err) {
@@ -118,26 +109,7 @@ export function matchItemAndCalculateShipping(
 } {
   const lineTotal = quantity * unitPrice;
 
-  // Priority 1: Try to match by QBO item ID (most reliable - direct reference)
-  if (qboItemRefValue) {
-    const qboIdKey = `QBO:${qboItemRefValue}`;
-    const priceListItem = priceListMap.get(qboIdKey);
-    
-    if (priceListItem) {
-      const shippingDeducted = quantity * priceListItem.shipping_included_per_unit;
-      const commissionable = lineTotal - shippingDeducted;
-
-      return {
-        matched: true,
-        matchedSku: priceListItem.sku,
-        shippingPerUnit: priceListItem.shipping_included_per_unit,
-        shippingDeducted,
-        commissionable: Math.max(0, commissionable),
-      };
-    }
-  }
-
-  // Priority 2: Try to match by exact name/SKU key
+  // Priority 1: Try to match by exact name/SKU key
   const searchKey = qboItemName?.toUpperCase() || qboItemRefValue?.toUpperCase();
   const priceListItem = searchKey ? priceListMap.get(searchKey) : undefined;
 
@@ -145,27 +117,28 @@ export function matchItemAndCalculateShipping(
     const shippingDeducted = quantity * priceListItem.shipping_included_per_unit;
     const commissionable = lineTotal - shippingDeducted;
 
+    console.log(`[match] ✓ Exact match: "${qboItemName}" → SKU ${priceListItem.item_no}, ship=$${shippingDeducted}`);
     return {
       matched: true,
-      matchedSku: priceListItem.sku,
+      matchedSku: priceListItem.item_no,
       shippingPerUnit: priceListItem.shipping_included_per_unit,
       shippingDeducted,
       commissionable: Math.max(0, commissionable),
     };
   }
 
-  // Priority 3: Fuzzy contains match (SKU contained in the QBO item name)
+  // Priority 2: Fuzzy contains match (item_no contained in the QBO item name)
   if (qboItemName) {
     const upperName = qboItemName.toUpperCase();
     const seen = new Set<string>();
     let best: PriceListItem | undefined;
     for (const value of priceListMap.values()) {
-      if (!value || !value.sku) continue;
-      if (seen.has(value.sku)) continue; // avoid duplicate entries created by multiple keys
-      seen.add(value.sku);
-      const skuUpper = value.sku.toUpperCase();
-      if (upperName.includes(skuUpper)) {
-        if (!best || skuUpper.length > best.sku.length) {
+      if (!value || !value.item_no) continue;
+      if (seen.has(value.item_no)) continue; // avoid duplicate entries created by multiple keys
+      seen.add(value.item_no);
+      const itemNoUpper = value.item_no.toUpperCase();
+      if (upperName.includes(itemNoUpper)) {
+        if (!best || itemNoUpper.length > best.item_no.length) {
           best = value;
         }
       }
@@ -173,9 +146,10 @@ export function matchItemAndCalculateShipping(
     if (best) {
       const shippingDeducted = quantity * best.shipping_included_per_unit;
       const commissionable = lineTotal - shippingDeducted;
+      console.log(`[match] ✓ Fuzzy match: "${qboItemName}" → SKU ${best.item_no}, ship=$${shippingDeducted}`);
       return {
         matched: true,
-        matchedSku: best.sku,
+        matchedSku: best.item_no,
         shippingPerUnit: best.shipping_included_per_unit,
         shippingDeducted,
         commissionable: Math.max(0, commissionable),
@@ -184,6 +158,7 @@ export function matchItemAndCalculateShipping(
   }
 
   // No match found - treat entire line as commissionable (shipping = $0)
+  console.log(`[match] ✗ No match for: "${qboItemName}" (ref=${qboItemRefValue}), lineTotal=$${lineTotal}`);
   return {
     matched: false,
     shippingPerUnit: 0,

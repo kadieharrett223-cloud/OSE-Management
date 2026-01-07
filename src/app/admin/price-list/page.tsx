@@ -471,7 +471,7 @@ export default function AdminPriceListPage() {
                             <th className="px-2 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Shipping</th>
                             <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Multiplier</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff 105%</th>
-                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Per Unit</th>
+                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Total Cost</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost w/ Ship</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell Price</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List Price</th>

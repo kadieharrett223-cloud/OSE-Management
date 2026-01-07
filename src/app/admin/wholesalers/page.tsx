@@ -33,6 +33,7 @@ const money = (value: number | null) =>
 export default function WholesalersPage() {
   const [wholesalers, setWholesalers] = useState<Wholesaler[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedWholesaler, setSelectedWholesaler] = useState<Wholesaler | null>(null);
   const [wholesalerInvoices, setWholesalerInvoices] = useState<Invoice[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
@@ -45,7 +46,7 @@ export default function WholesalersPage() {
   useEffect(() => {
     loadData();
     loadCommissionTotals();
-  }, []);
+  }, [selectedMonth]);
 
   // Load invoices when a wholesaler is selected so totals are ready outside the modal
   useEffect(() => {
@@ -54,7 +55,7 @@ export default function WholesalersPage() {
     } else {
       setWholesalerInvoices([]);
     }
-  }, [selectedWholesaler]);
+  }, [selectedWholesaler, selectedMonth]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -72,7 +73,10 @@ export default function WholesalersPage() {
 
   const loadCommissionTotals = async () => {
     try {
-      const res = await fetch("/api/wholesalers/commissions");
+      const [year, month] = selectedMonth.split("-");
+      const startDate = `${year}-${month}-01`;
+      const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
+      const res = await fetch(`/api/wholesalers/commissions?startDate=${startDate}&endDate=${endDate}`);
       if (!res.ok) throw new Error("Failed to load commission totals");
       const data = await res.json();
       setCommissionTotals({ total: data.commissionTotal || 0, invoiceCount: data.invoiceCount || 0 });
@@ -133,7 +137,10 @@ export default function WholesalersPage() {
   const loadInvoices = async (wholesalerId: string) => {
     setLoadingInvoices(true);
     try {
-      const res = await fetch(`/api/wholesalers/${wholesalerId}/invoices`);
+      const [year, month] = selectedMonth.split("-");
+      const startDate = `${year}-${month}-01`;
+      const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
+      const res = await fetch(`/api/wholesalers/${wholesalerId}/invoices?startDate=${startDate}&endDate=${endDate}`);
       if (!res.ok) throw new Error("Failed to load invoices");
       const data = await res.json();
       setWholesalerInvoices(data);
@@ -187,11 +194,20 @@ export default function WholesalersPage() {
               {/* Header */}
               <header className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-semibold text-slate-900">Wholesalers</h1>
-                  <p className="mt-2 text-sm text-slate-600">Manage client relationships, terms, and contact information</p>
+                    <h1 className="text-3xl font-semibold text-slate-900">Wholesalers</h1>
+                    <p className="mt-2 text-sm text-slate-600">Manage client relationships, terms, and contact information</p>
                 </div>
-                
-                <button
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <label className="block text-xs uppercase text-slate-600">Month</label>
+                      <input
+                        type="month"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                      />
+                    </div>
+                    <button
                   onClick={() => {
                     setEditingWholesaler({
                       id: "",
@@ -213,6 +229,7 @@ export default function WholesalersPage() {
                 >
                   Add Wholesaler
                 </button>
+                </div>
               </header>
 
           {/* Status */}

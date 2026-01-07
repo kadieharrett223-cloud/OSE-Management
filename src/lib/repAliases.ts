@@ -1,8 +1,21 @@
 export const REP_ALIASES: Record<string, string[]> = {
   // Canonical : Aliases (case-insensitive matching)
-  "Wholesale Lifts": ["Wholesale Lifts", "WL"],
+  // Include spaceless variants so inputs like "WholesaleLifts" map correctly
+  "Wholesale Lifts": ["Wholesale Lifts", "WholesaleLifts", "WL", "WS"],
+  "Turbo Lifts": ["Turbo Lifts", "TL"],
+  "Heavy Lift Direct": ["Heavy Lift Direct", "HLD"],
+  "PSV": ["PSV"],
+  "Northern Tool & Equipment": ["Northern Tool & Equipment", "Northern Tool", "NT"],
   "SC": ["SC", "sc"],
 };
+
+export const WHOLESALER_CANONICALS = [
+  "Wholesale Lifts",
+  "Turbo Lifts",
+  "Heavy Lift Direct",
+  "PSV",
+  "Northern Tool & Equipment",
+];
 
 function normalize(str: string): string {
   return str
@@ -31,4 +44,9 @@ export function aliasesForCanonical(canonical: string): string[] {
   const c = (canonical || "").trim();
   if (!c) return [];
   return REP_ALIASES[c] || [c];
+}
+
+export function isWholesalerName(name: string | undefined | null): boolean {
+  const c = canonicalizeRep(name);
+  return WHOLESALER_CANONICALS.some((w) => w.toLowerCase() === c.toLowerCase());
 }

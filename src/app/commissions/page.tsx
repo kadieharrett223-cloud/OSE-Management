@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { usePathname } from "next/navigation";
+import { isSalaryRep } from "@/lib/repTypes";
+import { isWholesalerName } from "@/lib/repAliases";
 
 interface RepData {
   repName: string;
@@ -209,8 +211,10 @@ export default function CommissionsPage() {
       invoiceCount: r.invoiceCount,
       missingSKUCount: 0,
     })) : mockReps;
+      // Filter out salary workers - they're shown in the Salary Bonus tab
+    const commissionedOnly = displayReps.filter(r => !isSalaryRep(r.name) && !isWholesalerName(r.name));
     // Sort by commission desc by default
-    const sorted = [...displayReps].sort((a, b) => (b.commissionMTD || 0) - (a.commissionMTD || 0));
+    const sorted = [...commissionedOnly].sort((a, b) => (b.commissionMTD || 0) - (a.commissionMTD || 0));
     return sorted.filter((r) => r.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [repSalesData, searchTerm]);
 
@@ -249,7 +253,8 @@ export default function CommissionsPage() {
 
   const pathname = usePathname();
   const tabs = [
-    { label: "Overview", href: "/commissions" },
+    { label: "Commissioned", href: "/commissions" },
+    { label: "Salary Bonus", href: "/commissions/salary-bonus" },
     { label: "Wholesalers", href: "/admin/wholesalers" },
   ];
 

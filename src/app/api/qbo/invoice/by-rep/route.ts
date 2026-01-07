@@ -158,9 +158,14 @@ export async function GET(req: NextRequest) {
             };
           } else {
             // Not a sales item (discount, tax, etc) — do not count toward commissionable
+            const detailType = line.DetailType || "Other";
+            const rawDescription = line.Description || "";
+            const description = rawDescription
+              ? `${detailType}: ${rawDescription}`
+              : `${detailType} (non-item)`;
             return {
-              sku: "",
-              description: line.Description || "Other (non-item)",
+              sku: detailType,
+              description,
               qty: 1,
               unitPrice: lineAmount,
               lineAmount,
