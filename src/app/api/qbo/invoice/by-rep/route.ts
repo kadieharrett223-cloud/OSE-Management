@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch } from "@/lib/qbo";
+import { getPriceList, matchItemAndCalculateShipping } from "@/lib/shippingDeduction";
 
 interface InvoiceDetail {
   id: string;
   invoiceNumber: string;
   txnDate: string;
   totalAmount: number;
+  totalCommissionable: number;
+  totalShippingDeducted: number;
   commission: number;
-  commissionable: number;
-  shippingDeducted: number;
   lines: {
     sku?: string;
     description: string;
     qty: number;
     unitPrice: number;
     lineAmount: number;
+    shippingDeducted: number;
+    commissionable: number;
+    matched: boolean;
   }[];
 }
 
@@ -32,6 +36,9 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Fetch price list for shipping deductions
+    const priceList = await getPriceList();
 
     // Build query for invoices
     let query = "SELECT * FROM Invoice";
@@ -79,41 +86,74 @@ export async function GET(req: NextRequest) {
 
         if (!invoiceRepName && inv.CustomerMemo?.value) {
           const memo = inv.CustomerMemo.value;
-          const repMatch = memo.match(/Rep:\s*([A-Za-z\s]+)/i);
+          const repMatch = memo.match(/Rep:\s*([A-Za-z\s/]+)/i);
           if (repMatch) {
             invoiceRepName = repMatch[1].trim();
           }
         }
 
-        // Case-insensitive matching
-        return invoiceRepName.toLowerCase() === repName.toLowerCase();
+        // Check if this rep (primary or assistant) is in the rep code
+        return invoiceRepName.includes(repName) || invoiceRepName === repName;
       })
       .map((inv: any) => {
         const totalAmount = Number(inv.TotalAmt) || 0;
         const balance = Number(inv.Balance) || 0;
         const paidAmount = totalAmount - balance;
 
-        // Parse line items
+        // Parse line items with shipping deduction
+        let totalCommissionable = 0;
+        let totalShippingDeducted = 0;
+        
         const lines = (inv.Line || []).map((line: any) => {
           let lineAmount = Number(line.Amount) || 0;
+          let itemName = "";
           let itemRef = "";
           let qty = 1;
           let unitPrice = lineAmount;
 
           if (line.SalesItemLineDetail) {
             const detail = line.SalesItemLineDetail;
-            itemRef = detail.ItemRef?.name || detail.ItemRef?.value || "";
+            itemName = detail.ItemRef?.name || detail.ItemRef?.value || "";
+            itemRef = detail.ItemRef?.value || "";
             qty = Number(detail.Qty) || 1;
             unitPrice = Number(detail.UnitPrice) || lineAmount / qty;
-          }
 
-          return {
-            sku: itemRef,
-            description: line.Description || itemRef || "Item",
-            qty,
-            unitPrice,
-            lineAmount,
-          };
+            // Match to price list and calculate shipping deduction
+            const matched = matchItemAndCalculateShipping(
+              itemName,
+              itemRef,
+              qty,
+              unitPrice,
+              priceList
+            );
+
+            totalCommissionable += matched.commissionable;
+            totalShippingDeducted += matched.shippingDeducted;
+
+            return {
+              sku: matched.matchedSku || itemName,
+              description: line.Description || itemName || "Item",
+              qty,
+              unitPrice,
+              lineAmount,
+              shippingDeducted: matched.shippingDeducted,
+              commissionable: matched.commissionable,
+              matched: matched.matched,
+            };
+          } else {
+            // Not a sales item (discount, tax, etc)
+            totalCommissionable += lineAmount;
+            return {
+              sku: "",
+              description: line.Description || "Other",
+              qty: 1,
+              unitPrice: lineAmount,
+              lineAmount,
+              shippingDeducted: 0,
+              commissionable: lineAmount,
+              matched: false,
+            };
+          }
         });
 
         return {
@@ -121,9 +161,9 @@ export async function GET(req: NextRequest) {
           invoiceNumber: inv.DocNumber || "Unknown",
           txnDate: inv.TxnDate || new Date().toISOString().split("T")[0],
           totalAmount: paidAmount,
-          commission: paidAmount * 0.05, // Default 5% - should match dashboard
-          commissionable: paidAmount,
-          shippingDeducted: 0, // Would need to be calculated from line items
+          totalCommissionable,
+          totalShippingDeducted,
+          commission: totalCommissionable * 0.05, // Default 5%
           lines,
         };
       });
@@ -138,6 +178,8 @@ export async function GET(req: NextRequest) {
       repName,
       invoices: repInvoices,
       count: repInvoices.length,
+      totalCommissionable: repInvoices.reduce((sum, inv) => sum + inv.totalCommissionable, 0),
+      totalShippingDeducted: repInvoices.reduce((sum, inv) => sum + inv.totalShippingDeducted, 0),
       totalCommission,
     });
   } catch (error: any) {
@@ -147,3 +189,4 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+

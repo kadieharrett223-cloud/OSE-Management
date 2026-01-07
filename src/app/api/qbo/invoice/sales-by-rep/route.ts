@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch } from "@/lib/qbo";
 import { parseRepCode, calculateCommission, getBonusProgress } from "@/lib/repCommissionLogic";
+import { getPriceList, matchItemAndCalculateShipping } from "@/lib/shippingDeduction";
 
 interface RepSales {
   repName: string;
   isPrimary: boolean;      // true if KLH, false if SC/CR
   totalSales: number;
+  totalCommissionable: number;
+  totalShippingDeducted: number;
   commission: number;
   invoiceCount: number;
   commissionRate: number;
@@ -23,6 +26,9 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const status = searchParams.get("status") || "paid";
+
+    // Fetch price list for shipping deductions
+    const priceList = await getPriceList();
 
     // Build the QuickBooks query
     let query = "SELECT * FROM Invoice";
@@ -54,7 +60,7 @@ export async function GET(req: NextRequest) {
     const invoices = data?.QueryResponse?.Invoice || [];
     
     // First pass: group by full rep code (including slash)
-    const repMapFull = new Map<string, { total: number; count: number }>();
+    const repMapFull = new Map<string, { total: number; commissionable: number; shipping: number; count: number }>();
 
     for (const invoice of invoices) {
       let repCode = "Unassigned";
@@ -80,19 +86,54 @@ export async function GET(req: NextRequest) {
       const balance = Number(invoice.Balance) || 0;
       const paidAmount = totalAmount - balance;
 
+      // Calculate commissionable amount (with shipping deduction)
+      let totalCommissionable = 0;
+      let totalShippingDeducted = 0;
+
+      if (invoice.Line && Array.isArray(invoice.Line)) {
+        for (const line of invoice.Line) {
+          if (line.SalesItemLineDetail) {
+            const detail = line.SalesItemLineDetail;
+            const itemName = detail.ItemRef?.name || "";
+            const qty = Number(detail.Qty) || 1;
+            const unitPrice = Number(detail.UnitPrice) || 0;
+            const lineAmount = Number(line.Amount) || 0;
+
+            const matched = matchItemAndCalculateShipping(
+              itemName,
+              detail.ItemRef?.value,
+              qty,
+              unitPrice,
+              priceList
+            );
+
+            totalCommissionable += matched.commissionable;
+            totalShippingDeducted += matched.shippingDeducted;
+          } else {
+            // Not a sales item line (maybe discount, tax, etc) - count full amount
+            totalCommissionable += Number(line.Amount) || 0;
+          }
+        }
+      } else {
+        // No line detail available, use full amount
+        totalCommissionable = paidAmount;
+      }
+
       if (!repMapFull.has(repCode)) {
-        repMapFull.set(repCode, { total: 0, count: 0 });
+        repMapFull.set(repCode, { total: 0, commissionable: 0, shipping: 0, count: 0 });
       }
 
       const entry = repMapFull.get(repCode)!;
       entry.total += paidAmount;
+      entry.commissionable += totalCommissionable;
+      entry.shipping += totalShippingDeducted;
       entry.count += 1;
     }
 
     // Second pass: split by primary and assistant rep
     const repMapSplit = new Map<string, RepSales>();
 
-    for (const [repCode, { total, count }] of repMapFull.entries()) {
+    for (const [repCode, { total, commissionable, shipping, count }] of repMapFull.entries()) {
       const parsed = parseRepCode(repCode);
       
       // Add primary rep entry
@@ -102,6 +143,8 @@ export async function GET(req: NextRequest) {
           repName: primaryKey,
           isPrimary: true,
           totalSales: 0,
+          totalCommissionable: 0,
+          totalShippingDeducted: 0,
           commission: 0,
           invoiceCount: 0,
           commissionRate: 0.05,
@@ -110,9 +153,11 @@ export async function GET(req: NextRequest) {
       
       const primaryEntry = repMapSplit.get(primaryKey)!;
       primaryEntry.totalSales += total;
+      primaryEntry.totalCommissionable += commissionable;
+      primaryEntry.totalShippingDeducted += shipping;
       primaryEntry.invoiceCount += count;
-      // Primary rep gets 100% of commission on all sales
-      primaryEntry.commission = primaryEntry.totalSales * primaryEntry.commissionRate;
+      // Primary rep gets commission on commissionable amount
+      primaryEntry.commission = primaryEntry.totalCommissionable * primaryEntry.commissionRate;
 
       // Add assistant rep entry (if exists)
       if (parsed.assistantRep) {
@@ -121,6 +166,8 @@ export async function GET(req: NextRequest) {
             repName: parsed.assistantRep,
             isPrimary: false,
             totalSales: 0,
+            totalCommissionable: 0,
+            totalShippingDeducted: 0,
             commission: 0,
             invoiceCount: 0,
             commissionRate: 0.05,
@@ -129,18 +176,20 @@ export async function GET(req: NextRequest) {
 
         const assistantEntry = repMapSplit.get(parsed.assistantRep)!;
         assistantEntry.totalSales += total;
+        assistantEntry.totalCommissionable += commissionable;
+        assistantEntry.totalShippingDeducted += shipping;
         assistantEntry.invoiceCount += count;
         
-        // Calculate commission based on bonus threshold
+        // Calculate commission based on bonus threshold (using commissionable amount)
         assistantEntry.commission += calculateCommission(
           parsed.assistantRep,
-          total,
-          assistantEntry.totalSales,
+          commissionable,
+          assistantEntry.totalCommissionable,
           assistantEntry.commissionRate
         );
 
         // Add bonus progress info
-        const bonusProgress = getBonusProgress(parsed.assistantRep, assistantEntry.totalSales);
+        const bonusProgress = getBonusProgress(parsed.assistantRep, assistantEntry.totalCommissionable);
         if (bonusProgress.isBonusRep) {
           assistantEntry.bonusProgress = {
             salesAmount: bonusProgress.salesAmount,
