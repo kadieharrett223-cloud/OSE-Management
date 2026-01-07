@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabaseClient } from '@/lib/supabase';
 import { calculateCommissionForInvoice } from '@/lib/commissions';
+import { queryQBO } from '@/lib/qbo';
 
 /**
  * POST /api/sync/qbo
  * 
  * Server-side QuickBooks Online invoice sync.
- * Called by cron job every 2-5 minutes.
+ * Called by cron job every 2-5 minutes or manually via Refresh button.
  * 
  * Steps:
  * 1. Fetch invoices from QBO (server-side OAuth)
@@ -30,34 +31,21 @@ export async function POST(request: Request) {
 
     const supabase = getServerSupabaseClient();
 
-    // TODO: Implement QBO OAuth token refresh
-    // const qboAccessToken = await refreshQBOToken();
-
-    // TODO: Fetch invoices from QBO API
-    // For now, return placeholder
-    const mockQBOInvoices = [
-      {
-        Id: 'qbo-inv-001',
-        DocNumber: '2024-001',
-        TxnDate: '2024-01-15',
-        TotalAmt: 10000,
-        Line: [
-          {
-            Id: '1',
-            LineNum: 1,
-            SalesItemLineDetail: {
-              ItemRef: { name: 'SKU-001' },
-              Qty: 10,
-              UnitPrice: 100,
-            },
-            Amount: 1000,
-          },
-        ],
-        CustomField: [
-          { DefinitionId: 'SalesRep', StringValue: 'John Smith' },
-        ],
-      },
-    ];
+    // Fetch real invoices from QBO
+    let qboInvoices: any[] = [];
+    try {
+      const response = await queryQBO(
+        "select * from Invoice maxresults 100",
+        supabase
+      );
+      qboInvoices = response.QueryResponse?.Invoice || [];
+    } catch (error: any) {
+      console.error('QBO query failed:', error);
+      return NextResponse.json(
+        { error: `QBO query failed: ${error.message}` },
+        { status: 500 }
+      );
+    }
 
     // Fetch all reps and price list items
     const { data: reps, error: repsError } = await supabase
@@ -79,7 +67,7 @@ export async function POST(request: Request) {
     let syncedCount = 0;
     const affectedRepMonths = new Set<string>();
 
-    for (const qboInv of mockQBOInvoices) {
+    for (const qboInv of qboInvoices) {
       const salesRepName = qboInv.CustomField?.find((f: any) => f.DefinitionId === 'SalesRep')?.StringValue;
       const rep = repByName.get(salesRepName || '');
 
