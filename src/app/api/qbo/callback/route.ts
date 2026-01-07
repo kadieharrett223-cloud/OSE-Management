@@ -1,3 +1,7 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const fetchCache = "force-no-store";
+
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCodeForToken } from "@/lib/qbo";
 import { getServerSupabaseClient } from "@/lib/supabase";
