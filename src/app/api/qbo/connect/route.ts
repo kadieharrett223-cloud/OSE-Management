@@ -7,9 +7,12 @@ export async function GET(req: NextRequest) {
   try {
     // Require authenticated admin to start QBO connect
     const session: any = await getServerSession(authOptions as any);
-    const role = session?.user?.role;
-    if (!session || role !== "admin") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const role = (session?.user?.role ?? "").toString().toLowerCase();
+    if (!session) {
+      return NextResponse.json({ error: "Login required" }, { status: 401 });
+    }
+    if (role !== "admin") {
+      return NextResponse.json({ error: "Admin role required" }, { status: 403 });
     }
     const state = "ose-qbo"; // TODO: replace with CSRF-safe state if needed
     const url = buildAuthorizeUrl(state);
@@ -22,6 +25,8 @@ export async function GET(req: NextRequest) {
         clientId: process.env.QBO_CLIENT_ID ? "set" : "missing",
         environment: process.env.QBO_ENVIRONMENT,
         user: session?.user?.email || null,
+        role,
+        isAdmin: role === "admin",
       });
     }
     return NextResponse.redirect(url);
