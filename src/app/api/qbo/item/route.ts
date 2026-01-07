@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch } from "@/lib/qbo";
 
+export async function GET(req: NextRequest) {
+  try {
+    // Fetch all items from QuickBooks
+    const query = "SELECT * FROM Item";
+    const data = await authorizedQboFetch<any>(
+      `/query?query=${encodeURIComponent(query)}&minorversion=65`
+    );
+
+    const items = data?.QueryResponse?.Item || [];
+    
+    return NextResponse.json({
+      ok: true,
+      items: items.map((item: any) => ({
+        id: item.Id,
+        name: item.Name,
+        sku: item.Sku || item.Name,
+        description: item.Description || item.Name,
+        type: item.Type,
+        incomeAccount: item.IncomeAccountRef?.name,
+      })),
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Failed to fetch items" }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));

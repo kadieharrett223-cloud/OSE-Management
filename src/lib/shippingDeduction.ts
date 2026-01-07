@@ -16,8 +16,17 @@ export interface PriceListItem {
   shipping_included_per_unit: number;
 }
 
+export interface QboItem {
+  id: string;
+  name: string;
+  sku?: string;
+  description?: string;
+  type?: string;
+}
+
 /**
  * Fetch all price list items from Supabase
+ * Maps by SKU (uppercase) for fast lookup
  */
 export async function getPriceList(): Promise<Map<string, PriceListItem>> {
   try {
@@ -42,15 +51,42 @@ export async function getPriceList(): Promise<Map<string, PriceListItem>> {
 }
 
 /**
+ * Build a fuzzy match map for QBO items
+ * Maps by name, SKU, and partial matches
+ */
+export function buildQboItemMap(qboItems: QboItem[]): Map<string, QboItem> {
+  const map = new Map<string, QboItem>();
+  
+  for (const item of qboItems) {
+    // Map by name (uppercase)
+    map.set(item.name.toUpperCase(), item);
+    
+    // Map by SKU if available
+    if (item.sku) {
+      map.set(item.sku.toUpperCase(), item);
+    }
+    
+    // Map by ID
+    map.set(item.id, item);
+  }
+  
+  return map;
+}
+
+/**
  * Match a QBO item to price list and calculate shipping deduction
- * Returns: { matched: boolean, shippingDeducted: number, commissionable: number }
+ * Strategy:
+ * 1. Try direct match on item name/SKU
+ * 2. Try partial fuzzy match
+ * 3. If no match, treat as non-commissionable (full deduction)
  */
 export function matchItemAndCalculateShipping(
   qboItemName: string,
   qboItemRefValue: string,
   quantity: number,
   unitPrice: number,
-  priceListMap: Map<string, PriceListItem>
+  priceListMap: Map<string, PriceListItem>,
+  qboItemMap?: Map<string, QboItem>
 ): {
   matched: boolean;
   matchedSku?: string;
