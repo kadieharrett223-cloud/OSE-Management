@@ -7,6 +7,7 @@ export const REP_ALIASES: Record<string, string[]> = {
   "PSV": ["PSV"],
   "Northern Tool & Equipment": ["Northern Tool & Equipment", "Northern Tool", "NT"],
   "SC": ["SC", "sc"],
+  "CR": ["CR", "cr"],
 };
 
 export const WHOLESALER_CANONICALS = [
@@ -16,6 +17,14 @@ export const WHOLESALER_CANONICALS = [
   "PSV",
   "Northern Tool & Equipment",
 ];
+
+// Salary reps who don't earn commission, just need to meet sales goals
+export const SALARY_REP_CANONICALS = ["SC", "CR"];
+
+export function isSalaryRep(name: string | undefined | null): boolean {
+  const c = canonicalizeRep(name);
+  return SALARY_REP_CANONICALS.some((s) => s.toLowerCase() === c.toLowerCase());
+}
 
 function normalize(str: string): string {
   return str

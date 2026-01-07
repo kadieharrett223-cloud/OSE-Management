@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSupabaseClient } from '@/lib/supabase';
 import { calculateCommissionForInvoice } from '@/lib/commissions';
 import { authorizedQboFetch } from '@/lib/qbo';
+import { isSalaryRep } from '@/lib/repAliases';
 
 /**
  * POST /api/sync/qbo
@@ -79,26 +80,26 @@ export async function POST(request: Request) {
         }
       }
       
-      // Handle split reps: "SC/KLH" means SC gets goal credit, KLH gets commission
+      // Handle split reps: extract commission rep (non-salary rep)
       let commissionRepName = salesRepName;
-      let goalRepName = salesRepName;
       
       if (salesRepName.includes('/')) {
         const parts = salesRepName.split('/').map((p: string) => p.trim());
-        goalRepName = parts[0];      // First rep gets goal credit
-        commissionRepName = parts[1]; // Last rep gets commission
+        // Find the non-salary rep (commission rep)
+        const nonSalaryRep = parts.find((p: string) => !isSalaryRep(p));
+        if (nonSalaryRep) {
+          commissionRepName = nonSalaryRep;
+        } else {
+          // Both are salary reps - shouldn't happen but use first as fallback
+          commissionRepName = parts[0];
+        }
       }
       
       const commissionRep = repByName.get(commissionRepName || '');
       const goalRep = repByName.get(goalRepName || '');
-
-      if (!commissionRep) {
-        console.warn(`No rep found for commission on invoice ${qboInv.DocNumber}, Sales Rep: ${commissionRepName}`);
-        continue;
-      }
       
-      if (!goalRep) {
-        console.warn(`No rep found for goal on invoice ${qboInv.DocNumber}, Sales Rep: ${goalRepName}`);
+      if (!commissionRep) {
+        console.warn(`No rep found for invoice ${qboInv.DocNumber}, Sales Rep: ${commissionRepName}`);
         continue;
       }
 
@@ -140,7 +141,6 @@ export async function POST(request: Request) {
             qbo_invoice_id: qboInv.Id,
             invoice_number: qboInv.DocNumber,
             rep_id: commissionRep.id,
-            goal_rep_id: goalRep.id,
             txn_date: qboInv.TxnDate,
             total_amount: qboInv.TotalAmt,
             commission_total: commissionTotal,
@@ -187,14 +187,11 @@ export async function POST(request: Request) {
       synced: syncedCount,
       affectedSnapshots: affectedRepMonths.size,
     });
-  } catch (error) {
-    console.error('QBO sync error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Sync failed' },
-      { status: 500 }
-    );
-  }
-}
+    @@      // Track affected rep/month for snapshot update
+    @@      const txnDate = new Date(qboInv.TxnDate);
+    @@      const year = txnDate.getFullYear();
+    @@      const month = txnDate.getMonth() + 1;
+    @@      affectedRepMonths.add(`${commissionRep.id}|${year}|${month}`);
 
 async function recomputeCommissionSnapshot(
   supabase: any,
