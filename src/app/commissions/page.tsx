@@ -1,9 +1,36 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
-// Mock data for demo—replace with Prisma queries + auth session
+interface RepData {
+  repName: string;
+  totalSales: number;
+  commission: number;
+  invoiceCount: number;
+  commissionRate: number;
+}
+
+interface InvoiceLine {
+  sku?: string;
+  description: string;
+  qty: number;
+  unitPrice: number;
+  lineAmount: number;
+}
+
+interface InvoiceDetail {
+  id: string;
+  invoiceNumber: string;
+  txnDate: string;
+  totalAmount: number;
+  commission: number;
+  commissionable: number;
+  shippingDeducted: number;
+  lines: InvoiceLine[];
+}
+
+// Mock data for fallback
 const mockReps = [
   { id: "1", name: "John Smith", qboCode: "JS", commissionMTD: 3250.5, invoiceCount: 12, missingSKUCount: 2 },
   { id: "2", name: "Sarah Johnson", qboCode: "SJ", commissionMTD: 4120.75, invoiceCount: 18, missingSKUCount: 0 },
@@ -45,19 +72,104 @@ export default function CommissionsPage() {
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
+  const [repInvoices, setRepInvoices] = useState<InvoiceDetail[]>([]);
+  const [loadingReps, setLoadingReps] = useState(true);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
 
-  const totalCommissionOwed = useMemo(
-    () => mockReps.reduce((sum, rep) => sum + rep.commissionMTD, 0),
-    [],
-  );
+  // Fetch sales reps for current month
+  useEffect(() => {
+    let isMounted = true;
+    const [year, month] = selectedMonth.split("-");
+    const startDate = `${year}-${month}-01`;
+    const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
+
+    fetch(
+      `/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=paid`
+    )
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to fetch sales by rep");
+        return await res.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.ok && data.reps) {
+          setRepSalesData(data.reps);
+          // Set first rep as selected
+          if (data.reps.length > 0) {
+            setSelectedRepId(data.reps[0].repName);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch rep sales:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingReps(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedMonth]);
+
+  // Fetch invoices for selected rep
+  useEffect(() => {
+    if (!selectedRepId) return;
+
+    let isMounted = true;
+    setLoadingInvoices(true);
+    const [year, month] = selectedMonth.split("-");
+    const startDate = `${year}-${month}-01`;
+    const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
+
+    fetch(
+      `/api/qbo/invoice/by-rep?repName=${encodeURIComponent(selectedRepId)}&startDate=${startDate}&endDate=${endDate}&status=paid`
+    )
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to fetch invoices");
+        return await res.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.ok && data.invoices) {
+          setRepInvoices(data.invoices);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch rep invoices:", err);
+        setRepInvoices([]);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingInvoices(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedRepId, selectedMonth]);
 
 
-  const filteredReps = useMemo(
-    () => mockReps.filter((r) => r.name.toLowerCase().includes(searchTerm.toLowerCase())),
-    [searchTerm],
-  );
+  const filteredReps = useMemo(() => {
+    const displayReps = repSalesData.length > 0 ? repSalesData.map(r => ({
+      id: r.repName,
+      name: r.repName,
+      qboCode: r.repName.split(" ")[0][0] + (r.repName.split(" ")[1]?.[0] || ""),
+      commissionMTD: r.commission,
+      invoiceCount: r.invoiceCount,
+      missingSKUCount: 0,
+    })) : mockReps;
+    
+    return displayReps.filter((r) => r.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [repSalesData, searchTerm]);
 
-  const selectedRep = mockReps.find((r) => r.id === selectedRepId);
+  const selectedRep = filteredReps.find((r) => r.id === selectedRepId);
+  
+  const totalCommissionOwed = useMemo(() => {
+    return repSalesData.length > 0
+      ? repSalesData.reduce((sum, rep) => sum + rep.commission, 0)
+      : mockReps.reduce((sum, rep) => sum + rep.commissionMTD, 0);
+  }, [repSalesData]);
 
   const startQboConnect = () => {
     setConnectError(null);
@@ -193,19 +305,23 @@ export default function CommissionsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                       <p className="text-xs uppercase text-slate-600">Commission MTD</p>
-                      <p className="mt-1 text-3xl font-semibold text-slate-900">${money(selectedRep.commissionMTD)}</p>
+                      <p className="mt-1 text-3xl font-semibold text-slate-900">${money(selectedRep?.commissionMTD || 0)}</p>
                     </div>
                     <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                       <p className="text-xs uppercase text-slate-600">Invoice Count</p>
-                      <p className="mt-1 text-3xl font-semibold text-slate-900">{selectedRep.invoiceCount}</p>
+                      <p className="mt-1 text-3xl font-semibold text-slate-900">{selectedRep?.invoiceCount || 0}</p>
                     </div>
                     <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                       <p className="text-xs uppercase text-slate-600">Commissionable Sales</p>
-                      <p className="mt-1 text-2xl font-semibold text-emerald-700">${money(selectedRep.commissionMTD * 20)}</p>
+                      <p className="mt-1 text-2xl font-semibold text-emerald-700">
+                        ${money((selectedRep?.commissionMTD || 0) / 0.05)}
+                      </p>
                     </div>
                     <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                       <p className="text-xs uppercase text-slate-600">Shipping Deducted</p>
-                      <p className="mt-1 text-2xl font-semibold text-blue-700">${money(selectedRep.commissionMTD * 0.15)}</p>
+                      <p className="mt-1 text-2xl font-semibold text-blue-700">
+                        ${money(repInvoices.reduce((sum, inv) => sum + inv.shippingDeducted, 0))}
+                      </p>
                     </div>
                   </div>
 
@@ -226,25 +342,39 @@ export default function CommissionsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {mockInvoices.map((inv) => (
-                            <tr key={inv.id} className="hover:bg-slate-50">
-                              <td className="px-6 py-4 font-medium text-slate-900">{inv.invoiceNumber}</td>
-                              <td className="px-6 py-4 text-slate-600">{new Date(inv.txnDate).toLocaleDateString()}</td>
-                              <td className="px-6 py-4 text-right text-slate-900">${money(inv.commissionable)}</td>
-                              <td className="px-6 py-4 text-right font-semibold text-emerald-700">${money(inv.commission)}</td>
-                              <td className="px-6 py-4 text-center">
-                                <button
-                                  onClick={() => toggleInvoiceExpand(inv.id)}
-                                  className="text-xs font-semibold text-blue-600 hover:text-blue-800"
-                                  type="button"
-                                >
-                                  {expandedInvoices.has(inv.id) ? "Hide" : "Show"} lines
-                                </button>
+                          {loadingInvoices ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                Loading invoices...
                               </td>
                             </tr>
-                          ))}
+                          ) : repInvoices.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                No invoices for this rep in the selected month
+                              </td>
+                            </tr>
+                          ) : (
+                            repInvoices.map((inv) => (
+                              <tr key={inv.id} className="hover:bg-slate-50">
+                                <td className="px-6 py-4 font-medium text-slate-900">{inv.invoiceNumber}</td>
+                                <td className="px-6 py-4 text-slate-600">{new Date(inv.txnDate).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 text-right text-slate-900">${money(inv.commissionable)}</td>
+                                <td className="px-6 py-4 text-right font-semibold text-emerald-700">${money(inv.commission)}</td>
+                                <td className="px-6 py-4 text-center">
+                                  <button
+                                    onClick={() => toggleInvoiceExpand(inv.id)}
+                                    className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                                    type="button"
+                                  >
+                                    {expandedInvoices.has(inv.id) ? "Hide" : "Show"} lines
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
                           {expandedInvoices.size > 0 &&
-                            mockInvoices
+                            repInvoices
                               .filter((inv) => expandedInvoices.has(inv.id))
                               .map((inv) => (
                                 <tr key={`${inv.id}-detail`} className="bg-blue-50">
@@ -253,9 +383,9 @@ export default function CommissionsPage() {
                                     <div className="space-y-2">
                                       {inv.lines.map((line, idx) => (
                                         <div key={idx} className="flex justify-between rounded-lg bg-white px-4 py-2 text-xs">
-                                          <span className="font-medium text-slate-900">{line.sku}</span>
+                                          <span className="font-medium text-slate-900">{line.sku || line.description}</span>
                                           <span className="text-slate-600">
-                                            {line.qty} × ${money(line.unitPrice)} = ${money(line.commission)} commission
+                                            {line.qty} × ${money(line.unitPrice)} = ${money(line.lineAmount)}
                                           </span>
                                         </div>
                                       ))}
