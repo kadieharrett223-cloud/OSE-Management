@@ -7,6 +7,14 @@ import { Sidebar } from "@/components/Sidebar";
 const money = (value: number) =>
   value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+interface RepData {
+  repName: string;
+  totalSales: number;
+  commission: number;
+  invoiceCount: number;
+  commissionRate: number;
+}
+
 const mockReps = [
   {
     id: 1,
@@ -54,6 +62,8 @@ export default function Dashboard() {
   const [qboSales, setQboSales] = useState<number | null>(null);
   const [qboInvoiceCount, setQboInvoiceCount] = useState<number>(0);
   const [loadingQbo, setLoadingQbo] = useState(true);
+  const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
+  const [loadingReps, setLoadingReps] = useState(true);
 
   // Fetch monthly goal
   useEffect(() => {
@@ -86,6 +96,7 @@ export default function Dashboard() {
     const startDate = `${year}-${month}-01`;
     const endDate = `${year}-${month}-${String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
     
+    // Fetch total sales
     fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`)
       .then(async (res) => {
         if (!res.ok) throw new Error('Failed to fetch invoices');
@@ -103,6 +114,25 @@ export default function Dashboard() {
       })
       .finally(() => {
         if (isMounted) setLoadingQbo(false);
+      });
+
+    // Fetch sales by rep
+    fetch(`/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=paid`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to fetch sales by rep');
+        return await res.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.ok && data.reps) {
+          setRepSalesData(data.reps);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch rep sales:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingReps(false);
       });
 
     return () => {
@@ -139,15 +169,25 @@ export default function Dashboard() {
   }
 
   const totalSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
-  const totalCommission = mockReps.reduce((sum, rep) => sum + rep.commission, 0);
+  
+  // Use real rep data if available, otherwise fall back to mock
+  const displayReps = repSalesData.length > 0 ? repSalesData : mockReps.map(r => ({
+    repName: r.name,
+    totalSales: r.sales,
+    commission: r.commission,
+    invoiceCount: r.orders,
+    commissionRate: 0.05,
+  }));
+
+  const totalCommission = displayReps.reduce((sum, rep) => sum + rep.commission, 0);
   const percentOfGoal = monthlyGoal > 0 ? Math.round((totalSales / monthlyGoal) * 100) : 0;
   const dailyPace = totalSales / 15; // 15 days elapsed in month (approx)
   const projectedMonth = dailyPace * 30;
 
-  const sortedReps = [...mockReps].sort((a, b) => {
-    if (sortField === "sales") return b.sales - a.sales;
+  const sortedReps = [...displayReps].sort((a, b) => {
+    if (sortField === "sales") return b.totalSales - a.totalSales;
     if (sortField === "commission") return b.commission - a.commission;
-    return b.orders - a.orders;
+    return b.invoiceCount - a.invoiceCount;
   });
 
   return (
@@ -316,26 +356,37 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {sortedReps.map((rep) => (
-                      <tr key={rep.id} className="hover:bg-slate-50 transition">
-                        <td className="px-6 py-3 font-medium text-slate-900">{rep.name}</td>
-                        <td className="px-6 py-3 text-right font-semibold text-emerald-700">
-                          ${money(rep.sales)}
-                        </td>
-                        <td className="px-6 py-3 text-right font-semibold text-indigo-700">
-                          ${money(rep.commission)}
-                        </td>
-                        <td className="px-6 py-3 text-right text-slate-600">{rep.orders}</td>
-                        <td className="px-6 py-3 text-right">
-                          <a
-                            href={`/commissions?rep=${rep.id}`}
-                            className="text-sm font-medium text-blue-600 hover:text-blue-700 transition"
-                          >
-                            View
-                          </a>
+                    {loadingReps ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                          Loading sales rep data...
                         </td>
                       </tr>
-                    ))}
+                    ) : sortedReps.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                          No sales data available for this month
+                        </td>
+                      </tr>
+                    ) : (
+                      sortedReps.map((rep, idx) => (
+                        <tr key={rep.repName + idx} className="hover:bg-slate-50 transition">
+                          <td className="px-6 py-3 font-medium text-slate-900">{rep.repName}</td>
+                          <td className="px-6 py-3 text-right font-semibold text-emerald-700">
+                            ${money(rep.totalSales)}
+                          </td>
+                          <td className="px-6 py-3 text-right font-semibold text-indigo-700">
+                            ${money(rep.commission)}
+                          </td>
+                          <td className="px-6 py-3 text-right text-slate-600">{rep.invoiceCount}</td>
+                          <td className="px-6 py-3 text-right">
+                            <span className="text-sm text-slate-500">
+                              {(rep.commissionRate * 100).toFixed(1)}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -346,22 +397,38 @@ export default function Dashboard() {
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                 <div className="text-xs uppercase font-semibold text-slate-500">Top Performer</div>
                 <div className="mt-2">
-                  <div className="text-lg font-semibold text-slate-900">{sortedReps[0]?.name}</div>
-                  <div className="mt-1 text-sm text-slate-600">
-                    ${money(sortedReps[0]?.sales || 0)} | {sortedReps[0]?.orders || 0} orders
-                  </div>
+                  {loadingReps ? (
+                    <div className="text-sm text-slate-400">Loading...</div>
+                  ) : sortedReps.length > 0 ? (
+                    <>
+                      <div className="text-lg font-semibold text-slate-900">{sortedReps[0].repName}</div>
+                      <div className="mt-1 text-sm text-slate-600">
+                        ${money(sortedReps[0].totalSales)} | {sortedReps[0].invoiceCount} orders
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-slate-500">No data</div>
+                  )}
                 </div>
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                 <div className="text-xs uppercase font-semibold text-slate-500">Avg Sale per Rep</div>
                 <div className="mt-2">
-                  <div className="text-lg font-semibold text-slate-900">
-                    ${money(totalSales / mockReps.length)}
-                  </div>
-                  <div className="mt-1 text-sm text-slate-600">
-                    {mockReps.length} active reps
-                  </div>
+                  {loadingReps ? (
+                    <div className="text-sm text-slate-400">Loading...</div>
+                  ) : sortedReps.length > 0 ? (
+                    <>
+                      <div className="text-lg font-semibold text-slate-900">
+                        ${money(totalSales / sortedReps.length)}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-600">
+                        {sortedReps.length} active reps
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-slate-500">No data</div>
+                  )}
                 </div>
               </div>
             </div>
