@@ -384,9 +384,8 @@ export default function ViewPO() {
           </div>
         </div>
       </div>
-    </div>
 
-      <style jsx global>{`
+      <style>{`
         @media print {
           @page {
             size: auto;

@@ -151,12 +151,24 @@ export async function ensureAccessToken(): Promise<{ accessToken: string; realmI
   return { accessToken: refreshed.access_token, realmId: refreshed.realmId! };
 }
 
+function extractTid(res: Response) {
+  return res.headers.get("intuit_tid") || res.headers.get("Intuit-Tid") || undefined;
+}
+
 export async function qboApiFetch<T>(realmId: string, path: string, init: RequestInit = {}): Promise<T> {
   const url = `${QBO_API_BASE}${path}`;
   const res = await fetch(url, init);
+  const tid = extractTid(res);
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`QBO API error ${res.status}: ${text}`);
+    console.error("QBO API error", {
+      status: res.status,
+      statusText: res.statusText,
+      url,
+      tid,
+      body: text,
+    });
+    throw new Error(`QBO API error ${res.status}${tid ? ` (tid ${tid})` : ""}: ${text}`);
   }
   return (await res.json()) as T;
 }

@@ -1,10 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { buildAuthorizeUrl } from "@/lib/qbo";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const state = "ose-qbo"; // TODO: replace with CSRF-safe state if needed
     const url = buildAuthorizeUrl(state);
+    const debug = req.nextUrl.searchParams.get("debug");
+    if (debug) {
+      return NextResponse.json({
+        ok: true,
+        authorizeUrl: url,
+        redirectUri: process.env.QBO_REDIRECT_URI,
+        clientId: process.env.QBO_CLIENT_ID ? "set" : "missing",
+        environment: process.env.QBO_ENVIRONMENT,
+      });
+    }
     return NextResponse.redirect(url);
   } catch (error: any) {
     console.error("QBO connect error", error);
