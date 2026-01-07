@@ -96,7 +96,6 @@ export async function POST(request: Request) {
       }
       
       const commissionRep = repByName.get(commissionRepName || '');
-      const goalRep = repByName.get(goalRepName || '');
       
       if (!commissionRep) {
         console.warn(`No rep found for invoice ${qboInv.DocNumber}, Sales Rep: ${commissionRepName}`);
@@ -166,14 +165,11 @@ export async function POST(request: Request) {
 
       syncedCount++;
 
-      // Track affected rep/month for snapshot update (both commission and goal reps)
+      // Track affected rep/month for snapshot update
       const txnDate = new Date(qboInv.TxnDate);
       const year = txnDate.getFullYear();
       const month = txnDate.getMonth() + 1;
       affectedRepMonths.add(`${commissionRep.id}|${year}|${month}`);
-      if (goalRep.id !== commissionRep.id) {
-        affectedRepMonths.add(`${goalRep.id}|${year}|${month}`);
-      }
     }
 
     // Recompute commission snapshots for affected rep/months
@@ -187,11 +183,6 @@ export async function POST(request: Request) {
       synced: syncedCount,
       affectedSnapshots: affectedRepMonths.size,
     });
-    @@      // Track affected rep/month for snapshot update
-    @@      const txnDate = new Date(qboInv.TxnDate);
-    @@      const year = txnDate.getFullYear();
-    @@      const month = txnDate.getMonth() + 1;
-    @@      affectedRepMonths.add(`${commissionRep.id}|${year}|${month}`);
 
 async function recomputeCommissionSnapshot(
   supabase: any,
