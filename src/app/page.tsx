@@ -51,7 +51,11 @@ export default function Dashboard() {
   const [goalInput, setGoalInput] = useState<string>("600000");
   const [goalStatus, setGoalStatus] = useState<string | null>(null);
   const [updatingGoal, setUpdatingGoal] = useState(false);
+  const [qboSales, setQboSales] = useState<number | null>(null);
+  const [qboInvoiceCount, setQboInvoiceCount] = useState<number>(0);
+  const [loadingQbo, setLoadingQbo] = useState(true);
 
+  // Fetch monthly goal
   useEffect(() => {
     let isMounted = true;
     fetch(`/api/goals/monthly`)
@@ -67,6 +71,39 @@ export default function Dashboard() {
         setGoalInput(String(value));
       })
       .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Fetch QuickBooks invoice data for current month
+  useEffect(() => {
+    let isMounted = true;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const startDate = `${year}-${month}-01`;
+    const endDate = `${year}-${month}-${String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+    
+    fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to fetch invoices');
+        return await res.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.ok) {
+          setQboSales(data.totalPaid || 0);
+          setQboInvoiceCount(data.count || 0);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch QBO invoices:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingQbo(false);
+      });
 
     return () => {
       isMounted = false;
@@ -101,7 +138,7 @@ export default function Dashboard() {
     }
   }
 
-  const totalSales = mockReps.reduce((sum, rep) => sum + rep.sales, 0);
+  const totalSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
   const totalCommission = mockReps.reduce((sum, rep) => sum + rep.commission, 0);
   const percentOfGoal = monthlyGoal > 0 ? Math.round((totalSales / monthlyGoal) * 100) : 0;
   const dailyPace = totalSales / 15; // 15 days elapsed in month (approx)
@@ -166,8 +203,16 @@ export default function Dashboard() {
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                 <div className="text-xs uppercase font-semibold text-slate-500">Sales to Date</div>
-                <div className="mt-2 text-2xl font-bold text-emerald-700">${money(totalSales)}</div>
-                <div className="mt-1 text-xs text-slate-600">YTD aggregate</div>
+                <div className="mt-2 text-2xl font-bold text-emerald-700">
+                  {loadingQbo ? (
+                    <span className="text-slate-400">Loading...</span>
+                  ) : (
+                    `$${money(totalSales)}`
+                  )}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">
+                  {qboSales !== null ? 'Paid invoices this month' : 'YTD aggregate'}
+                </div>
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
@@ -184,8 +229,18 @@ export default function Dashboard() {
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                 <div className="text-xs uppercase font-semibold text-slate-500">Order Count</div>
-                <div className="mt-2 text-2xl font-bold text-slate-900">{mockReps.reduce((sum, r) => sum + r.orders, 0)}</div>
-                <div className="mt-1 text-xs text-slate-600">Total invoices</div>
+                <div className="mt-2 text-2xl font-bold text-slate-900">
+                  {loadingQbo ? (
+                    <span className="text-slate-400">...</span>
+                  ) : qboSales !== null ? (
+                    qboInvoiceCount
+                  ) : (
+                    mockReps.reduce((sum, r) => sum + r.orders, 0)
+                  )}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">
+                  {qboSales !== null ? 'Paid invoices' : 'Total invoices'}
+                </div>
               </div>
             </div>
 
