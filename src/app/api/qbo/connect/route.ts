@@ -6,8 +6,8 @@ import { authOptions } from "@/lib/auth";
 export async function GET(req: NextRequest) {
   try {
     // Require authenticated admin to start QBO connect
-    const session = await getServerSession(authOptions as any);
-    const role = (session?.user as any)?.role;
+    const session: any = await getServerSession(authOptions as any);
+    const role = session?.user?.role;
     if (!session || role !== "admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

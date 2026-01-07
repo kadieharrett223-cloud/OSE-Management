@@ -418,13 +418,13 @@ export default function QboItemMappingPage() {
               </button>
               <button
                 onClick={() => {
-                  if (!selectedPriceListSku || !shippingAmount) {
+                  if (!selectedPriceListSku || !shippingAmount || !editingItem) {
                     setStatusMessage({ type: "error", text: "Please fill in all fields" });
-                    return {
-                      qboItem,
-                      priceListItem,
-                      isMatched: Boolean(priceListItem),
-                    };
+                    return;
+                  }
+                  handleSaveMapping(
+                    editingItem.qboItem,
+                    selectedPriceListSku,
                     parseFloat(shippingAmount)
                   );
                 }}
