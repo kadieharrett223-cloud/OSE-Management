@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildAuthorizeUrl } from "@/lib/qbo";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
+    // Require authenticated admin to start QBO connect
+    const session = await getServerSession(authOptions as any);
+    const role = (session?.user as any)?.role;
+    if (!session || role !== "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const state = "ose-qbo"; // TODO: replace with CSRF-safe state if needed
     const url = buildAuthorizeUrl(state);
     const debug = req.nextUrl.searchParams.get("debug");
@@ -13,6 +21,7 @@ export async function GET(req: NextRequest) {
         redirectUri: process.env.QBO_REDIRECT_URI,
         clientId: process.env.QBO_CLIENT_ID ? "set" : "missing",
         environment: process.env.QBO_ENVIRONMENT,
+        user: session?.user?.email || null,
       });
     }
     return NextResponse.redirect(url);

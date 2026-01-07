@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Sidebar } from "@/components/Sidebar";
+import { usePathname } from "next/navigation";
 
 type Supplier = {
   id: string;
@@ -54,9 +56,37 @@ export default function SuppliersPage() {
 
   function editSupplier(s: Supplier) { setForm({ ...s }); }
 
+  const pathname = usePathname();
+  const tabs = [
+    { label: "Purchase Orders", href: "/admin/purchasing" },
+    { label: "Suppliers", href: "/admin/suppliers" },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto max-w-5xl px-6 py-8 space-y-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="flex min-h-screen">
+        <Sidebar activePage="Purchasing" />
+        <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
+          {/* Chrome-style Tabs */}
+          <div className="bg-slate-800 border-b border-slate-700 px-8">
+            <div className="flex gap-1">
+              {tabs.map((tab) => (
+                <a
+                  key={tab.href}
+                  href={tab.href}
+                  className={`px-6 py-3 text-sm font-medium transition relative ${
+                    pathname === tab.href
+                      ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
+                      : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                  }`}
+                >
+                  {tab.label}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <div className="mx-auto max-w-5xl px-6 py-8 space-y-8">
         <header className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Suppliers</h1>
         </header>
@@ -116,6 +146,8 @@ export default function SuppliersPage() {
             </div>
           )}
         </div>
+          </div>
+        </main>
       </div>
     </div>
   );

@@ -15,6 +15,16 @@ export async function GET(req: NextRequest) {
     // Exchange code for tokens
     const tokenResponse = await exchangeCodeForToken(code, realmId);
 
+    // Enforce allowed QuickBooks company via realmId, if configured
+    const allowedRealm = process.env.QBO_ALLOWED_REALM_ID;
+    const resolvedRealm = tokenResponse.realmId || realmId || "";
+    if (allowedRealm && resolvedRealm !== allowedRealm) {
+      return NextResponse.json(
+        { error: "Unauthorized QuickBooks company (realmId mismatch)" },
+        { status: 403 }
+      );
+    }
+
     // Persist tokens (soft requirement: SUPABASE_SERVICE_ROLE_KEY must be set)
     const supabase = getServerSupabaseClient();
     const expiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString();

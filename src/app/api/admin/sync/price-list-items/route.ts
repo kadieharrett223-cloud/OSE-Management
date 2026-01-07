@@ -59,14 +59,17 @@ export async function GET(req: NextRequest) {
 
         // If sync is enabled and match is new, update the price list
         if (sync && match.confidence > 0.5) {
-          const updatePromise = supabase
-            .from("price_list_items")
-            .update({
-              qbo_item_id: match.qboItemId,
-              qbo_item_name: match.qboItemName,
-              last_synced_with_qbo: new Date().toISOString(),
-            })
-            .eq("sku", priceItem.sku);
+          const updatePromise = (async () => {
+            return await supabase
+              .from("price_list_items")
+              .update({
+                qbo_item_id: match.qboItemId,
+                qbo_item_name: match.qboItemName,
+                last_synced_with_qbo: new Date().toISOString(),
+              })
+              .eq("item_no", priceItem.sku)
+              .select("id");
+          })();
 
           updatePromises.push(updatePromise);
         }
@@ -159,10 +162,12 @@ function findBestMatch(
       const qboDesc = (qboItem.Description || "").toUpperCase();
 
       // Check if words overlap
-      const priceWords = priceDesc.split(/\s+/).filter((w) => w.length > 2);
+      const priceWords = priceDesc
+        .split(/\s+/)
+        .filter((w: string) => w.length > 2);
       const qboWords = new Set([...qboName.split(/\s+/), ...qboDesc.split(/\s+/)]);
 
-      const matchingWords = priceWords.filter((w) => qboWords.has(w)).length;
+      const matchingWords = priceWords.filter((w: string) => qboWords.has(w)).length;
       const confidence = matchingWords / Math.max(priceWords.length, 1);
 
       if (confidence > 0.5) {

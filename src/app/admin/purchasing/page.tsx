@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Sidebar } from "@/components/Sidebar";
+import { usePathname } from "next/navigation";
 
 type PurchaseOrder = {
   id: string;
@@ -316,11 +317,36 @@ export default function PurchasingPage() {
   const remainingWeight = WEIGHT_LIMIT_LBS - totalWeight;
   const weightPercentage = (totalWeight / WEIGHT_LIMIT_LBS) * 100;
 
+  const pathname = usePathname();
+  const tabs = [
+    { label: "Purchase Orders", href: "/admin/purchasing" },
+    { label: "Suppliers", href: "/admin/suppliers" },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
         <Sidebar activePage="Purchasing" />
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
+          {/* Chrome-style Tabs */}
+          <div className="bg-slate-800 border-b border-slate-700 px-8">
+            <div className="flex gap-1">
+              {tabs.map((tab) => (
+                <a
+                  key={tab.href}
+                  href={tab.href}
+                  className={`px-6 py-3 text-sm font-medium transition relative ${
+                    pathname === tab.href
+                      ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
+                      : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                  }`}
+                >
+                  {tab.label}
+                </a>
+              ))}
+            </div>
+          </div>
+
           <div className="mx-auto max-w-7xl px-8 py-10 space-y-8">
             <header className="flex items-center justify-between">
               <div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { usePathname } from "next/navigation";
 
 interface Wholesaler {
   id: string;
@@ -151,42 +152,68 @@ export default function WholesalersPage() {
       : true
   );
 
+  const pathname = usePathname();
+  const tabs = [
+    { label: "Overview", href: "/commissions" },
+    { label: "Wholesalers", href: "/admin/wholesalers" },
+  ];
+
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <Sidebar activePage="/admin/wholesalers" />
-      
-      <main className="flex-1 p-8">
-        <div className="mx-auto max-w-7xl space-y-6">
-          {/* Header */}
-          <header className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold text-slate-900">Wholesalers</h1>
-              <p className="mt-2 text-sm text-slate-600">Manage client relationships, terms, and contact information</p>
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="flex min-h-screen">
+        <Sidebar activePage="Commissions" />
+        <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
+          {/* Chrome-style Tabs */}
+          <div className="bg-slate-800 border-b border-slate-700 px-8">
+            <div className="flex gap-1">
+              {tabs.map((tab) => (
+                <a
+                  key={tab.href}
+                  href={tab.href}
+                  className={`px-6 py-3 text-sm font-medium transition relative ${
+                    pathname === tab.href
+                      ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
+                      : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                  }`}
+                >
+                  {tab.label}
+                </a>
+              ))}
             </div>
-            
-            <button
-              onClick={() => {
-                setEditingWholesaler({
-                  id: "",
-                  company_name: "",
-                  contact_name: null,
-                  email: null,
-                  phone: null,
-                  address: null,
-                  city: null,
-                  state: null,
-                  zip: null,
-                  commission_percentage: null,
-                  notes: null,
-                  is_active: true,
-                });
-                setShowAddModal(true);
-              }}
-              className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-md transition-colors"
-            >
-              Add Wholesaler
-            </button>
-          </header>
+          </div>
+
+          <div className="p-8">
+            <div className="mx-auto max-w-7xl space-y-6">
+              {/* Header */}
+              <header className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-semibold text-slate-900">Wholesalers</h1>
+                  <p className="mt-2 text-sm text-slate-600">Manage client relationships, terms, and contact information</p>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setEditingWholesaler({
+                      id: "",
+                      company_name: "",
+                      contact_name: null,
+                      email: null,
+                      phone: null,
+                      address: null,
+                      city: null,
+                      state: null,
+                      zip: null,
+                      commission_percentage: null,
+                      notes: null,
+                      is_active: true,
+                    });
+                    setShowAddModal(true);
+                  }}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-md transition-colors"
+                >
+                  Add Wholesaler
+                </button>
+              </header>
 
           {/* Status */}
           {status && (
@@ -321,7 +348,9 @@ export default function WholesalersPage() {
             </div>
           )}
         </div>
+        </div>
       </main>
+      </div>
 
       {/* Add/Edit Modal */}
       {showAddModal && editingWholesaler && (
