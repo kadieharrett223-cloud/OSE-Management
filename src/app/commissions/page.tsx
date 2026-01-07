@@ -394,7 +394,7 @@ export default function CommissionsPage() {
                               .filter((inv) => expandedInvoices.has(inv.id))
                               .map((inv) => (
                                 <tr key={`${inv.id}-detail`} className="bg-blue-50">
-                                  <td colSpan={5} className="px-6 py-4">
+                                  <td colSpan={6} className="px-6 py-4">
                                     <p className="mb-3 text-xs font-semibold uppercase text-slate-700">Line Items</p>
                                     <div className="space-y-2">
                                       {inv.lines.map((line, idx) => (
