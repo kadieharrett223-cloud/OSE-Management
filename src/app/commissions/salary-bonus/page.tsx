@@ -10,7 +10,7 @@ interface SalaryWorker {
   totalSales: number;
   totalCommissionable: number;
   invoiceCount: number;
-  bonusProgress: {
+  bonusProgress?: {
     salesAmount: number;
     bonusThreshold: number;
     percentToThreshold: number;
@@ -125,7 +125,13 @@ export default function SalaryBonusPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {salaryWorkers.map((worker) => {
-                  const progress = worker.bonusProgress;
+                  const sales = (worker.totalCommissionable ?? worker.totalSales ?? 0);
+                  const progress = worker.bonusProgress ?? {
+                    salesAmount: sales,
+                    bonusThreshold: SALARY_BONUS_THRESHOLD,
+                    percentToThreshold: Math.min((sales / SALARY_BONUS_THRESHOLD) * 100, 100),
+                    hasEarnedBonus: sales >= SALARY_BONUS_THRESHOLD,
+                  };
                   const progressPercent = Math.min(progress.percentToThreshold, 100);
                   const remaining = Math.max(0, progress.bonusThreshold - progress.salesAmount);
 
