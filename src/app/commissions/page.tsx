@@ -84,6 +84,9 @@ export default function CommissionsPage() {
   const [repInvoices, setRepInvoices] = useState<InvoiceDetail[]>([]);
   const [loadingReps, setLoadingReps] = useState(true);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [editingRate, setEditingRate] = useState<string>("");
+  const [currentRate, setCurrentRate] = useState<number>(0.05);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch sales reps for current month
   useEffect(() => {
@@ -141,14 +144,18 @@ export default function CommissionsPage() {
       .then((data) => {
         if (!isMounted) return;
         if (data.ok && data.invoices) {
-          // Ensure all invoices have shippingDeducted field
+          // Normalize fields for UI (align with API response keys)
           const invoicesWithDefaults = data.invoices.map((inv: any) => ({
             ...inv,
-            shippingDeducted: inv.shippingDeducted ?? 0,
-            commissionable: inv.commissionable ?? 0,
+            totalShippingDeducted: inv.totalShippingDeducted ?? inv.shippingDeducted ?? 0,
+            totalCommissionable: inv.totalCommissionable ?? inv.commissionable ?? 0,
             commission: inv.commission ?? 0,
           }));
           setRepInvoices(invoicesWithDefaults);
+          if (typeof data.commissionRate === "number") {
+            setCurrentRate(data.commissionRate);
+            setEditingRate(String((data.commissionRate * 100).toFixed(2)));
+          }
         }
       })
       .catch((err) => {
@@ -162,7 +169,27 @@ export default function CommissionsPage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedRepId, selectedMonth]);
+  }, [selectedRepId, selectedMonth, refreshKey]);
+
+  // Save commission rate
+  const saveCommissionRate = async () => {
+    const pct = parseFloat(editingRate);
+    if (!isFinite(pct)) return;
+    const rate = Math.max(0, pct) / 100;
+    try {
+      const res = await fetch("/api/reps/commission-rate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repName: selectedRepId, commissionRate: rate }),
+      });
+      if (!res.ok) throw new Error("Failed to save rate");
+      setCurrentRate(rate);
+      // refresh invoices for updated totals
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
 
   const filteredReps = useMemo(() => {
@@ -174,17 +201,20 @@ export default function CommissionsPage() {
       invoiceCount: r.invoiceCount,
       missingSKUCount: 0,
     })) : mockReps;
-    
-    return displayReps.filter((r) => r.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    // Sort by commission desc by default
+    const sorted = [...displayReps].sort((a, b) => (b.commissionMTD || 0) - (a.commissionMTD || 0));
+    return sorted.filter((r) => r.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [repSalesData, searchTerm]);
 
   const selectedRep = filteredReps.find((r) => r.id === selectedRepId);
   
-  const totalCommissionOwed = useMemo(() => {
-    return repSalesData.length > 0
-      ? repSalesData.reduce((sum, rep) => sum + rep.commission, 0)
-      : mockReps.reduce((sum, rep) => sum + rep.commissionMTD, 0);
-  }, [repSalesData]);
+  // Selected totals
+  const selectedTotals = useMemo(() => {
+    const totalCommission = repInvoices.reduce((s, i) => s + (i.commission || 0), 0);
+    const totalCommissionable = repInvoices.reduce((s, i) => s + (i.totalCommissionable || 0), 0);
+    const totalShipping = repInvoices.reduce((s, i) => s + (i.totalShippingDeducted || 0), 0);
+    return { totalCommission, totalCommissionable, totalShipping, count: repInvoices.length };
+  }, [repInvoices]);
 
   const startQboConnect = () => {
     setConnectError(null);
@@ -277,20 +307,39 @@ export default function CommissionsPage() {
               </div>
             )}
 
-            {/* Totals */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="rounded-2xl bg-white shadow-sm border border-slate-200 px-5 py-4">
-                <div className="text-xs font-semibold uppercase text-slate-500">All Sales Rep Commission Owed</div>
-                <div className="text-3xl font-bold text-slate-900 mt-1">${money(totalCommissionOwed)}</div>
-                <div className="text-xs text-slate-500 mt-1">Across all reps (current data source)</div>
+            {/* Hero Summary Row */}
+            <section className="rounded-2xl bg-white/90 shadow-sm ring-1 ring-slate-200 p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+                {/* Left: Rep + Owed */}
+                <div className="lg:col-span-2">
+                  <div className="text-sm text-slate-600">{monthYearDisplay}</div>
+                  <div className="mt-1 text-2xl font-semibold text-slate-900">{selectedRep?.name || "Select a rep"}</div>
+                  <div className="mt-3 text-slate-600 text-sm">Total Commission Owed</div>
+                  <div className="text-5xl font-bold text-emerald-700 tracking-tight">${money(selectedTotals.totalCommission)}</div>
+                </div>
+                {/* Right: Secondary metrics */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="rounded-xl bg-slate-50 px-4 py-3">
+                    <div className="text-xs uppercase text-slate-600">Commissionable</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900">${money(selectedTotals.totalCommissionable)}</div>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 px-4 py-3">
+                    <div className="text-xs uppercase text-slate-600">Invoices</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900">{selectedTotals.count}</div>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 px-4 py-3">
+                    <div className="text-xs uppercase text-slate-600">Shipping</div>
+                    <div className="mt-1 text-lg font-semibold text-blue-700">${money(selectedTotals.totalShipping)}</div>
+                  </div>
+                </div>
               </div>
-            </div>
+            </section>
 
             {/* Master-Detail */}
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-12 gap-6">
               {/* Left: Sales Rep List */}
-              <div className="col-span-1 rounded-2xl bg-white shadow-md ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 px-4 py-4">
+              <div className="col-span-12 md:col-span-4 lg:col-span-3 rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-4 py-3">
                   <h2 className="text-lg font-semibold text-slate-900">Sales Reps</h2>
                   <input
                     type="text"
@@ -305,23 +354,21 @@ export default function CommissionsPage() {
                     <button
                       key={rep.id}
                       onClick={() => setSelectedRepId(rep.id)}
-                      className={`w-full text-left px-4 py-4 transition ${
+                      className={`w-full text-left px-4 py-5 transition ${
                         selectedRepId === rep.id
-                          ? "bg-blue-50 border-l-4 border-blue-600"
+                          ? "bg-blue-50/70 border-l-4 border-blue-600"
                           : "hover:bg-slate-50 border-l-4 border-transparent"
                       }`}
                       type="button"
                     >
                       <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-semibold text-slate-900">{rep.name}</p>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 truncate">{rep.name}</p>
                           <p className="text-xs text-slate-600">{rep.qboCode}</p>
                         </div>
-                        {rep.missingSKUCount > 0 && (
-                          <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
-                            {rep.missingSKUCount} SKU
-                          </span>
-                        )}
+                        <span className="ml-2 shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                          {rep.invoiceCount}
+                        </span>
                       </div>
                       <div className="mt-2 flex gap-4 text-xs">
                         <div>
@@ -340,38 +387,70 @@ export default function CommissionsPage() {
 
               {/* Right: Selected Rep Profile */}
               {selectedRep && (
-                <div className="col-span-2 space-y-6">
-                  {/* Summary Cards */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                      <p className="text-xs uppercase text-slate-600">Commission MTD</p>
-                      <p className="mt-1 text-3xl font-semibold text-slate-900">${money(selectedRep?.commissionMTD || 0)}</p>
+                <div className="col-span-12 md:col-span-8 lg:col-span-9 space-y-6">
+                  {/* Cluster: Earnings */}
+                  <div className="rounded-2xl bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                      <div>
+                        <p className="text-xs uppercase text-slate-600">Commission MTD</p>
+                        <p className="mt-1 text-2xl font-semibold text-slate-900">${money(selectedTotals.totalCommission)}</p>
+                      </div>
+                      <div className="flex items-end gap-3">
+                        <div>
+                          <p className="text-xs uppercase text-slate-600">Commission Rate (%)</p>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editingRate}
+                            onChange={(e) => setEditingRate(e.target.value)}
+                            className="mt-1 w-28 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+                          />
+                        </div>
+                        <button
+                          onClick={saveCommissionRate}
+                          className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition hover:bg-blue-700"
+                          type="button"
+                        >
+                          Save Rate
+                        </button>
+                        <span className="text-sm text-slate-600">Current: {(currentRate * 100).toFixed(2)}%</span>
+                      </div>
                     </div>
-                    <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                      <p className="text-xs uppercase text-slate-600">Invoice Count</p>
-                      <p className="mt-1 text-3xl font-semibold text-slate-900">{selectedRep?.invoiceCount || 0}</p>
+                  </div>
+
+                  {/* Cluster: Volume & Adjustments */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="rounded-2xl bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200">
+                      <div className="text-xs uppercase text-slate-600">Volume</div>
+                      <div className="mt-2 grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-xs text-slate-600">Commissionable Sales</div>
+                          <div className="text-lg font-semibold text-slate-900">${money(selectedTotals.totalCommissionable)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-600">Invoice Count</div>
+                          <div className="text-lg font-semibold text-slate-900">{selectedTotals.count}</div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                      <p className="text-xs uppercase text-slate-600">Commissionable Sales</p>
-                      <p className="mt-1 text-2xl font-semibold text-emerald-700">
-                        ${money((selectedRep?.commissionMTD || 0) / 0.05)}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                      <p className="text-xs uppercase text-slate-600">Shipping Deducted</p>
-                      <p className="mt-1 text-2xl font-semibold text-blue-700">
-                        ${money(repInvoices.reduce((sum, inv) => sum + inv.shippingDeducted, 0))}
-                      </p>
+                    <div className="rounded-2xl bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200">
+                      <div className="text-xs uppercase text-slate-600">Adjustments</div>
+                      <div className="mt-2 grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-xs text-slate-600">Shipping Deducted</div>
+                          <div className="text-lg font-semibold text-blue-700">${money(selectedTotals.totalShipping)}</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   {/* Invoices Table */}
-                  <div className="rounded-2xl bg-white shadow-md ring-1 ring-slate-200">
+                  <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
                     <div className="border-b border-slate-200 px-6 py-4">
                       <h3 className="text-lg font-semibold text-slate-900">Invoices</h3>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full divide-y divide-slate-100 text-sm">
+                      <table className="w-full text-sm">
                         <thead className="bg-slate-50">
                           <tr>
                             <th className="px-6 py-3 text-left font-semibold text-slate-600">Invoice #</th>
@@ -381,7 +460,7 @@ export default function CommissionsPage() {
                             <th className="px-6 py-3 text-center font-semibold text-slate-600">Action</th>
                           </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100">
                           {loadingInvoices ? (
                             <tr>
                               <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
@@ -395,16 +474,16 @@ export default function CommissionsPage() {
                               </td>
                             </tr>
                           ) : (
-                            repInvoices.map((inv) => (
-                              <tr key={inv.id} className="hover:bg-slate-50">
+                            repInvoices.map((inv, idx) => (
+                              <tr key={inv.id} className={"hover:bg-slate-50 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white") }>
                                 <td className="px-6 py-4 font-medium text-slate-900">{inv.invoiceNumber}</td>
                                 <td className="px-6 py-4 text-slate-600">{new Date(inv.txnDate).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 text-right text-slate-600">${money(inv.shippingDeducted)}</td>
-                                <td className="px-6 py-4 text-right font-semibold text-emerald-700">${money(inv.commission)}</td>
+                                <td className="px-6 py-4 text-right text-slate-600">${money(inv.totalShippingDeducted)}</td>
+                                <td className="px-6 py-4 text-right font-semibold text-emerald-700 text-base">${money(inv.commission)}</td>
                                 <td className="px-6 py-4 text-center">
                                   <button
                                     onClick={() => toggleInvoiceExpand(inv.id)}
-                                    className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                                     type="button"
                                   >
                                     {expandedInvoices.has(inv.id) ? "Hide" : "Show"} lines
@@ -434,6 +513,14 @@ export default function CommissionsPage() {
                                 </tr>
                               ))}
                         </tbody>
+                        <tfoot className="bg-white sticky bottom-0">
+                          <tr>
+                            <td className="px-6 py-3 text-left text-slate-600 font-semibold" colSpan={2}>Totals</td>
+                            <td className="px-6 py-3 text-right text-slate-600 font-semibold">${money(selectedTotals.totalShipping)}</td>
+                            <td className="px-6 py-3 text-right text-emerald-700 font-bold">${money(selectedTotals.totalCommission)}</td>
+                            <td className="px-6 py-3"></td>
+                          </tr>
+                        </tfoot>
                       </table>
                     </div>
                   </div>

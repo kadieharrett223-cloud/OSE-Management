@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch } from "@/lib/qbo";
 import { parseRepCode, calculateCommission, getBonusProgress } from "@/lib/repCommissionLogic";
+import { canonicalizeRep, aliasesForCanonical } from "@/lib/repAliases";
 import { getPriceList, matchItemAndCalculateShipping } from "@/lib/shippingDeduction";
+import { getServerSupabaseClient } from "@/lib/supabase";
 
 interface RepSales {
   repName: string;
@@ -130,6 +132,36 @@ export async function GET(req: NextRequest) {
       entry.count += 1;
     }
 
+    // Load custom commission rates, defaulting to 5%
+    const allRepCodes = Array.from(repMapFull.keys()).flatMap((code) => {
+      const p = parseRepCode(code);
+      const primary = canonicalizeRep(p.primaryRep);
+      const assistant = p.assistantRep ? canonicalizeRep(p.assistantRep) : undefined;
+      return [primary, assistant].filter(Boolean) as string[];
+    });
+    const canonicalReps = Array.from(new Set(allRepCodes));
+    const supabase = getServerSupabaseClient();
+    const rateMap = new Map<string, number>();
+    if (canonicalReps.length > 0) {
+      // Query by aliases too so existing rows under aliases are respected
+      const repNamesToQuery = Array.from(new Set(canonicalReps.flatMap((c) => aliasesForCanonical(c))));
+      const { data } = await supabase
+        .from("rep_commission_rates")
+        .select("rep_name, commission_rate")
+        .in("rep_name", repNamesToQuery);
+      // Populate map by canonical key, preferring an exact canonical match if present
+      for (const c of canonicalReps) {
+        const aliases = aliasesForCanonical(c);
+        const exact = (data || []).find((r: any) => r.rep_name === c);
+        if (exact) {
+          rateMap.set(c, Number(exact.commission_rate));
+          continue;
+        }
+        const aliasRow = (data || []).find((r: any) => aliases.includes(r.rep_name));
+        if (aliasRow) rateMap.set(c, Number(aliasRow.commission_rate));
+      }
+    }
+
     // Second pass: split by primary and assistant rep
     const repMapSplit = new Map<string, RepSales>();
 
@@ -137,7 +169,8 @@ export async function GET(req: NextRequest) {
       const parsed = parseRepCode(repCode);
       
       // Add primary rep entry
-      const primaryKey = parsed.primaryRep;
+      const primaryKey = canonicalizeRep(parsed.primaryRep);
+      const primaryRate = rateMap.get(primaryKey) ?? 0.05;
       if (!repMapSplit.has(primaryKey)) {
         repMapSplit.set(primaryKey, {
           repName: primaryKey,
@@ -147,7 +180,7 @@ export async function GET(req: NextRequest) {
           totalShippingDeducted: 0,
           commission: 0,
           invoiceCount: 0,
-          commissionRate: 0.05,
+          commissionRate: primaryRate,
         });
       }
       
@@ -161,20 +194,22 @@ export async function GET(req: NextRequest) {
 
       // Add assistant rep entry (if exists)
       if (parsed.assistantRep) {
-        if (!repMapSplit.has(parsed.assistantRep)) {
-          repMapSplit.set(parsed.assistantRep, {
-            repName: parsed.assistantRep,
+        const assistantKey = canonicalizeRep(parsed.assistantRep);
+        const assistantRate = rateMap.get(assistantKey) ?? 0.05;
+        if (!repMapSplit.has(assistantKey)) {
+          repMapSplit.set(assistantKey, {
+            repName: assistantKey,
             isPrimary: false,
             totalSales: 0,
             totalCommissionable: 0,
             totalShippingDeducted: 0,
             commission: 0,
             invoiceCount: 0,
-            commissionRate: 0.05,
+            commissionRate: assistantRate,
           });
         }
 
-        const assistantEntry = repMapSplit.get(parsed.assistantRep)!;
+        const assistantEntry = repMapSplit.get(assistantKey)!;
         assistantEntry.totalSales += total;
         assistantEntry.totalCommissionable += commissionable;
         assistantEntry.totalShippingDeducted += shipping;
@@ -182,14 +217,14 @@ export async function GET(req: NextRequest) {
         
         // Calculate commission based on bonus threshold (using commissionable amount)
         assistantEntry.commission += calculateCommission(
-          parsed.assistantRep,
+          assistantKey,
           commissionable,
           assistantEntry.totalCommissionable,
           assistantEntry.commissionRate
         );
 
         // Add bonus progress info
-        const bonusProgress = getBonusProgress(parsed.assistantRep, assistantEntry.totalCommissionable);
+        const bonusProgress = getBonusProgress(assistantKey, assistantEntry.totalCommissionable);
         if (bonusProgress.isBonusRep) {
           assistantEntry.bonusProgress = {
             salesAmount: bonusProgress.salesAmount,

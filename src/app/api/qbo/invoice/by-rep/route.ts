@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch } from "@/lib/qbo";
 import { getPriceList, matchItemAndCalculateShipping } from "@/lib/shippingDeduction";
+import { getServerSupabaseClient } from "@/lib/supabase";
+import { canonicalizeRep, aliasesForCanonical } from "@/lib/repAliases";
 
 interface InvoiceDetail {
   id: string;
@@ -39,6 +41,16 @@ export async function GET(req: NextRequest) {
 
     // Fetch price list for shipping deductions
     const priceList = await getPriceList();
+    // Commission rate for this rep (canonical + aliases)
+    const supabase = getServerSupabaseClient();
+    const canonical = canonicalizeRep(repName);
+    const aliasList = aliasesForCanonical(canonical);
+    const { data: rateRows } = await supabase
+      .from("rep_commission_rates")
+      .select("rep_name, commission_rate")
+      .in("rep_name", aliasList);
+    const exact = (rateRows || []).find((r: any) => r.rep_name === canonical);
+    const commissionRate = Number((exact?.commission_rate ?? (rateRows?.[0]?.commission_rate)) ?? 0.05);
 
     // Build query for invoices
     let query = "SELECT * FROM Invoice";
@@ -92,8 +104,12 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        // Check if this rep (primary or assistant) is in the rep code
-        return invoiceRepName.includes(repName) || invoiceRepName === repName;
+        // Match against any alias for the canonical rep (case-insensitive contains or exact)
+        const invoiceLower = invoiceRepName.toLowerCase();
+        return aliasList.some((alias) => {
+          const a = alias.toLowerCase();
+          return invoiceLower.includes(a) || invoiceLower === a;
+        });
       })
       .map((inv: any) => {
         const totalAmount = Number(inv.TotalAmt) || 0;
@@ -163,7 +179,7 @@ export async function GET(req: NextRequest) {
           totalAmount: paidAmount,
           totalCommissionable,
           totalShippingDeducted,
-          commission: totalCommissionable * 0.05, // Default 5%
+          commission: totalCommissionable * commissionRate,
           lines,
         };
       });
@@ -181,6 +197,7 @@ export async function GET(req: NextRequest) {
       totalCommissionable: repInvoices.reduce((sum, inv) => sum + inv.totalCommissionable, 0),
       totalShippingDeducted: repInvoices.reduce((sum, inv) => sum + inv.totalShippingDeducted, 0),
       totalCommission,
+      commissionRate,
     });
   } catch (error: any) {
     return NextResponse.json(
