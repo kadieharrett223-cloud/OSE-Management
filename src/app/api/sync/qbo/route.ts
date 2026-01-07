@@ -79,10 +79,26 @@ export async function POST(request: Request) {
         }
       }
       
-      const rep = repByName.get(salesRepName || '');
+      // Handle split reps: "SC/KLH" means SC gets goal credit, KLH gets commission
+      let commissionRepName = salesRepName;
+      let goalRepName = salesRepName;
+      
+      if (salesRepName.includes('/')) {
+        const parts = salesRepName.split('/').map((p: string) => p.trim());
+        goalRepName = parts[0];      // First rep gets goal credit
+        commissionRepName = parts[1]; // Last rep gets commission
+      }
+      
+      const commissionRep = repByName.get(commissionRepName || '');
+      const goalRep = repByName.get(goalRepName || '');
 
-      if (!rep) {
-        console.warn(`No rep found for invoice ${qboInv.DocNumber}, Sales Rep: ${salesRepName}`);
+      if (!commissionRep) {
+        console.warn(`No rep found for commission on invoice ${qboInv.DocNumber}, Sales Rep: ${commissionRepName}`);
+        continue;
+      }
+      
+      if (!goalRep) {
+        console.warn(`No rep found for goal on invoice ${qboInv.DocNumber}, Sales Rep: ${goalRepName}`);
         continue;
       }
 
@@ -95,7 +111,7 @@ export async function POST(request: Request) {
 
         const shippingDeducted = priceItem ? qty * priceItem.shipping_included_per_unit : 0;
         const commissionableAmount = Math.max(0, line.Amount - shippingDeducted);
-        const commissionAmount = commissionableAmount * rep.commission_rate;
+        const commissionAmount = commissionableAmount * commissionRep.commission_rate;
 
         return {
           qbo_line_id: line.Id,
@@ -123,7 +139,8 @@ export async function POST(request: Request) {
           {
             qbo_invoice_id: qboInv.Id,
             invoice_number: qboInv.DocNumber,
-            rep_id: rep.id,
+            rep_id: commissionRep.id,
+            goal_rep_id: goalRep.id,
             txn_date: qboInv.TxnDate,
             total_amount: qboInv.TotalAmt,
             commission_total: commissionTotal,
@@ -149,9 +166,14 @@ export async function POST(request: Request) {
 
       syncedCount++;
 
-      // Track affected rep/month for snapshot update
+      // Track affected rep/month for snapshot update (both commission and goal reps)
       const txnDate = new Date(qboInv.TxnDate);
-      affectedRepMonths.add(`${rep.id}|${txnDate.getFullYear()}|${txnDate.getMonth() + 1}`);
+      const year = txnDate.getFullYear();
+      const month = txnDate.getMonth() + 1;
+      affectedRepMonths.add(`${commissionRep.id}|${year}|${month}`);
+      if (goalRep.id !== commissionRep.id) {
+        affectedRepMonths.add(`${goalRep.id}|${year}|${month}`);
+      }
     }
 
     // Recompute commission snapshots for affected rep/months
