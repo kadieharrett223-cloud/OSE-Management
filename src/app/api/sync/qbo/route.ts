@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabaseClient } from '@/lib/supabase';
 import { calculateCommissionForInvoice } from '@/lib/commissions';
-import { queryQBO } from '@/lib/qbo';
+import { authorizedQboFetch } from '@/lib/qbo';
 
 /**
  * POST /api/sync/qbo
@@ -34,9 +34,9 @@ export async function POST(request: Request) {
     // Fetch real invoices from QBO
     let qboInvoices: any[] = [];
     try {
-      const response = await queryQBO(
-        "select * from Invoice maxresults 100",
-        supabase
+      const query = "SELECT * FROM Invoice";
+      const response = await authorizedQboFetch<any>(
+        `/query?query=${encodeURIComponent(query)}&minorversion=65`
       );
       qboInvoices = response.QueryResponse?.Invoice || [];
     } catch (error: any) {
