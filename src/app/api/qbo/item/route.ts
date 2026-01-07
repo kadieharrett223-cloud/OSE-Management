@@ -1,19 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch } from "@/lib/qbo";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const fetchCache = "force-no-store";
+
 export async function GET(req: NextRequest) {
   try {
-    // Fetch all items from QuickBooks
-    const query = "SELECT * FROM Item";
-    const data = await authorizedQboFetch<any>(
-      `/query?query=${encodeURIComponent(query)}&minorversion=65`
-    );
-
-    const items = data?.QueryResponse?.Item || [];
+    // Fetch all items from QuickBooks with pagination
+    const allItems: any[] = [];
+    let start = 1;
+    const pageSize = 1000; // QBO maxresults limit
+    while (true) {
+      const query = `SELECT * FROM Item STARTPOSITION ${start} MAXRESULTS ${pageSize}`;
+      const data = await authorizedQboFetch<any>(
+        `/query?query=${encodeURIComponent(query)}&minorversion=65`
+      );
+      const page = data?.QueryResponse?.Item || [];
+      allItems.push(...page);
+      if (page.length < pageSize) break;
+      start += pageSize;
+    }
     
+    // Filter out sales tax codes and similar non-inventory entries
+    const isSalesTaxLike = (item: any) => {
+      const name: string = String(item?.Name || "");
+      const type: string = String(item?.Type || "");
+      const nameLower = name.toLowerCase();
+      // Examples to exclude: "Sales Tax", names like "0302 Kennewick Service"
+      const looksLikeTaxCode = /sales\s*tax|tax\b/.test(nameLower) || /^(\d{3,4})\s+.*\bservice\b/i.test(name);
+      return type.toLowerCase() === "salestax" || looksLikeTaxCode;
+    };
+
+    const filteredItems = allItems.filter((item) => !isSalesTaxLike(item));
+
     return NextResponse.json({
       ok: true,
-      items: items.map((item: any) => ({
+      items: filteredItems.map((item: any) => ({
         id: item.Id,
         name: item.Name,
         sku: item.Sku || item.Name,

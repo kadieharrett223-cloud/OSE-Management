@@ -4,14 +4,27 @@ export const REP_ALIASES: Record<string, string[]> = {
   "SC": ["SC", "sc"],
 };
 
+function normalize(str: string): string {
+  return str
+    .trim()
+    .toLowerCase()
+    // replace any non-alphanumeric with a single space
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " "); // collapse whitespace
+}
+
 export function canonicalizeRep(name: string | undefined | null): string {
-  const n = (name || "").trim();
-  if (!n) return "";
-  const lower = n.toLowerCase();
+  const raw = (name || "").trim();
+  if (!raw) return "";
+  const normName = normalize(raw);
   for (const [canonical, aliases] of Object.entries(REP_ALIASES)) {
-    if (aliases.some((a) => a.toLowerCase() === lower)) return canonical;
+    const aliasNorms = aliases.map(normalize);
+    // exact match OR contains alias token (handles "Wholesale Lifts Inc")
+    if (aliasNorms.some((a) => normName === a || normName.includes(a))) {
+      return canonical;
+    }
   }
-  return n;
+  return raw;
 }
 
 export function aliasesForCanonical(canonical: string): string[] {

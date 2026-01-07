@@ -28,6 +28,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json(
+        { error: "SUPABASE_SERVICE_ROLE_KEY is not set on the server. Saving commission rates requires the service role key. Add it to your environment (e.g., .env.local) and restart the server." },
+        { status: 503 }
+      );
+    }
     const body = await req.json();
     const repName = String(body.repName || "");
     const commissionRate = Number(body.commissionRate);

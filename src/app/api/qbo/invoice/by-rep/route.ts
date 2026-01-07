@@ -157,16 +157,15 @@ export async function GET(req: NextRequest) {
               matched: matched.matched,
             };
           } else {
-            // Not a sales item (discount, tax, etc)
-            totalCommissionable += lineAmount;
+            // Not a sales item (discount, tax, etc) — do not count toward commissionable
             return {
               sku: "",
-              description: line.Description || "Other",
+              description: line.Description || "Other (non-item)",
               qty: 1,
               unitPrice: lineAmount,
               lineAmount,
               shippingDeducted: 0,
-              commissionable: lineAmount,
+              commissionable: 0,
               matched: false,
             };
           }

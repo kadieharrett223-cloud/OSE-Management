@@ -112,8 +112,8 @@ export async function GET(req: NextRequest) {
             totalCommissionable += matched.commissionable;
             totalShippingDeducted += matched.shippingDeducted;
           } else {
-            // Not a sales item line (maybe discount, tax, etc) - count full amount
-            totalCommissionable += Number(line.Amount) || 0;
+            // Not a sales item (discount, tax, etc) — do not count toward commissionable
+            // Keep shippingDeducted unchanged; exclude from commissionable
           }
         }
       } else {
@@ -236,10 +236,30 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Convert to array and sort by sales
-    const repSales = Array.from(repMapSplit.values()).sort(
-      (a, b) => b.totalSales - a.totalSales
-    );
+    // Convert to array and sort by sales, then consolidate any residual duplicates by repName
+    const preliminary = Array.from(repMapSplit.values());
+    const consolidated = new Map<string, typeof preliminary[number]>();
+    for (const entry of preliminary) {
+      const key = entry.repName;
+      if (!consolidated.has(key)) {
+        consolidated.set(key, { ...entry });
+      } else {
+        const acc = consolidated.get(key)!;
+        acc.totalSales += entry.totalSales;
+        acc.totalCommissionable += entry.totalCommissionable;
+        acc.totalShippingDeducted += entry.totalShippingDeducted;
+        acc.commission += entry.commission;
+        acc.invoiceCount += entry.invoiceCount;
+        // keep highest commissionRate if they differ
+        acc.commissionRate = Math.max(acc.commissionRate, entry.commissionRate);
+        // prefer marking as primary if any entry is primary
+        acc.isPrimary = acc.isPrimary || entry.isPrimary;
+        if (entry.bonusProgress) {
+          acc.bonusProgress = entry.bonusProgress;
+        }
+      }
+    }
+    const repSales = Array.from(consolidated.values()).sort((a, b) => b.totalSales - a.totalSales);
 
     return NextResponse.json({
       ok: true,

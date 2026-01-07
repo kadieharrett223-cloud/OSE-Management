@@ -4,20 +4,10 @@ export const fetchCache = "force-no-store";
 
 import { NextRequest, NextResponse } from "next/server";
 import { buildAuthorizeUrl } from "@/lib/qbo";
-import { getSessionOrBypass } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
-    // Require authenticated admin to start QBO connect
-    const session: any = await getSessionOrBypass();
-    const role = (session?.user?.role ?? "").toString().toLowerCase();
-    if (!session) {
-      return NextResponse.json({ error: "Login required" }, { status: 401 });
-    }
-    if (role !== "admin") {
-      return NextResponse.json({ error: "Admin role required" }, { status: 403 });
-    }
-    const state = "ose-qbo"; // TODO: replace with CSRF-safe state if needed
+    const state = "ose-qbo";
     const url = buildAuthorizeUrl(state);
     const debug = req.nextUrl.searchParams.get("debug");
     if (debug) {
@@ -27,9 +17,6 @@ export async function GET(req: NextRequest) {
         redirectUri: process.env.QBO_REDIRECT_URI,
         clientId: process.env.QBO_CLIENT_ID ? "set" : "missing",
         environment: process.env.QBO_ENVIRONMENT,
-        user: session?.user?.email || null,
-        role,
-        isAdmin: role === "admin",
       });
     }
     return NextResponse.redirect(url);

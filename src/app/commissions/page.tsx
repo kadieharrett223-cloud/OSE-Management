@@ -87,6 +87,8 @@ export default function CommissionsPage() {
   const [editingRate, setEditingRate] = useState<string>("");
   const [currentRate, setCurrentRate] = useState<number>(0.05);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [saveStatus, setSaveStatus] = useState<{ok?: boolean; message?: string}>({});
+  const [invoiceStatus, setInvoiceStatus] = useState<"paid" | "unpaid" | "all">("paid");
 
   // Fetch sales reps for current month
   useEffect(() => {
@@ -96,7 +98,7 @@ export default function CommissionsPage() {
     const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
 
     fetch(
-      `/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=paid`
+      `/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=${invoiceStatus}&_=${Date.now()}`
     )
       .then(async (res) => {
         if (!res.ok) throw new Error("Failed to fetch sales by rep");
@@ -122,7 +124,7 @@ export default function CommissionsPage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedMonth]);
+  }, [selectedMonth, invoiceStatus]);
 
   // Fetch invoices for selected rep
   useEffect(() => {
@@ -135,7 +137,7 @@ export default function CommissionsPage() {
     const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
 
     fetch(
-      `/api/qbo/invoice/by-rep?repName=${encodeURIComponent(selectedRepId)}&startDate=${startDate}&endDate=${endDate}&status=paid`
+      `/api/qbo/invoice/by-rep?repName=${encodeURIComponent(selectedRepId)}&startDate=${startDate}&endDate=${endDate}&status=${invoiceStatus}&_=${Date.now()}`
     )
       .then(async (res) => {
         if (!res.ok) throw new Error("Failed to fetch invoices");
@@ -169,7 +171,7 @@ export default function CommissionsPage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedRepId, selectedMonth, refreshKey]);
+  }, [selectedRepId, selectedMonth, refreshKey, invoiceStatus]);
 
   // Save commission rate
   const saveCommissionRate = async () => {
@@ -177,17 +179,23 @@ export default function CommissionsPage() {
     if (!isFinite(pct)) return;
     const rate = Math.max(0, pct) / 100;
     try {
+      setSaveStatus({});
       const res = await fetch("/api/reps/commission-rate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ repName: selectedRepId, commissionRate: rate }),
       });
-      if (!res.ok) throw new Error("Failed to save rate");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || "Failed to save rate");
+      }
       setCurrentRate(rate);
       // refresh invoices for updated totals
       setRefreshKey((k) => k + 1);
+      setSaveStatus({ ok: true, message: "Saved" });
     } catch (e) {
       console.error(e);
+      setSaveStatus({ ok: false, message: e instanceof Error ? e.message : "Failed to save" });
     }
   };
 
@@ -289,6 +297,18 @@ export default function CommissionsPage() {
                       onChange={(e) => setSelectedMonth(e.target.value)}
                       className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase text-slate-600">Status</label>
+                    <select
+                      value={invoiceStatus}
+                      onChange={(e) => setInvoiceStatus(e.target.value as any)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    >
+                      <option value="paid">Paid</option>
+                      <option value="unpaid">Unpaid</option>
+                      <option value="all">All</option>
+                    </select>
                   </div>
                   <button
                     onClick={startQboConnect}
@@ -414,6 +434,11 @@ export default function CommissionsPage() {
                           Save Rate
                         </button>
                         <span className="text-sm text-slate-600">Current: {(currentRate * 100).toFixed(2)}%</span>
+                        {saveStatus.message && (
+                          <span className={`text-xs ${saveStatus.ok ? "text-emerald-700" : "text-red-600"}`}>
+                            {saveStatus.message}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -475,43 +500,45 @@ export default function CommissionsPage() {
                             </tr>
                           ) : (
                             repInvoices.map((inv, idx) => (
-                              <tr key={inv.id} className={"hover:bg-slate-50 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white") }>
-                                <td className="px-6 py-4 font-medium text-slate-900">{inv.invoiceNumber}</td>
-                                <td className="px-6 py-4 text-slate-600">{new Date(inv.txnDate).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 text-right text-slate-600">${money(inv.totalShippingDeducted)}</td>
-                                <td className="px-6 py-4 text-right font-semibold text-emerald-700 text-base">${money(inv.commission)}</td>
-                                <td className="px-6 py-4 text-center">
-                                  <button
-                                    onClick={() => toggleInvoiceExpand(inv.id)}
-                                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                                    type="button"
-                                  >
-                                    {expandedInvoices.has(inv.id) ? "Hide" : "Show"} lines
-                                  </button>
-                                </td>
-                              </tr>
+                              [
+                                (
+                                  <tr key={inv.id} className={"hover:bg-slate-50 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white") }>
+                                    <td className="px-6 py-4 font-medium text-slate-900">{inv.invoiceNumber}</td>
+                                    <td className="px-6 py-4 text-slate-600">{new Date(inv.txnDate).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 text-right text-slate-600">${money(inv.totalShippingDeducted)}</td>
+                                    <td className="px-6 py-4 text-right font-semibold text-emerald-700 text-base">${money(inv.commission)}</td>
+                                    <td className="px-6 py-4 text-center">
+                                      <button
+                                        onClick={() => toggleInvoiceExpand(inv.id)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                                        type="button"
+                                      >
+                                        {expandedInvoices.has(inv.id) ? "Hide" : "Show"} lines
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ),
+                                expandedInvoices.has(inv.id) ? (
+                                  <tr key={`${inv.id}-detail`} className="bg-blue-50">
+                                    <td colSpan={5} className="px-6 py-4">
+                                      <p className="mb-3 text-xs font-semibold uppercase text-slate-700">Line Items</p>
+                                      <div className="space-y-2">
+                                        {inv.lines.map((line, idx2) => (
+                                          <div key={idx2} className="flex justify-between rounded-lg bg-white px-4 py-2 text-xs">
+                                            <span className="font-medium text-slate-900">{line.sku || line.description}</span>
+                                            <span className="text-slate-600">
+                                              {line.qty} × ${money(line.unitPrice)} = ${money(line.lineAmount)}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ) : null,
+                              ]
                             ))
                           )}
-                          {expandedInvoices.size > 0 &&
-                            repInvoices
-                              .filter((inv) => expandedInvoices.has(inv.id))
-                              .map((inv) => (
-                                <tr key={`${inv.id}-detail`} className="bg-blue-50">
-                                  <td colSpan={5} className="px-6 py-4">
-                                    <p className="mb-3 text-xs font-semibold uppercase text-slate-700">Line Items</p>
-                                    <div className="space-y-2">
-                                      {inv.lines.map((line, idx) => (
-                                        <div key={idx} className="flex justify-between rounded-lg bg-white px-4 py-2 text-xs">
-                                          <span className="font-medium text-slate-900">{line.sku || line.description}</span>
-                                          <span className="text-slate-600">
-                                            {line.qty} × ${money(line.unitPrice)} = ${money(line.lineAmount)}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
+                          
                         </tbody>
                         <tfoot className="bg-white sticky bottom-0">
                           <tr>

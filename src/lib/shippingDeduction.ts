@@ -2,12 +2,20 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables");
 }
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Prefer service role key on the server so RLS doesn't block shipping data reads
+const supabase = createClient(
+  supabaseUrl,
+  serviceRoleKey || supabaseAnonKey,
+  serviceRoleKey
+    ? { auth: { autoRefreshToken: false, persistSession: false } }
+    : undefined
+);
 
 export interface PriceListItem {
   id?: string;
@@ -129,9 +137,9 @@ export function matchItemAndCalculateShipping(
     }
   }
 
-  // Priority 2: Try to match by SKU (item name from QBO)
+  // Priority 2: Try to match by exact name/SKU key
   const searchKey = qboItemName?.toUpperCase() || qboItemRefValue?.toUpperCase();
-  const priceListItem = priceListMap.get(searchKey);
+  const priceListItem = searchKey ? priceListMap.get(searchKey) : undefined;
 
   if (priceListItem) {
     const shippingDeducted = quantity * priceListItem.shipping_included_per_unit;
@@ -144,6 +152,35 @@ export function matchItemAndCalculateShipping(
       shippingDeducted,
       commissionable: Math.max(0, commissionable),
     };
+  }
+
+  // Priority 3: Fuzzy contains match (SKU contained in the QBO item name)
+  if (qboItemName) {
+    const upperName = qboItemName.toUpperCase();
+    const seen = new Set<string>();
+    let best: PriceListItem | undefined;
+    for (const value of priceListMap.values()) {
+      if (!value || !value.sku) continue;
+      if (seen.has(value.sku)) continue; // avoid duplicate entries created by multiple keys
+      seen.add(value.sku);
+      const skuUpper = value.sku.toUpperCase();
+      if (upperName.includes(skuUpper)) {
+        if (!best || skuUpper.length > best.sku.length) {
+          best = value;
+        }
+      }
+    }
+    if (best) {
+      const shippingDeducted = quantity * best.shipping_included_per_unit;
+      const commissionable = lineTotal - shippingDeducted;
+      return {
+        matched: true,
+        matchedSku: best.sku,
+        shippingPerUnit: best.shipping_included_per_unit,
+        shippingDeducted,
+        commissionable: Math.max(0, commissionable),
+      };
+    }
   }
 
   // No match found - treat entire line as commissionable (shipping = $0)
