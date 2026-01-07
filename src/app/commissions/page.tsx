@@ -148,11 +148,11 @@ export default function CommissionsPage() {
       .then((data) => {
         if (!isMounted) return;
         if (data.ok && data.invoices) {
-          // Normalize fields for UI (align with API response keys)
+          // Normalize fields for UI: set invoice-level commissionable and shippingDeducted
           const invoicesWithDefaults = data.invoices.map((inv: any) => ({
             ...inv,
-            totalShippingDeducted: inv.totalShippingDeducted ?? inv.shippingDeducted ?? 0,
-            totalCommissionable: inv.totalCommissionable ?? inv.commissionable ?? 0,
+            commissionable: inv.totalCommissionable ?? inv.commissionable ?? 0,
+            shippingDeducted: inv.totalShippingDeducted ?? inv.shippingDeducted ?? 0,
             commission: inv.commission ?? 0,
           }));
           setRepInvoices(invoicesWithDefaults);
