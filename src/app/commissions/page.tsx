@@ -337,6 +337,7 @@ export default function CommissionsPage() {
                             <th className="px-6 py-3 text-left font-semibold text-slate-600">Invoice #</th>
                             <th className="px-6 py-3 text-left font-semibold text-slate-600">Date</th>
                             <th className="px-6 py-3 text-right font-semibold text-slate-600">Commissionable</th>
+                            <th className="px-6 py-3 text-right font-semibold text-slate-600">Shipping Deducted</th>
                             <th className="px-6 py-3 text-right font-semibold text-slate-600">Commission</th>
                             <th className="px-6 py-3 text-center font-semibold text-slate-600">Action</th>
                           </tr>
@@ -344,13 +345,13 @@ export default function CommissionsPage() {
                         <tbody>
                           {loadingInvoices ? (
                             <tr>
-                              <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                              <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                                 Loading invoices...
                               </td>
                             </tr>
                           ) : repInvoices.length === 0 ? (
                             <tr>
-                              <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                              <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                                 No invoices for this rep in the selected month
                               </td>
                             </tr>
@@ -360,6 +361,7 @@ export default function CommissionsPage() {
                                 <td className="px-6 py-4 font-medium text-slate-900">{inv.invoiceNumber}</td>
                                 <td className="px-6 py-4 text-slate-600">{new Date(inv.txnDate).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 text-right text-slate-900">${money(inv.commissionable)}</td>
+                                <td className="px-6 py-4 text-right text-slate-600">${money(inv.shippingDeducted)}</td>
                                 <td className="px-6 py-4 text-right font-semibold text-emerald-700">${money(inv.commission)}</td>
                                 <td className="px-6 py-4 text-center">
                                   <button
