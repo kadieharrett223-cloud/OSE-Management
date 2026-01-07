@@ -223,7 +223,7 @@ export default function CommissionsPage() {
   // Selected totals
   const selectedTotals = useMemo(() => {
     const totalCommission = repInvoices.reduce((s, i) => s + (i.commission || 0), 0);
-    const totalCommissionable = repInvoices.reduce((s, i) => s + (i.totalCommissionable || 0), 0);
+    const totalCommissionable = repInvoices.reduce((s, i) => s + (i.commissionable || 0), 0);
     const totalShipping = repInvoices.reduce((s, i) => s + (i.totalShippingDeducted || 0), 0);
     return { totalCommission, totalCommissionable, totalShipping, count: repInvoices.length };
   }, [repInvoices]);
