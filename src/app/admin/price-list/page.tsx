@@ -213,8 +213,8 @@ export default function AdminPriceListPage() {
     // 8) rounded_sale_price = floor(black_friday_price / 100) * 100 - 1
     const rounded_sale_price = Math.floor(black_friday_price / 100) * 100 - 1;
 
-    // 9) profit = sell_price - per_unit
-    const profit = sell_price - per_unit;
+    // 9) profit = sell_price - cost_with_shipping (total cost including shipping)
+    const profit = sell_price - cost_with_shipping;
 
     return {
       ...item,

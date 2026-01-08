@@ -19,8 +19,8 @@ BEGIN
   -- 4) sell_price = cost_with_shipping * multiplier
   NEW.sell_price := NEW.cost_with_shipping * COALESCE(NEW.multiplier, 1);
   
-  -- 5) profit = sell_price - per_unit (final cost without shipping/markup)
-  NEW.profit := NEW.sell_price - NEW.per_unit;
+  -- 5) profit = sell_price - cost_with_shipping (total cost including shipping)
+  NEW.profit := NEW.sell_price - NEW.cost_with_shipping;
   
   -- 6) rounded_normal_price = floor(sell_price / 5) * 5
   NEW.rounded_normal_price := FLOOR(NEW.sell_price / 5) * 5;
@@ -47,4 +47,4 @@ CREATE TRIGGER compute_price_list_fields_trigger
 
 -- Backfill existing rows with profit calculation
 UPDATE price_list_items
-SET profit = sell_price - per_unit;
+SET profit = sell_price - cost_with_shipping;
