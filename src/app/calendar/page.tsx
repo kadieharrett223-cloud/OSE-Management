@@ -276,7 +276,12 @@ export default function CalendarPage() {
   };
 
   const getSalesForDate = (date: Date) => {
-    const dateStr = date.toISOString().split("T")[0];
+    // Format date as YYYY-MM-DD in local timezone (no UTC conversion)
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
     const found = dailySales.find(s => s.date === dateStr);
     return found;
   };
