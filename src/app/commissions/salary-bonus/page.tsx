@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { usePathname } from "next/navigation";
 import { SALARY_BONUS_THRESHOLD } from "@/lib/repTypes";
+import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
 interface SalaryWorker {
   repName: string;
@@ -24,7 +25,7 @@ const money = (value: number | undefined) => {
 };
 
 export default function SalaryBonusPage() {
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentCommissionMonth());
   const [salaryWorkers, setSalaryWorkers] = useState<SalaryWorker[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,9 +35,7 @@ export default function SalaryBonusPage() {
 
   const loadSalaryWorkers = async () => {
     setLoading(true);
-    const [year, month] = selectedMonth.split("-");
-    const startDate = `${year}-${month}-01`;
-    const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
+    const { startDate, endDate } = getCommissionDateRange(selectedMonth);
 
     try {
       const res = await fetch(

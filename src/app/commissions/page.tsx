@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { usePathname } from "next/navigation";
 import { isSalaryRep } from "@/lib/repTypes";
 import { isWholesalerName } from "@/lib/repAliases";
+import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
 interface RepData {
   repName: string;
@@ -80,7 +81,7 @@ export default function CommissionsPage() {
   const [selectedRepId, setSelectedRepId] = useState(mockReps[0]?.id);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentCommissionMonth());
   const [connectError, setConnectError] = useState<string | null>(null);
   const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
   const [repInvoices, setRepInvoices] = useState<InvoiceDetail[]>([]);
@@ -95,9 +96,7 @@ export default function CommissionsPage() {
   // Fetch sales reps for current month
   useEffect(() => {
     let isMounted = true;
-    const [year, month] = selectedMonth.split("-");
-    const startDate = `${year}-${month}-01`;
-    const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
+    const { startDate, endDate } = getCommissionDateRange(selectedMonth);
 
     fetch(
       `/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=${invoiceStatus}&_=${Date.now()}`
@@ -134,9 +133,7 @@ export default function CommissionsPage() {
 
     let isMounted = true;
     setLoadingInvoices(true);
-    const [year, month] = selectedMonth.split("-");
-    const startDate = `${year}-${month}-01`;
-    const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
+    const { startDate, endDate } = getCommissionDateRange(selectedMonth);
 
     fetch(
       `/api/qbo/invoice/by-rep?repName=${encodeURIComponent(selectedRepId)}&startDate=${startDate}&endDate=${endDate}&status=${invoiceStatus}&_=${Date.now()}`

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { usePathname } from "next/navigation";
+import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
 interface Wholesaler {
   id: string;
@@ -33,7 +34,7 @@ const money = (value: number | null) =>
 export default function WholesalersPage() {
   const [wholesalers, setWholesalers] = useState<Wholesaler[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentCommissionMonth());
   const [selectedWholesaler, setSelectedWholesaler] = useState<Wholesaler | null>(null);
   const [wholesalerInvoices, setWholesalerInvoices] = useState<Invoice[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
@@ -73,9 +74,7 @@ export default function WholesalersPage() {
 
   const loadCommissionTotals = async () => {
     try {
-      const [year, month] = selectedMonth.split("-");
-      const startDate = `${year}-${month}-01`;
-      const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
+      const { startDate, endDate } = getCommissionDateRange(selectedMonth);
       const res = await fetch(`/api/wholesalers/commissions?startDate=${startDate}&endDate=${endDate}`);
       if (!res.ok) throw new Error("Failed to load commission totals");
       const data = await res.json();
@@ -137,9 +136,7 @@ export default function WholesalersPage() {
   const loadInvoices = async (wholesalerId: string) => {
     setLoadingInvoices(true);
     try {
-      const [year, month] = selectedMonth.split("-");
-      const startDate = `${year}-${month}-01`;
-      const endDate = `${year}-${month}-${String(new Date(Number(year), Number(month), 0).getDate()).padStart(2, "0")}`;
+      const { startDate, endDate } = getCommissionDateRange(selectedMonth);
       const res = await fetch(`/api/wholesalers/${wholesalerId}/invoices?startDate=${startDate}&endDate=${endDate}`);
       if (!res.ok) throw new Error("Failed to load invoices");
       const data = await res.json();
