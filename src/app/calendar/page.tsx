@@ -140,11 +140,17 @@ export default function CalendarPage() {
     const fetchDailySales = async () => {
       setLoading(true);
       try {
-        const dateRange = getCommissionDateRange(selectedMonth);
+        // Parse selected month (YYYY-MM format) and get calendar month range
+        const [year, month] = selectedMonth.split("-").map(Number);
+        const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay}`;
         
-        // Fetch paid invoices with payment date information
+        console.log('[calendar] Fetching sales for calendar month:', startDate, 'to', endDate);
+        
+        // Fetch paid invoices for the calendar month
         const response = await fetch(
-          `/api/qbo/invoice/query?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&status=paid`
+          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`
         );
         
         if (!response.ok) throw new Error("Failed to fetch invoices");
@@ -183,7 +189,7 @@ export default function CalendarPage() {
         setDailySales(dailySalesArray);
         console.log('[calendar] Daily sales loaded:', dailySalesArray.length, 'days with sales');
         console.log('[calendar] Sample dates:', dailySalesArray.slice(0, 3).map(d => d.date));
-        console.log('[calendar] Date range:', dateRange);
+        console.log('[calendar] Full month range:', startDate, 'to', endDate);
       } catch (error) {
         console.error("Error fetching daily sales:", error);
         setDailySales([]);
