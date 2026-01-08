@@ -458,13 +458,19 @@ export default function AdminPriceListPage() {
                           <col style={{ width: "40px" }} />
                           <col style={{ width: "75px" }} />
                           <col style={{ width: "140px" }} />
+                          <col style={{ width: "60px" }} />
+                          <col style={{ width: "60px" }} />
                           <col style={{ width: "65px" }} />
-                          <col style={{ width: "55px" }} />
                           <col style={{ width: "65px" }} />
-                          <col style={{ width: "60px" }} />
-                          <col style={{ width: "60px" }} />
-                          <col style={{ width: "60px" }} />
-                          <col style={{ width: "60px" }} />
+                          <col style={{ width: "65px" }} />
+                          <col style={{ width: "65px" }} />
+                          <col style={{ width: "65px" }} />
+                          <col style={{ width: "65px" }} />
+                          <col style={{ width: "65px" }} />
+                          <col style={{ width: "65px" }} />
+                          <col style={{ width: "65px" }} />
+                          <col style={{ width: "65px" }} />
+                          <col style={{ width: "65px" }} />
                           <col style={{ width: "85px" }} />
                         </colgroup>
                         <thead className="bg-slate-50">
@@ -472,12 +478,19 @@ export default function AdminPriceListPage() {
                             <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap"></th>
                             <th className="pl-3 pr-0.5 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
                             <th className="pl-0.5 pr-1.5 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">Description</th>
-                            <th className="px-2 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Shipping</th>
+                            <th className="px-2 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
+                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
+                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Quantity</th>
+                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff +105%</th>
+                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean Frt</th>
+                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Importing</th>
+                            <th className="px-2 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Zone 5</th>
+                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Per Unit</th>
+                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost w/Shipping</th>
                             <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Multiplier</th>
-                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Total Cost</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell Price</th>
-                            <th className="px-2 py-2 text-right font-semibold text-emerald-700 whitespace-nowrap">Profit</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List Price</th>
+                            <th className="px-2 py-2 text-right font-semibold text-emerald-700 whitespace-nowrap">Profit</th>
                             <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap sticky right-0 bg-slate-50 z-10">Action</th>
                           </tr>
                         </thead>
@@ -536,7 +549,77 @@ export default function AdminPriceListPage() {
                                 )}
                               </td>
 
-                              {/* Shipping (INPUT - CRITICAL) */}
+                              {/* Supplier */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                <span className="text-slate-600 text-xs">{item.supplier || "—"}</span>
+                              </td>
+
+                              {/* FOB Cost (INPUT) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={displayItem.fob_cost !== null && displayItem.fob_cost !== undefined ? displayItem.fob_cost : ""}
+                                    onChange={(e) => updateEditingItem("fob_cost", e.target.value === "" ? null : Number(e.target.value))}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                  />
+                                ) : (
+                                  <span className="text-blue-900 font-semibold">${money(item.fob_cost)}</span>
+                                )}
+                              </td>
+
+                              {/* Quantity (INPUT) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    step="1"
+                                    value={displayItem.quantity !== null && displayItem.quantity !== undefined ? displayItem.quantity : ""}
+                                    onChange={(e) => updateEditingItem("quantity", e.target.value === "" ? null : Number(e.target.value))}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                  />
+                                ) : (
+                                  <span className="text-blue-900">{item.quantity ?? "—"}</span>
+                                )}
+                              </td>
+
+                              {/* Tariff +105% (DERIVED) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                <span className="text-slate-600 text-xs">${money(displayItem.tariff_105)}</span>
+                              </td>
+
+                              {/* Ocean Frt (INPUT) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={displayItem.ocean_frt !== null && displayItem.ocean_frt !== undefined ? displayItem.ocean_frt : ""}
+                                    onChange={(e) => updateEditingItem("ocean_frt", e.target.value === "" ? null : Number(e.target.value))}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                  />
+                                ) : (
+                                  <span className="text-blue-900">${money(item.ocean_frt)}</span>
+                                )}
+                              </td>
+
+                              {/* Importing (INPUT) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={displayItem.importing !== null && displayItem.importing !== undefined ? displayItem.importing : ""}
+                                    onChange={(e) => updateEditingItem("importing", e.target.value === "" ? null : Number(e.target.value))}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                  />
+                                ) : (
+                                  <span className="text-blue-900">${money(item.importing)}</span>
+                                )}
+                              </td>
+
+                              {/* Zone 5 Shipping (INPUT) */}
                               <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
@@ -544,11 +627,21 @@ export default function AdminPriceListPage() {
                                     step="0.01"
                                     value={displayItem.zone5_shipping !== null && displayItem.zone5_shipping !== undefined ? displayItem.zone5_shipping : ""}
                                     onChange={(e) => updateEditingItem("zone5_shipping", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-slate-300 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                    className="w-full rounded border border-amber-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
                                   />
                                 ) : (
                                   <span className="font-semibold text-amber-700">${money(item.zone5_shipping)}</span>
                                 )}
+                              </td>
+
+                              {/* Per Unit (DERIVED) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                <span className="text-slate-600 text-xs">${money(displayItem.per_unit)}</span>
+                              </td>
+
+                              {/* Cost w/ Shipping (DERIVED) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                <span className="text-slate-600 text-xs font-semibold">${money(displayItem.cost_with_shipping)}</span>
                               </td>
 
                               {/* Multiplier (INPUT) */}
@@ -559,31 +652,26 @@ export default function AdminPriceListPage() {
                                     step="0.01"
                                     value={displayItem.multiplier !== null && displayItem.multiplier !== undefined ? displayItem.multiplier : ""}
                                     onChange={(e) => updateEditingItem("multiplier", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-slate-300 px-1.5 py-0.5 text-right text-xs text-slate-700 bg-white tabular-nums"
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
                                   />
                                 ) : (
                                   <span className="text-blue-900">{item.multiplier ?? "—"}</span>
                                 )}
                               </td>
 
-                              {/* Per Unit / Total Cost (DERIVED) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                <span className={isEditing ? "text-slate-300 text-xs" : "text-slate-500 text-xs"}>${money(displayItem.per_unit)}</span>
-                              </td>
-
                               {/* Sell Price (DERIVED) */}
                               <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                <span className={isEditing ? "text-slate-300 text-xs" : "text-slate-500 text-xs"}>${money(displayItem.sell_price)}</span>
-                              </td>
-
-                              {/* Profit (DERIVED) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                <span className={isEditing ? "text-slate-300 text-xs font-semibold" : "text-emerald-700 text-xs font-semibold"}>${money(displayItem.profit)}</span>
+                                <span className="text-slate-600 text-xs">${money(displayItem.sell_price)}</span>
                               </td>
 
                               {/* List Price (DERIVED) */}
                               <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                <span className={isEditing ? "text-slate-300 text-xs" : "text-slate-500 text-xs"}>${money(displayItem.list_price)}</span>
+                                <span className="text-slate-600 text-xs">${money(displayItem.list_price)}</span>
+                              </td>
+
+                              {/* Profit (DERIVED) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                <span className="text-emerald-700 text-xs font-bold">${money(displayItem.profit)}</span>
                               </td>
 
                               {/* Action */}
