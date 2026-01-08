@@ -457,7 +457,6 @@ export default function AdminPriceListPage() {
                         <colgroup>
                           <col style={{ width: "40px" }} />
                           <col style={{ width: "75px" }} />
-                          <col style={{ width: "140px" }} />
                           <col style={{ width: "60px" }} />
                           <col style={{ width: "60px" }} />
                           <col style={{ width: "65px" }} />
@@ -477,7 +476,6 @@ export default function AdminPriceListPage() {
                           <tr>
                             <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap"></th>
                             <th className="pl-3 pr-0.5 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
-                            <th className="pl-0.5 pr-1.5 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">Description</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
                             <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
                             <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Quantity</th>
@@ -533,20 +531,6 @@ export default function AdminPriceListPage() {
                               {/* Item No */}
                               <td className="pl-3 pr-0.5 py-1.5 sticky left-0 bg-inherit z-10">
                                 <span className="font-mono text-xs font-medium text-slate-900 whitespace-nowrap">{item.item_no}</span>
-                              </td>
-                              
-                              {/* Description */}
-                              <td className="pl-0.5 pr-1.5 py-1.5 truncate max-w-[140px]" title={item.description || ""}>
-                                {isEditing ? (
-                                  <input
-                                    type="text"
-                                    value={displayItem.description || ""}
-                                    onChange={(e) => updateEditingItem("description", e.target.value)}
-                                    className="w-full rounded border border-slate-300 px-1.5 py-0.5 text-xs text-slate-700 font-medium bg-white"
-                                  />
-                                ) : (
-                                  <span className="text-slate-600">{item.description || "—"}</span>
-                                )}
                               </td>
 
                               {/* Supplier */}
