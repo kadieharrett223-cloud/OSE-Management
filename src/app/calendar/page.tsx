@@ -179,12 +179,18 @@ export default function CalendarPage() {
           salesByDate[date].count += 1;
         });
         
-        // Convert to array
-        const dailySalesArray = Object.entries(salesByDate).map(([date, data]) => ({
-          date,
-          totalSales: data.total,
-          invoiceCount: data.count
-        }));
+        // Create entries for ALL days in the month (including days with $0 sales)
+        const dailySalesArray: DailySales[] = [];
+        for (let day = 1; day <= lastDay; day++) {
+          const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+          const salesData = salesByDate[dateStr];
+          
+          dailySalesArray.push({
+            date: dateStr,
+            totalSales: salesData?.total || 0,
+            invoiceCount: salesData?.count || 0
+          });
+        }
         
         setDailySales(dailySalesArray);
         console.log('[calendar] Daily sales loaded:', dailySalesArray.length, 'days with sales');
@@ -368,9 +374,11 @@ export default function CalendarPage() {
                         <div className="text-[10px] font-medium text-emerald-900">
                           ${money(sales.totalSales)}
                         </div>
-                        <div className="text-[9px] text-emerald-700">
-                          {sales.invoiceCount} invoice{sales.invoiceCount !== 1 ? 's' : ''}
-                        </div>
+                        {sales.invoiceCount > 0 && (
+                          <div className="text-[9px] text-emerald-700">
+                            {sales.invoiceCount} invoice{sales.invoiceCount !== 1 ? 's' : ''}
+                          </div>
+                        )}
                       </div>
                     )}
 
