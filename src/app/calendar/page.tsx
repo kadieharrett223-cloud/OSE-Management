@@ -151,8 +151,8 @@ export default function CalendarPage() {
         
         const result = await response.json();
         
-        // Handle different response formats
-        const invoices = Array.isArray(result) ? result : (result.QueryResponse?.Invoice || []);
+        // Handle different response formats from our API
+        const invoices = result.invoices || result.QueryResponse?.Invoice || (Array.isArray(result) ? result : []);
         
         console.log('[calendar] Fetched invoices:', invoices.length);
         
