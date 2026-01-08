@@ -173,9 +173,12 @@ export default function CalendarPage() {
         
         invoices.forEach((invoice: any) => {
           // Use TxnDate (transaction/invoice date) for grouping
-          const date = invoice.TxnDate;
+          const rawDate = invoice.TxnDate;
           
-          if (!date) return;
+          if (!rawDate) return;
+          
+          // Normalize date to YYYY-MM-DD format (strip time/timezone if present)
+          const date = rawDate.split('T')[0];
           
           if (!salesByDate[date]) {
             salesByDate[date] = { total: 0, count: 0 };
