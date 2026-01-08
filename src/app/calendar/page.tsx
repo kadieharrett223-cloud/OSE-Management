@@ -14,7 +14,7 @@ interface Notification {
   id: string;
   title: string;
   date: string;
-  recurring: "none" | "daily" | "weekly" | "biweekly" | "monthly";
+  recurring: "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
   notes?: string;
 }
 
@@ -43,6 +43,9 @@ export default function CalendarPage() {
       const hasPaydayNotif = loadedNotifications.some((n: Notification) => 
         n.title === "Payday" && n.recurring === "biweekly"
       );
+      const hasHolidays = loadedNotifications.some((n: Notification) => 
+        n.title === "New Year's Day" || n.notes?.includes("Federal Holiday")
+      );
       
       if (!hasSalesMonthNotif) {
         loadedNotifications.push({
@@ -64,10 +67,36 @@ export default function CalendarPage() {
         });
       }
       
+      // Add US Federal Holidays
+      if (!hasHolidays) {
+        const holidays = [
+          { title: "New Year's Day", date: "2026-01-01", notes: "Federal Holiday" },
+          { title: "Martin Luther King Jr. Day", date: "2026-01-19", notes: "Federal Holiday - 3rd Monday in January" },
+          { title: "Presidents' Day", date: "2026-02-16", notes: "Federal Holiday - 3rd Monday in February" },
+          { title: "Memorial Day", date: "2026-05-25", notes: "Federal Holiday - Last Monday in May" },
+          { title: "Independence Day", date: "2026-07-04", notes: "Federal Holiday" },
+          { title: "Labor Day", date: "2026-09-07", notes: "Federal Holiday - 1st Monday in September" },
+          { title: "Columbus Day", date: "2026-10-12", notes: "Federal Holiday - 2nd Monday in October" },
+          { title: "Veterans Day", date: "2026-11-11", notes: "Federal Holiday" },
+          { title: "Thanksgiving", date: "2026-11-26", notes: "Federal Holiday - 4th Thursday in November" },
+          { title: "Christmas Day", date: "2026-12-25", notes: "Federal Holiday" }
+        ];
+        
+        holidays.forEach((holiday, idx) => {
+          loadedNotifications.push({
+            id: "holiday-" + Date.now() + idx,
+            title: holiday.title,
+            date: holiday.date,
+            recurring: "yearly",
+            notes: holiday.notes
+          });
+        });
+      }
+      
       setNotifications(loadedNotifications);
     } else {
-      // First time - create default notifications
-      setNotifications([
+      // First time - create default notifications including holidays
+      const defaultNotifications = [
         {
           id: "sales-month-" + Date.now(),
           title: "Sales Month Begins",
@@ -81,8 +110,21 @@ export default function CalendarPage() {
           date: "2026-01-10",
           recurring: "biweekly",
           notes: "Bi-weekly payday"
-        }
-      ]);
+        },
+        // US Federal Holidays
+        { id: "holiday-1", title: "New Year's Day", date: "2026-01-01", recurring: "yearly", notes: "Federal Holiday" },
+        { id: "holiday-2", title: "Martin Luther King Jr. Day", date: "2026-01-19", recurring: "yearly", notes: "Federal Holiday - 3rd Monday in January" },
+        { id: "holiday-3", title: "Presidents' Day", date: "2026-02-16", recurring: "yearly", notes: "Federal Holiday - 3rd Monday in February" },
+        { id: "holiday-4", title: "Memorial Day", date: "2026-05-25", recurring: "yearly", notes: "Federal Holiday - Last Monday in May" },
+        { id: "holiday-5", title: "Independence Day", date: "2026-07-04", recurring: "yearly", notes: "Federal Holiday" },
+        { id: "holiday-6", title: "Labor Day", date: "2026-09-07", recurring: "yearly", notes: "Federal Holiday - 1st Monday in September" },
+        { id: "holiday-7", title: "Columbus Day", date: "2026-10-12", recurring: "yearly", notes: "Federal Holiday - 2nd Monday in October" },
+        { id: "holiday-8", title: "Veterans Day", date: "2026-11-11", recurring: "yearly", notes: "Federal Holiday" },
+        { id: "holiday-9", title: "Thanksgiving", date: "2026-11-26", recurring: "yearly", notes: "Federal Holiday - 4th Thursday in November" },
+        { id: "holiday-10", title: "Christmas Day", date: "2026-12-25", recurring: "yearly", notes: "Federal Holiday" }
+      ];
+      
+      setNotifications(defaultNotifications as Notification[]);
     }
   }, []);
 
@@ -192,6 +234,11 @@ export default function CalendarPage() {
       if (n.recurring === "daily") return true;
       if (n.recurring === "weekly") return date.getDay() === new Date(n.date).getDay();
       if (n.recurring === "monthly") return date.getDate() === new Date(n.date).getDate();
+      if (n.recurring === "yearly") {
+        // Match month and day, regardless of year
+        const notifDate = new Date(n.date);
+        return date.getMonth() === notifDate.getMonth() && date.getDate() === notifDate.getDate();
+      }
       if (n.recurring === "biweekly") {
         // Calculate days between start date and current date
         const startDate = new Date(n.date);
@@ -302,20 +349,28 @@ export default function CalendarPage() {
 
                     {/* Notifications */}
                     <div className="space-y-1">
-                      {dayNotifications.slice(0, 2).map((notif) => (
-                        <div
-                          key={notif.id}
-                          className="cursor-pointer truncate rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-800 hover:bg-blue-200"
-                          onClick={() => {
-                            setEditingNotification(notif);
-                            setShowAddModal(true);
-                          }}
-                          title={notif.title}
-                        >
-                          {notif.recurring !== "none" && "🔁 "}
-                          {notif.title}
-                        </div>
-                      ))}
+                      {dayNotifications.slice(0, 2).map((notif) => {
+                        const isHoliday = notif.notes?.includes("Federal Holiday");
+                        return (
+                          <div
+                            key={notif.id}
+                            className={`cursor-pointer truncate rounded px-1.5 py-0.5 text-[10px] hover:opacity-80 ${
+                              isHoliday 
+                                ? "bg-red-100 text-red-800" 
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                            onClick={() => {
+                              setEditingNotification(notif);
+                              setShowAddModal(true);
+                            }}
+                            title={notif.title}
+                          >
+                            {isHoliday && "🇺🇸 "}
+                            {notif.recurring !== "none" && !isHoliday && "🔁 "}
+                            {notif.title}
+                          </div>
+                        );
+                      })}
                       {dayNotifications.length > 2 && (
                         <div className="text-[9px] text-slate-500">
                           +{dayNotifications.length - 2} more
@@ -424,7 +479,7 @@ export default function CalendarPage() {
                   onChange={(e) =>
                     setEditingNotification({
                       ...editingNotification,
-                      recurring: e.target.value as "none" | "daily" | "weekly" | "biweekly" | "monthly",
+                      recurring: e.target.value as "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly",
                     })
                   }
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -434,6 +489,7 @@ export default function CalendarPage() {
                   <option value="weekly">Weekly</option>
                   <option value="biweekly">Bi-weekly (every 2 weeks)</option>
                   <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly (annual)</option>
                 </select>
               </div>
 
