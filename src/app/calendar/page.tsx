@@ -151,12 +151,13 @@ export default function CalendarPage() {
         const lastDay = new Date(year, month, 0).getDate();
         const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay}`;
         
+        console.log('[calendar] Selected month:', selectedMonth);
         console.log('[calendar] Fetching sales for calendar month:', startDate, 'to', endDate);
         
         // Fetch paid invoices for the calendar month
-        const response = await fetch(
-          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`
-        );
+        const url = `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`;
+        console.log('[calendar] API URL:', url);
+        const response = await fetch(url);
         
         if (!response.ok) throw new Error("Failed to fetch invoices");
         
