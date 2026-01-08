@@ -141,6 +141,8 @@ export default function CalendarPage() {
       setLoading(true);
       try {
         const dateRange = getCommissionDateRange(selectedMonth);
+        
+        // Fetch paid invoices with payment date information
         const response = await fetch(
           `/api/qbo/invoice/query?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&status=paid`
         );
@@ -149,12 +151,14 @@ export default function CalendarPage() {
         
         const data = await response.json();
         
-        // Group sales by date
+        // Group sales by payment date (use TxnDate as fallback)
         const salesByDate: Record<string, { total: number; count: number }> = {};
         
         data.forEach((invoice: any) => {
-          const date = invoice.MetaData?.LastUpdatedTime?.split("T")[0] || 
-                       invoice.TxnDate;
+          // Use TxnDate (transaction/invoice date) for grouping
+          const date = invoice.TxnDate;
+          
+          if (!date) return;
           
           if (!salesByDate[date]) {
             salesByDate[date] = { total: 0, count: 0 };
@@ -172,6 +176,7 @@ export default function CalendarPage() {
         }));
         
         setDailySales(dailySalesArray);
+        console.log('[calendar] Daily sales loaded:', dailySalesArray.length, 'days with sales');
       } catch (error) {
         console.error("Error fetching daily sales:", error);
         setDailySales([]);
