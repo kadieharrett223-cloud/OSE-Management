@@ -179,6 +179,9 @@ export default function CalendarPage() {
           salesByDate[date].count += 1;
         });
         
+        console.log('[calendar] Grouped by date:', Object.keys(salesByDate).length, 'unique dates');
+        console.log('[calendar] Sample grouped data:', Object.entries(salesByDate).slice(0, 5));
+        
         // Create entries for ALL days in the month (including days with $0 sales)
         const dailySalesArray: DailySales[] = [];
         for (let day = 1; day <= lastDay; day++) {
