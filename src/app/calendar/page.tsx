@@ -177,6 +177,8 @@ export default function CalendarPage() {
         
         setDailySales(dailySalesArray);
         console.log('[calendar] Daily sales loaded:', dailySalesArray.length, 'days with sales');
+        console.log('[calendar] Sample dates:', dailySalesArray.slice(0, 3).map(d => d.date));
+        console.log('[calendar] Date range:', dateRange);
       } catch (error) {
         console.error("Error fetching daily sales:", error);
         setDailySales([]);
@@ -258,7 +260,8 @@ export default function CalendarPage() {
 
   const getSalesForDate = (date: Date) => {
     const dateStr = date.toISOString().split("T")[0];
-    return dailySales.find(s => s.date === dateStr);
+    const found = dailySales.find(s => s.date === dateStr);
+    return found;
   };
 
   const isToday = (date: Date | null) => {
@@ -277,7 +280,15 @@ export default function CalendarPage() {
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Sales Calendar</h1>
-              <p className="text-slate-600">Daily sales tracking and recurring notifications</p>
+              <p className="text-slate-600">
+                Daily sales tracking and recurring notifications
+                {loading && <span className="ml-2 text-blue-600">Loading sales data...</span>}
+                {!loading && dailySales.length > 0 && (
+                  <span className="ml-2 text-emerald-600">
+                    ({dailySales.length} days with sales)
+                  </span>
+                )}
+              </p>
             </div>
             <div className="flex gap-3">
               <input
