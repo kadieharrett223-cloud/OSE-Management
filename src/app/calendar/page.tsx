@@ -154,42 +154,59 @@ export default function CalendarPage() {
         console.log('[calendar] Selected month:', selectedMonth);
         console.log('[calendar] Fetching sales for calendar month:', startDate, 'to', endDate);
         
-        // Fetch paid invoices for the calendar month
-        const url = `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`;
-        console.log('[calendar] API URL:', url);
-        const response = await fetch(url);
+        // Fetch payments for the calendar month (use payment date)
+        const paymentsUrl = `/api/qbo/payment/query?startDate=${startDate}&endDate=${endDate}`;
+        console.log('[calendar] Payments API URL:', paymentsUrl);
+        const paymentsResponse = await fetch(paymentsUrl);
+        let payments: any[] = [];
+        if (paymentsResponse.ok) {
+          const paymentsResult = await paymentsResponse.json();
+          payments = paymentsResult.payments || paymentsResult.QueryResponse?.Payment || (Array.isArray(paymentsResult) ? paymentsResult : []);
+        } else {
+          console.warn('[calendar] Failed to fetch payments, falling back to invoices');
+        }
         
-        if (!response.ok) throw new Error("Failed to fetch invoices");
+        // If no payments returned, fall back to invoices (invoice creation date)
+        let invoices: any[] = [];
+        if (payments.length === 0) {
+          const invoicesUrl = `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`;
+          console.log('[calendar] Invoices API URL (fallback):', invoicesUrl);
+          const invoiceResponse = await fetch(invoicesUrl);
+          if (!invoiceResponse.ok) throw new Error("Failed to fetch invoices");
+          const invoiceResult = await invoiceResponse.json();
+          invoices = invoiceResult.invoices || invoiceResult.QueryResponse?.Invoice || (Array.isArray(invoiceResult) ? invoiceResult : []);
+        }
         
-        const result = await response.json();
+        const usingPayments = payments.length > 0;
+        console.log('[calendar] Using payments:', usingPayments, 'payments:', payments.length, 'invoices fallback:', invoices.length);
+        if (usingPayments) console.log('[calendar] Sample payment structure:', payments[0]);
+        if (!usingPayments) console.log('[calendar] Sample invoice structure:', invoices[0]);
         
-        // Handle different response formats from our API
-        const invoices = result.invoices || result.QueryResponse?.Invoice || (Array.isArray(result) ? result : []);
-        
-        console.log('[calendar] Fetched invoices:', invoices.length);
-        
-        // Group sales by payment date (use TxnDate as fallback)
+        // Group sales by payment date (preferred) or invoice date (fallback)
         const salesByDate: Record<string, { total: number; count: number }> = {};
         
-        invoices.forEach((invoice: any) => {
-          // Use TxnDate (transaction/invoice date) for grouping
-          const rawDate = invoice.TxnDate;
-          
+        const source = usingPayments ? payments : invoices;
+        source.forEach((item: any) => {
+          const rawDate = item.TxnDate;
           if (!rawDate) return;
-          
-          // Normalize date to YYYY-MM-DD format (strip time/timezone if present)
           const date = rawDate.split('T')[0];
-          
           if (!salesByDate[date]) {
             salesByDate[date] = { total: 0, count: 0 };
           }
-          
-          salesByDate[date].total += invoice.TotalAmt || 0;
+          if (usingPayments) {
+            const total = Number(item.TotalAmt) || 0;
+            const unapplied = Number(item.UnappliedAmt) || 0;
+            const applied = total - unapplied;
+            salesByDate[date].total += applied > 0 ? applied : 0;
+          } else {
+            salesByDate[date].total += item.TotalAmt || 0;
+          }
           salesByDate[date].count += 1;
         });
         
         console.log('[calendar] Grouped by date:', Object.keys(salesByDate).length, 'unique dates');
         console.log('[calendar] Sample grouped data:', Object.entries(salesByDate).slice(0, 5));
+        console.log('[calendar] All grouped date keys:', Object.keys(salesByDate));
         
         // Create entries for ALL days in the month (including days with $0 sales)
         const dailySalesArray: DailySales[] = [];
