@@ -149,12 +149,17 @@ export default function CalendarPage() {
         
         if (!response.ok) throw new Error("Failed to fetch invoices");
         
-        const data = await response.json();
+        const result = await response.json();
+        
+        // Handle different response formats
+        const invoices = Array.isArray(result) ? result : (result.QueryResponse?.Invoice || []);
+        
+        console.log('[calendar] Fetched invoices:', invoices.length);
         
         // Group sales by payment date (use TxnDate as fallback)
         const salesByDate: Record<string, { total: number; count: number }> = {};
         
-        data.forEach((invoice: any) => {
+        invoices.forEach((invoice: any) => {
           // Use TxnDate (transaction/invoice date) for grouping
           const date = invoice.TxnDate;
           
