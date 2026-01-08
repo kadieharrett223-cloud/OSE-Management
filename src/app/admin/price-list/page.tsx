@@ -31,6 +31,8 @@ type PriceListItem = {
   list_price: number | null;
   black_friday_price: number | null;
   rounded_sale_price: number | null;
+  profit: number | null;
+  display_order: number | null;
 };
 
 type Category = {
@@ -66,6 +68,7 @@ export default function AdminPriceListPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [discountPercentage, setDiscountPercentage] = useState<number>(20); // Default 20% off
   const [showAddModal, setShowAddModal] = useState(false);
+  const [expandedCosts, setExpandedCosts] = useState<Set<string>>(new Set());
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -100,7 +103,8 @@ export default function AdminPriceListPage() {
           *,
           price_list_categories!inner(category_name)
         `)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .order("display_order", { ascending: true, nullsFirst: false });
 
       if (itemError) throw itemError;
 
@@ -209,6 +213,9 @@ export default function AdminPriceListPage() {
     // 8) rounded_sale_price = floor(black_friday_price / 100) * 100 - 1
     const rounded_sale_price = Math.floor(black_friday_price / 100) * 100 - 1;
 
+    // 9) profit = sell_price - per_unit
+    const profit = sell_price - per_unit;
+
     return {
       ...item,
       tariff_105,
@@ -219,6 +226,7 @@ export default function AdminPriceListPage() {
       list_price,
       black_friday_price,
       rounded_sale_price,
+      profit,
     };
   };
 
@@ -447,33 +455,28 @@ export default function AdminPriceListPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full divide-y divide-slate-100 text-xs border-collapse table-fixed">
                         <colgroup>
+                          <col style={{ width: "40px" }} />
                           <col style={{ width: "75px" }} />
                           <col style={{ width: "140px" }} />
-                          <col style={{ width: "60px" }} />
-                          <col style={{ width: "60px" }} />
-                          <col style={{ width: "60px" }} />
                           <col style={{ width: "65px" }} />
                           <col style={{ width: "55px" }} />
-                          <col style={{ width: "60px" }} />
-                          <col style={{ width: "60px" }} />
                           <col style={{ width: "65px" }} />
+                          <col style={{ width: "60px" }} />
+                          <col style={{ width: "60px" }} />
                           <col style={{ width: "60px" }} />
                           <col style={{ width: "60px" }} />
                           <col style={{ width: "85px" }} />
                         </colgroup>
                         <thead className="bg-slate-50">
                           <tr>
+                            <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap"></th>
                             <th className="pl-3 pr-0.5 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
                             <th className="pl-0.5 pr-1.5 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">Description</th>
-                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
-                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean Frt</th>
-                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Importing</th>
                             <th className="px-2 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Shipping</th>
                             <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Multiplier</th>
-                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff 105%</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Total Cost</th>
-                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost w/ Ship</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell Price</th>
+                            <th className="px-2 py-2 text-right font-semibold text-emerald-700 whitespace-nowrap">Profit</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List Price</th>
                             <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap sticky right-0 bg-slate-50 z-10">Action</th>
                           </tr>
@@ -482,9 +485,38 @@ export default function AdminPriceListPage() {
                           {categoryItems.map((item, index) => {
                             const isEditing = editingId === item.id;
                             const displayItem = isEditing && editingItem ? editingItem : item;
+                            const isExpanded = expandedCosts.has(item.id);
                             
                             return (
-                            <tr key={item.id} className={isEditing ? "bg-blue-50/70 border-l-4 border-l-blue-500" : "hover:bg-slate-50"}>
+                            <React.Fragment key={item.id}>
+                            <tr className={isEditing ? "bg-blue-50/70 border-l-4 border-l-blue-500" : "hover:bg-slate-50"}>
+                              {/* Expand Button */}
+                              <td className="px-1 py-1.5 text-center">
+                                <button
+                                  onClick={() => {
+                                    const newExpanded = new Set(expandedCosts);
+                                    if (isExpanded) {
+                                      newExpanded.delete(item.id);
+                                    } else {
+                                      newExpanded.add(item.id);
+                                    }
+                                    setExpandedCosts(newExpanded);
+                                  }}
+                                  className="text-slate-400 hover:text-slate-700 transition"
+                                  type="button"
+                                >
+                                  {isExpanded ? (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  ) : (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                  )}
+                                </button>
+                              </td>
+                              
                               {/* Item No */}
                               <td className="pl-3 pr-0.5 py-1.5 sticky left-0 bg-inherit z-10">
                                 <span className="font-mono text-xs font-medium text-slate-900 whitespace-nowrap">{item.item_no}</span>
@@ -501,51 +533,6 @@ export default function AdminPriceListPage() {
                                   />
                                 ) : (
                                   <span className="text-slate-600">{item.description || "—"}</span>
-                                )}
-                              </td>
-
-                              {/* FOB Cost (INPUT) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.fob_cost !== null && displayItem.fob_cost !== undefined ? displayItem.fob_cost : ""}
-                                    onChange={(e) => updateEditingItem("fob_cost", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-slate-300 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
-                                  />
-                                ) : (
-                                  <span className="text-blue-900">${money(item.fob_cost)}</span>
-                                )}
-                              </td>
-
-                              {/* Ocean Freight (INPUT) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.ocean_frt !== null && displayItem.ocean_frt !== undefined ? displayItem.ocean_frt : ""}
-                                    onChange={(e) => updateEditingItem("ocean_frt", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-slate-300 px-1.5 py-0.5 text-right text-xs text-slate-700 bg-white tabular-nums"
-                                  />
-                                ) : (
-                                  <span className="text-blue-900">${money(item.ocean_frt)}</span>
-                                )}
-                              </td>
-
-                              {/* Importing (INPUT) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.importing !== null && displayItem.importing !== undefined ? displayItem.importing : ""}
-                                    onChange={(e) => updateEditingItem("importing", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-slate-300 px-1.5 py-0.5 text-right text-xs text-slate-700 bg-white tabular-nums"
-                                  />
-                                ) : (
-                                  <span className="text-blue-900">${money(item.importing)}</span>
                                 )}
                               </td>
 
@@ -579,24 +566,19 @@ export default function AdminPriceListPage() {
                                 )}
                               </td>
 
-                              {/* Tariff 105% (DERIVED) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                <span className={isEditing ? "text-slate-300 text-xs" : "text-slate-500 text-xs"}>${money(displayItem.tariff_105)}</span>
-                              </td>
-
-                              {/* Per Unit (DERIVED) */}
+                              {/* Per Unit / Total Cost (DERIVED) */}
                               <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                                 <span className={isEditing ? "text-slate-300 text-xs" : "text-slate-500 text-xs"}>${money(displayItem.per_unit)}</span>
-                              </td>
-
-                              {/* Cost with Shipping (DERIVED) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                <span className={isEditing ? "text-slate-300 text-xs" : "text-slate-500 text-xs"}>${money(displayItem.cost_with_shipping)}</span>
                               </td>
 
                               {/* Sell Price (DERIVED) */}
                               <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                                 <span className={isEditing ? "text-slate-300 text-xs" : "text-slate-500 text-xs"}>${money(displayItem.sell_price)}</span>
+                              </td>
+
+                              {/* Profit (DERIVED) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                <span className={isEditing ? "text-slate-300 text-xs font-semibold" : "text-emerald-700 text-xs font-semibold"}>${money(displayItem.profit)}</span>
                               </td>
 
                               {/* List Price (DERIVED) */}
@@ -646,10 +628,76 @@ export default function AdminPriceListPage() {
                                 )}
                               </td>
                             </tr>
+
+                            {/* Expanded Cost Details - Inline Horizontal */}
+                            {isExpanded && (
+                              <tr className="bg-blue-50 border-t border-blue-200">
+                                <td colSpan={1}></td>
+                                <td colSpan={9} className="px-4 py-4">
+                                  <div className="grid grid-cols-5 gap-6">
+                                    <div className="space-y-1">
+                                      <label className="block text-xs font-semibold text-blue-700">FOB Cost</label>
+                                      {isEditing ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={displayItem.fob_cost !== null && displayItem.fob_cost !== undefined ? displayItem.fob_cost : ""}
+                                          onChange={(e) => updateEditingItem("fob_cost", e.target.value === "" ? null : Number(e.target.value))}
+                                          className="w-full rounded border border-blue-400 px-2 py-1 text-xs font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
+                                        />
+                                      ) : (
+                                        <div className="text-sm font-mono text-slate-900">${money(item.fob_cost)}</div>
+                                      )}
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <label className="block text-xs font-semibold text-blue-700">Ocean Freight</label>
+                                      {isEditing ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={displayItem.ocean_frt !== null && displayItem.ocean_frt !== undefined ? displayItem.ocean_frt : ""}
+                                          onChange={(e) => updateEditingItem("ocean_frt", e.target.value === "" ? null : Number(e.target.value))}
+                                          className="w-full rounded border border-blue-400 px-2 py-1 text-xs font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
+                                        />
+                                      ) : (
+                                        <div className="text-sm font-mono text-slate-900">${money(item.ocean_frt)}</div>
+                                      )}
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <label className="block text-xs font-semibold text-blue-700">Importing</label>
+                                      {isEditing ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={displayItem.importing !== null && displayItem.importing !== undefined ? displayItem.importing : ""}
+                                          onChange={(e) => updateEditingItem("importing", e.target.value === "" ? null : Number(e.target.value))}
+                                          className="w-full rounded border border-blue-400 px-2 py-1 text-xs font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
+                                        />
+                                      ) : (
+                                        <div className="text-sm font-mono text-slate-900">${money(item.importing)}</div>
+                                      )}
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <label className="block text-xs font-semibold text-slate-600">Tariff 105%</label>
+                                      <div className="text-sm font-mono text-slate-900">${money(displayItem.tariff_105)}</div>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <label className="block text-xs font-semibold text-slate-600">Per Unit (Total Cost)</label>
+                                      <div className="text-sm font-mono font-bold text-slate-900">${money(displayItem.per_unit)}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                            </React.Fragment>
                           );})}
                           {categoryItems.length === 0 && (
                             <tr>
-                              <td colSpan={13} className="px-6 py-4 text-center text-xs text-slate-600">
+                              <td colSpan={10} className="px-6 py-4 text-center text-xs text-slate-600">
                                 No items in this category
                               </td>
                             </tr>
