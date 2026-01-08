@@ -47,5 +47,4 @@ CREATE TRIGGER compute_price_list_fields_trigger
 
 -- Backfill existing rows with profit calculation
 UPDATE price_list_items
-SET profit = sell_price - per_unit
-WHERE profit IS NULL;
+SET profit = sell_price - per_unit;
