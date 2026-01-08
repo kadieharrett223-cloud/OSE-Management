@@ -180,6 +180,7 @@ export default function Dashboard() {
   const totalSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
   
   // Use real rep data if available, otherwise fall back to mock
+  // Show ALL reps on leaderboard (both commission and salary)
   const commissionReps = repSalesData.filter(r => r.isPrimary);
   const bonusReps = repSalesData.filter(r => !r.isPrimary);
   
@@ -197,7 +198,8 @@ export default function Dashboard() {
   const dailyPace = totalSales / 15; // 15 days elapsed in month (approx)
   const projectedMonth = dailyPace * 30;
 
-  const sortedReps = [...commissionReps].sort((a, b) => {
+  // Show ALL reps on leaderboard (both salary and commission)
+  const sortedReps = [...repSalesData].sort((a, b) => {
     if (sortField === "sales") return b.totalSales - a.totalSales;
     if (sortField === "commission") return b.commission - a.commission;
     return b.invoiceCount - a.invoiceCount;
@@ -326,7 +328,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900">Sales Rep Leaderboard</h2>
-                    <p className="text-sm text-slate-600">Sorted by sales (commission-eligible reps)</p>
+                    <p className="text-sm text-slate-600">All sales representatives (commission & salary)</p>
                   </div>
                   <div className="flex gap-2">
                     {(["sales", "commission", "orders"] as const).map((field) => (

@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 const navItems = [
    { label: "Dashboard", hint: "Company overview", href: "/" },
    { label: "Commissions", hint: "QBO sync & payouts", href: "/commissions" },
+   { label: "Calendar", hint: "Sales & notifications", href: "/calendar" },
    { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
    { label: "Purchasing", hint: "POs and payments", href: "/admin/purchasing" },
 ];
