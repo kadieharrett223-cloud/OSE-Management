@@ -22,7 +22,12 @@ const money = (value: number) =>
   value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function CalendarPage() {
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentCommissionMonth());
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    return `${year}-${month}`;
+  });
   const [currentDate, setCurrentDate] = useState(new Date());
   const [dailySales, setDailySales] = useState<DailySales[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
