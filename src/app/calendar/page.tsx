@@ -14,7 +14,7 @@ interface Notification {
   id: string;
   title: string;
   date: string;
-  recurring: "none" | "daily" | "weekly" | "monthly";
+  recurring: "none" | "daily" | "weekly" | "biweekly" | "monthly";
   notes?: string;
 }
 
@@ -30,18 +30,116 @@ export default function CalendarPage() {
   const [editingNotification, setEditingNotification] = useState<Notification | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Load notifications from localStorage
+  // Load notifications from localStorage and add default notifications
   useEffect(() => {
     const stored = localStorage.getItem("calendar-notifications");
     if (stored) {
-      setNotifications(JSON.parse(stored));
+      const loadedNotifications = JSON.parse(stored);
+      
+      // Check if default notifications exist, if not add them
+      const hasSalesMonthNotif = loadedNotifications.some((n: Notification) => 
+        n.title === "Sales Month Begins" && n.recurring === "monthly"
+      );
+      const hasPaydayNotif = loadedNotifications.some((n: Notification) => 
+        n.title === "Payday" && n.recurring === "biweekly"
+      );
+      
+      if (!hasSalesMonthNotif) {
+        loadedNotifications.push({
+          id: "sales-month-" + Date.now(),
+          title: "Sales Month Begins",
+          date: "2026-01-05", // 5th of month
+          recurring: "monthly",
+          notes: "Commission period starts today (5th to 4th)"
+        });
+      }
+      
+      if (!hasPaydayNotif) {
+        loadedNotifications.push({
+          id: "payday-" + Date.now(),
+          title: "Payday",
+          date: "2026-01-10", // Starting Friday, Jan 10, 2026
+          recurring: "biweekly",
+          notes: "Bi-weekly payday"
+        });
+      }
+      
+      setNotifications(loadedNotifications);
+    } else {
+      // First time - create default notifications
+      setNotifications([
+        {
+          id: "sales-month-" + Date.now(),
+          title: "Sales Month Begins",
+          date: "2026-01-05",
+          recurring: "monthly",
+          notes: "Commission period starts today (5th to 4th)"
+        },
+        {
+          id: "payday-" + Date.now() + 1,
+          title: "Payday",
+          date: "2026-01-10",
+          recurring: "biweekly",
+          notes: "Bi-weekly payday"
+        }
+      ]);
     }
   }, []);
 
   // Save notifications to localStorage
   useEffect(() => {
-    localStorage.setItem("calendar-notifications", JSON.stringify(notifications));
+    if (notifications.length > 0) {
+      localStorage.setItem("calendar-notifications", JSON.stringify(notifications));
+    }
   }, [notifications]);
+
+  // Fetch daily sales data for selected month
+  useEffect(() => {
+    const fetchDailySales = async () => {
+      setLoading(true);
+      try {
+        const dateRange = getCommissionDateRange(selectedMonth);
+        const response = await fetch(
+          `/api/qbo/invoice/query?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&status=paid`
+        );
+        
+        if (!response.ok) throw new Error("Failed to fetch invoices");
+        
+        const data = await response.json();
+        
+        // Group sales by date
+        const salesByDate: Record<string, { total: number; count: number }> = {};
+        
+        data.forEach((invoice: any) => {
+          const date = invoice.MetaData?.LastUpdatedTime?.split("T")[0] || 
+                       invoice.TxnDate;
+          
+          if (!salesByDate[date]) {
+            salesByDate[date] = { total: 0, count: 0 };
+          }
+          
+          salesByDate[date].total += invoice.TotalAmt || 0;
+          salesByDate[date].count += 1;
+        });
+        
+        // Convert to array
+        const dailySalesArray = Object.entries(salesByDate).map(([date, data]) => ({
+          date,
+          totalSales: data.total,
+          invoiceCount: data.count
+        }));
+        
+        setDailySales(dailySalesArray);
+      } catch (error) {
+        console.error("Error fetching daily sales:", error);
+        setDailySales([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDailySales();
+  }, [selectedMonth]);
 
   // Generate calendar days
   const generateCalendarDays = () => {
@@ -94,6 +192,14 @@ export default function CalendarPage() {
       if (n.recurring === "daily") return true;
       if (n.recurring === "weekly") return date.getDay() === new Date(n.date).getDay();
       if (n.recurring === "monthly") return date.getDate() === new Date(n.date).getDate();
+      if (n.recurring === "biweekly") {
+        // Calculate days between start date and current date
+        const startDate = new Date(n.date);
+        const diffTime = date.getTime() - startDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        // Show if it's a multiple of 14 days from start date
+        return diffDays >= 0 && diffDays % 14 === 0;
+      }
       return false;
     });
   };
@@ -180,19 +286,26 @@ export default function CalendarPage() {
                       <span className={`text-sm font-semibold ${today ? "text-blue-700" : "text-slate-700"}`}>
                         {date.getDate()}
                       </span>
-                      {sales && (
-                        <span className="text-xs font-semibold text-emerald-600">
-                          ${money(sales.totalSales)}
-                        </span>
-                      )}
                     </div>
+
+                    {/* Daily Sales Total */}
+                    {sales && (
+                      <div className="mb-1.5 rounded bg-emerald-50 px-1.5 py-0.5">
+                        <div className="text-[10px] font-medium text-emerald-900">
+                          ${money(sales.totalSales)}
+                        </div>
+                        <div className="text-[9px] text-emerald-700">
+                          {sales.invoiceCount} invoice{sales.invoiceCount !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Notifications */}
                     <div className="space-y-1">
                       {dayNotifications.slice(0, 2).map((notif) => (
                         <div
                           key={notif.id}
-                          className="cursor-pointer truncate rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-800 hover:bg-blue-200"
+                          className="cursor-pointer truncate rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-800 hover:bg-blue-200"
                           onClick={() => {
                             setEditingNotification(notif);
                             setShowAddModal(true);
@@ -204,7 +317,7 @@ export default function CalendarPage() {
                         </div>
                       ))}
                       {dayNotifications.length > 2 && (
-                        <div className="text-xs text-slate-500">
+                        <div className="text-[9px] text-slate-500">
                           +{dayNotifications.length - 2} more
                         </div>
                       )}
@@ -311,7 +424,7 @@ export default function CalendarPage() {
                   onChange={(e) =>
                     setEditingNotification({
                       ...editingNotification,
-                      recurring: e.target.value as "none" | "daily" | "weekly" | "monthly",
+                      recurring: e.target.value as "none" | "daily" | "weekly" | "biweekly" | "monthly",
                     })
                   }
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -319,6 +432,7 @@ export default function CalendarPage() {
                   <option value="none">One-time</option>
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
+                  <option value="biweekly">Bi-weekly (every 2 weeks)</option>
                   <option value="monthly">Monthly</option>
                 </select>
               </div>
