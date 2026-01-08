@@ -187,7 +187,8 @@ export default function CalendarPage() {
         
         const source = usingPayments ? payments : invoices;
         source.forEach((item: any) => {
-          const rawDate = item.TxnDate;
+          // Prefer payment creation date if available, fall back to TxnDate
+          const rawDate = item.MetaData?.CreateTime || item.TxnDate || item.MetaData?.LastUpdatedTime;
           if (!rawDate) return;
           const date = rawDate.split('T')[0];
           if (!salesByDate[date]) {
