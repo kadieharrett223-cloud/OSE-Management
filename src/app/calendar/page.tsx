@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
@@ -34,6 +34,10 @@ export default function CalendarPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingNotification, setEditingNotification] = useState<Notification | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const monthlyTotal = useMemo(() => {
+    return dailySales.reduce((sum, day) => sum + (day.totalSales || 0), 0);
+  }, [dailySales]);
 
   // Load notifications from localStorage and add default notifications
   useEffect(() => {
@@ -335,12 +339,12 @@ export default function CalendarPage() {
               <p className="text-slate-600">
                 Daily sales tracking and recurring notifications
                 {loading && <span className="ml-2 text-blue-600">Loading sales data...</span>}
-                {!loading && dailySales.length > 0 && (
-                  <span className="ml-2 text-emerald-600">
-                    ({dailySales.length} days with sales)
-                  </span>
-                )}
               </p>
+              {!loading && dailySales.length > 0 && (
+                <div className="mt-1 text-sm font-semibold text-emerald-700">
+                  Month total: ${money(monthlyTotal)}
+                </div>
+              )}
             </div>
             <div className="flex gap-3">
               <input
@@ -402,20 +406,6 @@ export default function CalendarPage() {
                         {date.getDate()}
                       </span>
                     </div>
-
-                    {/* Daily Sales Total */}
-                    {sales && (
-                      <div className="mb-1.5 rounded bg-emerald-50 px-1.5 py-0.5">
-                        <div className="text-[10px] font-medium text-emerald-900">
-                          ${money(sales.totalSales)}
-                        </div>
-                        {sales.invoiceCount > 0 && (
-                          <div className="text-[9px] text-emerald-700">
-                            {sales.invoiceCount} invoice{sales.invoiceCount !== 1 ? 's' : ''}
-                          </div>
-                        )}
-                      </div>
-                    )}
 
                     {/* Notifications */}
                     <div className="space-y-1">

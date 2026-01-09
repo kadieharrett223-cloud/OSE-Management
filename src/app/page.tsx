@@ -24,6 +24,16 @@ interface RepData {
   };
 }
 
+interface UnpaidInvoice {
+  id: string;
+  docNumber: string;
+  customerName: string;
+  totalAmt: number;
+  balance: number;
+  txnDate: string;
+  salesRep?: string;
+}
+
 const mockReps = [
   {
     id: 1,
@@ -61,6 +71,30 @@ const mockReps = [
 
 type SortField = "sales" | "commission" | "orders";
 
+type LineSeries = Array<number | null>;
+
+const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const buildLinePath = (values: LineSeries, maxValue: number, width: number, height: number, padding: number) => {
+  const usableWidth = width - padding * 2;
+  const usableHeight = height - padding * 2;
+  const stepX = values.length > 1 ? usableWidth / (values.length - 1) : 0;
+
+  let path = "";
+  values.forEach((val, idx) => {
+    if (val === null || val === undefined) return;
+    const x = padding + stepX * idx;
+    const y = padding + (1 - (maxValue > 0 ? val / maxValue : 0)) * usableHeight;
+    if (!path) {
+      path = `M ${x.toFixed(2)} ${y.toFixed(2)}`;
+    } else {
+      path += ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
+    }
+  });
+
+  return path;
+};
+
 export default function Dashboard() {
   const { data: session } = useSession();
   const [sortField, setSortField] = useState<SortField>("sales");
@@ -73,6 +107,9 @@ export default function Dashboard() {
   const [loadingQbo, setLoadingQbo] = useState(true);
   const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
   const [loadingReps, setLoadingReps] = useState(true);
+  const [unpaidInvoices, setUnpaidInvoices] = useState<UnpaidInvoice[]>([]);
+  const [loadingUnpaid, setLoadingUnpaid] = useState(false);
+  const [showAllUnpaid, setShowAllUnpaid] = useState(false);
 
   // Fetch monthly goal
   useEffect(() => {
@@ -149,41 +186,98 @@ export default function Dashboard() {
     };
   }, []);
 
+  // Load QuickBooks invoice data for current month
+  useEffect(() => {
+    let isMounted = true;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const startDate = `${year}-${month}-01`;
+    const endDate = `${year}-${month}-${String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+    
+    // Fetch total sales
+    fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to fetch invoices');
+        return await res.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.ok) {
+          setQboSales(data.totalPaid || 0);
+          setQboInvoiceCount(data.count || 0);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch QBO invoices:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingQbo(false);
+      });
+
+    // Fetch sales by rep
+    fetch(`/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=paid`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to fetch sales by rep');
+        return await res.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.ok && data.reps) {
+          setRepSalesData(data.reps);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch rep sales:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   async function handleGoalSave(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setGoalStatus(null);
     setUpdatingGoal(true);
     try {
       const numericGoal = Number(goalInput);
+      console.log("[dashboard] Saving goal:", numericGoal);
       const res = await fetch(`/api/goals/monthly`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ goalAmount: numericGoal }),
       });
       const payload = await res.json().catch(() => null);
+      console.log("[dashboard] Full payload:", payload);
+      console.log("[dashboard] Payload keys:", Object.keys(payload || {}));
+      console.log("[dashboard] res.status:", res.status, "res.ok:", res.ok);
       if (!res.ok) {
-        throw new Error(payload?.error || "Failed to save goal");
+        throw new Error(payload?.error || `HTTP ${res.status}`);
       }
+      // The API returns { ok: true, goal: data }
       const saved = payload?.goal;
+      console.log("[dashboard] Saved goal object:", saved);
       if (saved?.goal_amount) {
+        console.log("[dashboard] Updating monthly goal to:", saved.goal_amount);
         setMonthlyGoal(Number(saved.goal_amount));
         setGoalInput(String(saved.goal_amount));
+        setGoalStatus("Saved!");
+        // Clear status after 2 seconds
+        setTimeout(() => setGoalStatus(null), 2000);
+      } else {
+        console.warn("[dashboard] Response missing goal_amount:", saved);
+        setGoalStatus("Save failed: No goal amount returned");
       }
-      setGoalStatus("Saved");
     } catch (err: any) {
+      console.error("[dashboard] Save error:", err);
       setGoalStatus(err?.message || "Save failed");
     } finally {
       setUpdatingGoal(false);
     }
   }
 
-  const totalSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
-  
   // Use real rep data if available, otherwise fall back to mock
-  // Show ALL reps on leaderboard (both commission and salary)
-  const commissionReps = repSalesData.filter(r => r.isPrimary);
-  const bonusReps = repSalesData.filter(r => !r.isPrimary);
-  
   const displayReps = repSalesData.length > 0 ? repSalesData : mockReps.map(r => ({
     repName: r.name,
     isPrimary: true,
@@ -193,17 +287,90 @@ export default function Dashboard() {
     commissionRate: 0.05,
   }));
 
+  const totalSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
   const totalCommission = displayReps.reduce((sum, rep) => sum + rep.commission, 0);
   const percentOfGoal = monthlyGoal > 0 ? Math.round((totalSales / monthlyGoal) * 100) : 0;
   const dailyPace = totalSales / 15; // 15 days elapsed in month (approx)
   const projectedMonth = dailyPace * 30;
 
+  // Fetch unpaid invoices for current month
+  useEffect(() => {
+    const fetchUnpaidInvoices = async () => {
+      setLoadingUnpaid(true);
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const startDate = `${year}-${month}-01`;
+        const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+        const endDate = `${year}-${month}-${lastDay}`;
+
+        const response = await fetch(
+          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=unpaid`
+        );
+        
+        if (!response.ok) throw new Error("Failed to fetch unpaid invoices");
+        
+        const data = await response.json();
+        const invoices = data.invoices || [];
+
+        const formatted: UnpaidInvoice[] = invoices.map((inv: any) => {
+          // Extract sales rep using same logic as sales-by-rep route
+          let rep = "Unassigned";
+          
+          // First check CustomField
+          if (inv.CustomField && Array.isArray(inv.CustomField)) {
+            const repField = inv.CustomField.find((f: any) => 
+              f.Name === "Sales Rep" || f.Name === "SalesRep" || f.Name === "Rep"
+            );
+            if (repField && repField.StringValue) {
+              rep = repField.StringValue.trim();
+            }
+          }
+          
+          // Fall back to CustomerMemo if not found
+          if (rep === "Unassigned" && inv.CustomerMemo?.value) {
+            const memo = inv.CustomerMemo.value;
+            const repMatch = memo.match(/Rep:\s*([A-Za-z\s/]+)/i);
+            if (repMatch) {
+              rep = repMatch[1].trim();
+            }
+          }
+          
+          return {
+            id: inv.Id,
+            docNumber: inv.DocNumber,
+            customerName: inv.CustomerRef?.name || "Unknown",
+            totalAmt: Number(inv.TotalAmt) || 0,
+            balance: Number(inv.Balance) || 0,
+            txnDate: inv.TxnDate,
+            salesRep: rep !== "Unassigned" ? rep : undefined,
+          };
+        });
+
+        console.log(`[dashboard] Unpaid invoices fetched: ${formatted.length} invoices`);
+        setUnpaidInvoices(formatted);
+      } catch (error) {
+        console.error("Error fetching unpaid invoices:", error);
+        setUnpaidInvoices([]);
+      } finally {
+        setLoadingUnpaid(false);
+      }
+    };
+
+    fetchUnpaidInvoices();
+  }, []);
+
   // Show ALL reps on leaderboard (both salary and commission)
-  const sortedReps = [...repSalesData].sort((a, b) => {
+  const sortedReps = [...displayReps].sort((a, b) => {
     if (sortField === "sales") return b.totalSales - a.totalSales;
     if (sortField === "commission") return b.commission - a.commission;
     return b.invoiceCount - a.invoiceCount;
   });
+
+  // Separate primary and bonus reps
+  const commissionReps = displayReps.filter(r => r.isPrimary);
+  const bonusReps = displayReps.filter(r => !r.isPrimary);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -407,6 +574,82 @@ export default function Dashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Unpaid Invoices Section */}
+            <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Unpaid Invoices</h2>
+                  <p className="text-sm text-slate-600">Current month invoices awaiting payment</p>
+                </div>
+              </div>
+
+              {loadingUnpaid ? (
+                <div className="px-6 py-8 text-center text-slate-500">
+                  Loading unpaid invoices...
+                </div>
+              ) : unpaidInvoices.length === 0 ? (
+                <div className="px-6 py-8 text-center text-slate-500">
+                  No unpaid invoices this month.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b border-slate-200 bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                          Invoice #
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                          Customer
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                          Sales Rep
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                          Date
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                          Total
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                          Balance
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(showAllUnpaid ? unpaidInvoices : unpaidInvoices.slice(0, 15)).map((inv) => (
+                        <tr key={inv.id} className="hover:bg-slate-50 transition">
+                          <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
+                          <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
+                          <td className="px-6 py-3 text-slate-600">{inv.salesRep || "-"}</td>
+                          <td className="px-6 py-3 text-slate-600">
+                            {new Date(inv.txnDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </td>
+                          <td className="px-6 py-3 text-right text-slate-700">${money(inv.totalAmt)}</td>
+                          <td className="px-6 py-3 text-right font-semibold text-red-700">${money(inv.balance)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="border-t border-slate-200 px-6 py-4 bg-slate-50">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-semibold text-slate-900">
+                        Total Unpaid: ${money(unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0))}
+                      </div>
+                      {unpaidInvoices.length > 15 && (
+                        <button
+                          onClick={() => setShowAllUnpaid(!showAllUnpaid)}
+                          className="rounded-lg px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 transition"
+                        >
+                          {showAllUnpaid ? "Show Less" : `View All (${unpaidInvoices.length})`}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Bonus Reps Section (SC/CR) */}

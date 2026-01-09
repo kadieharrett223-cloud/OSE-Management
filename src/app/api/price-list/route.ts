@@ -7,13 +7,19 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabase
       .from("price_list_items")
-      .select("id, item_no, description, list_price, shipping_included_per_unit, weight_lbs, fob_cost")
-      .order("item_no", { ascending: true });
+      .select("id, item_no, description, list_price, shipping_included_per_unit, weight_lbs, fob_cost");
 
     if (error) throw error;
 
+    // Sort by list_price from lowest to highest (cheapest to most expensive)
+    const sortedData = (data || []).sort((a, b) => {
+      const priceA = Number(a.list_price || 0);
+      const priceB = Number(b.list_price || 0);
+      return priceA - priceB;
+    });
+
     // Map to match expected format
-    const items = (data || []).map((item: any) => ({
+    const items = (sortedData || []).map((item: any) => ({
       id: item.id,
       sku: item.item_no,
       description: item.description || "",

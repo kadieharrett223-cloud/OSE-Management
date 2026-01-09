@@ -32,6 +32,9 @@ type PriceListItem = {
   black_friday_price: number | null;
   rounded_sale_price: number | null;
   profit: number | null;
+  // Derived helpers (not persisted)
+  ocean_per_unit?: number | null;
+  importing_per_unit?: number | null;
   display_order: number | null;
 };
 
@@ -68,7 +71,6 @@ export default function AdminPriceListPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [discountPercentage, setDiscountPercentage] = useState<number>(20); // Default 20% off
   const [showAddModal, setShowAddModal] = useState(false);
-  const [expandedCosts, setExpandedCosts] = useState<Set<string>>(new Set());
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -81,8 +83,19 @@ export default function AdminPriceListPage() {
     multiplier: 1,
   });
 
+  // Save discount to localStorage when changed
+  const updateDiscount = (value: number) => {
+    setDiscountPercentage(value);
+    localStorage.setItem("priceListDiscount", value.toString());
+  };
+
   useEffect(() => {
     loadData();
+    // Load discount from localStorage on mount
+    const saved = localStorage.getItem("priceListDiscount");
+    if (saved) {
+      setDiscountPercentage(Number(saved));
+    }
   }, []);
 
   const loadData = async () => {
@@ -156,6 +169,7 @@ export default function AdminPriceListPage() {
         .update({
           description: editingItem.description,
           fob_cost: editingItem.fob_cost,
+          quantity: editingItem.quantity,
           ocean_frt: editingItem.ocean_frt,
           importing: editingItem.importing,
           zone5_shipping: editingItem.zone5_shipping,
@@ -176,49 +190,45 @@ export default function AdminPriceListPage() {
     }
   };
 
-  // Client-side calculation matching database trigger
+  // Client-side calculation: Tariff = FOB×2, Per Unit = Tariff+Ocean+Import, Cost w/Shipping = Per Unit+Zone5, Sell = Cost×Mult, List = Sell×1.2, Profit = Sell−Cost
   const computeDerivedFields = (item: PriceListItem): PriceListItem => {
     const fob_cost = item.fob_cost || 0;
-    const ocean_frt = item.ocean_frt || 0;
-    const importing = item.importing || 0;
+    const ocean_per_unit = item.ocean_frt || 0;  // Already per-unit in DB
+    const importing_per_unit = item.importing || 0;  // Already per-unit in DB
     const zone5_shipping = item.zone5_shipping || 0;
     const multiplier = item.multiplier || 1;
 
-    // 1) tariff_105 = fob_cost * 2
+    // 1) Tariff: FOB × 2
     const tariff_105 = fob_cost * 2;
-    
-    // 2) per_unit = tariff_105 + ocean_frt + importing
-    const per_unit = tariff_105 + ocean_frt + importing;
-    
-    // 3) cost_with_shipping = per_unit + zone5_shipping
-    const cost_with_shipping = per_unit + zone5_shipping;
-    
-    // 4) base_price = cost_with_shipping * multiplier
-    const base_price = cost_with_shipping * multiplier;
-    
-    // 5) list_price = floor(base_price / 5) * 5 (this is the fixed retail price)
-    const list_price = Math.floor(base_price / 5) * 5;
-    
-    // 6) sell_price = list_price * (1 - discount/100)
-    // If list price is $1000 and discount is 20%, sell price = $1000 * 0.8 = $800
-    const discount = discountPercentage || 20;
-    const sell_price = list_price * (1 - discount / 100);
-    
-    // Keep rounded_normal_price for compatibility (same as sell_price now)
-    const rounded_normal_price = sell_price;
-    
-    // 7) black_friday_price = list_price * 0.75
-    const black_friday_price = list_price * 0.75;
-    
-    // 8) rounded_sale_price = floor(black_friday_price / 100) * 100 - 1
-    const rounded_sale_price = Math.floor(black_friday_price / 100) * 100 - 1;
 
-    // 9) profit = sell_price - cost_with_shipping (total cost including shipping)
+    // 2) Per unit: Tariff + Ocean per-unit + Importing per-unit
+    const per_unit = tariff_105 + ocean_per_unit + importing_per_unit;
+
+    // 3) Cost with shipping: Per unit + Zone 5
+    const cost_with_shipping = per_unit + zone5_shipping;
+
+    // 4) Base sell price (before discount): Cost with shipping × Multiplier
+    const base_sell_price = cost_with_shipping * multiplier;
+
+    // 5) List price: Base sell price × 1.2 (fixed, never changes with discount)
+    const list_price = base_sell_price * 1.2;
+
+    // 6) Actual sell price: List price × (1 - discount/100)
+    const sell_price = list_price * (1 - (discountPercentage || 20) / 100);
+
+    // 6) Profit: Sell price - Cost with shipping
     const profit = sell_price - cost_with_shipping;
+
+    // Preserve legacy fields for compatibility.
+    const rounded_normal_price = sell_price;
+    const black_friday_price = list_price * 0.75;
+    const rounded_sale_price = Math.floor(black_friday_price / 100) * 100 - 1;
 
     return {
       ...item,
       tariff_105,
+      ocean_per_unit,
+      importing_per_unit,
       per_unit,
       cost_with_shipping,
       sell_price,
@@ -232,7 +242,7 @@ export default function AdminPriceListPage() {
 
   const updateEditingItem = (field: keyof PriceListItem, value: string | number | null) => {
     if (!editingItem) return;
-    const updated = { ...editingItem, [field]: value };
+    const updated = { ...editingItem, [field]: value === null || value === "" ? null : Number(value) } as PriceListItem;
     // Recompute derived fields
     const withDerived = computeDerivedFields(updated);
     setEditingItem(withDerived);
@@ -332,6 +342,7 @@ export default function AdminPriceListPage() {
     category: cat,
     items: filteredItems
       .filter((item) => item.category_id === cat.id)
+      .sort((a, b) => (a.list_price || 0) - (b.list_price || 0))
       .map((item) => computeDerivedFields(item)),
   })).filter(({ items }) => items.length > 0);
 
@@ -407,7 +418,7 @@ export default function AdminPriceListPage() {
                       max="100"
                       step="1"
                       value={discountPercentage}
-                      onChange={(e) => setDiscountPercentage(Number(e.target.value))}
+                      onChange={(e) => updateDiscount(Number(e.target.value))}
                       className="w-16 rounded-lg border border-emerald-300 bg-white px-2 py-1.5 text-sm text-slate-900 text-right font-semibold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none"
                     />
                     <span className="text-sm font-semibold text-emerald-700">% off</span>
@@ -455,7 +466,6 @@ export default function AdminPriceListPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full divide-y divide-slate-100 text-xs border-collapse table-fixed">
                         <colgroup>
-                          <col style={{ width: "40px" }} />
                           <col style={{ width: "75px" }} />
                           <col style={{ width: "60px" }} />
                           <col style={{ width: "60px" }} />
@@ -474,7 +484,6 @@ export default function AdminPriceListPage() {
                         </colgroup>
                         <thead className="bg-slate-50">
                           <tr>
-                            <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap"></th>
                             <th className="pl-3 pr-0.5 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
                             <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
@@ -496,38 +505,10 @@ export default function AdminPriceListPage() {
                           {categoryItems.map((item, index) => {
                             const isEditing = editingId === item.id;
                             const displayItem = isEditing && editingItem ? editingItem : item;
-                            const isExpanded = expandedCosts.has(item.id);
                             
                             return (
                             <React.Fragment key={item.id}>
                             <tr className={isEditing ? "bg-blue-50/70 border-l-4 border-l-blue-500" : "hover:bg-slate-50"}>
-                              {/* Expand Button */}
-                              <td className="px-1 py-1.5 text-center">
-                                <button
-                                  onClick={() => {
-                                    const newExpanded = new Set(expandedCosts);
-                                    if (isExpanded) {
-                                      newExpanded.delete(item.id);
-                                    } else {
-                                      newExpanded.add(item.id);
-                                    }
-                                    setExpandedCosts(newExpanded);
-                                  }}
-                                  className="text-slate-400 hover:text-slate-700 transition"
-                                  type="button"
-                                >
-                                  {isExpanded ? (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                  ) : (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                  )}
-                                </button>
-                              </td>
-                              
                               {/* Item No */}
                               <td className="pl-3 pr-0.5 py-1.5 sticky left-0 bg-inherit z-10">
                                 <span className="font-mono text-xs font-medium text-slate-900 whitespace-nowrap">{item.item_no}</span>
@@ -584,7 +565,7 @@ export default function AdminPriceListPage() {
                                     className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
                                   />
                                 ) : (
-                                  <span className="text-blue-900">${money(item.ocean_frt)}</span>
+                                  <span className="text-blue-900">${money(displayItem.ocean_frt)}</span>
                                 )}
                               </td>
 
@@ -599,7 +580,7 @@ export default function AdminPriceListPage() {
                                     className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
                                   />
                                 ) : (
-                                  <span className="text-blue-900">${money(item.importing)}</span>
+                                  <span className="text-blue-900">${money(displayItem.importing)}</span>
                                 )}
                               </td>
 
@@ -700,71 +681,6 @@ export default function AdminPriceListPage() {
                                 )}
                               </td>
                             </tr>
-
-                            {/* Expanded Cost Details - Inline Horizontal */}
-                            {isExpanded && (
-                              <tr className="bg-blue-50 border-t border-blue-200">
-                                <td colSpan={1}></td>
-                                <td colSpan={9} className="px-4 py-4">
-                                  <div className="grid grid-cols-5 gap-6">
-                                    <div className="space-y-1">
-                                      <label className="block text-xs font-semibold text-blue-700">FOB Cost</label>
-                                      {isEditing ? (
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          value={displayItem.fob_cost !== null && displayItem.fob_cost !== undefined ? displayItem.fob_cost : ""}
-                                          onChange={(e) => updateEditingItem("fob_cost", e.target.value === "" ? null : Number(e.target.value))}
-                                          className="w-full rounded border border-blue-400 px-2 py-1 text-xs font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
-                                        />
-                                      ) : (
-                                        <div className="text-sm font-mono text-slate-900">${money(item.fob_cost)}</div>
-                                      )}
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <label className="block text-xs font-semibold text-blue-700">Ocean Freight</label>
-                                      {isEditing ? (
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          value={displayItem.ocean_frt !== null && displayItem.ocean_frt !== undefined ? displayItem.ocean_frt : ""}
-                                          onChange={(e) => updateEditingItem("ocean_frt", e.target.value === "" ? null : Number(e.target.value))}
-                                          className="w-full rounded border border-blue-400 px-2 py-1 text-xs font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
-                                        />
-                                      ) : (
-                                        <div className="text-sm font-mono text-slate-900">${money(item.ocean_frt)}</div>
-                                      )}
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <label className="block text-xs font-semibold text-blue-700">Importing</label>
-                                      {isEditing ? (
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          value={displayItem.importing !== null && displayItem.importing !== undefined ? displayItem.importing : ""}
-                                          onChange={(e) => updateEditingItem("importing", e.target.value === "" ? null : Number(e.target.value))}
-                                          className="w-full rounded border border-blue-400 px-2 py-1 text-xs font-medium text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
-                                        />
-                                      ) : (
-                                        <div className="text-sm font-mono text-slate-900">${money(item.importing)}</div>
-                                      )}
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <label className="block text-xs font-semibold text-slate-600">Tariff 105%</label>
-                                      <div className="text-sm font-mono text-slate-900">${money(displayItem.tariff_105)}</div>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <label className="block text-xs font-semibold text-slate-600">Per Unit (Total Cost)</label>
-                                      <div className="text-sm font-mono font-bold text-slate-900">${money(displayItem.per_unit)}</div>
-                                    </div>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
                             </React.Fragment>
                           );})}
                           {categoryItems.length === 0 && (
@@ -799,6 +715,44 @@ export default function AdminPriceListPage() {
                   All derived fields (Per Unit, Sell Price, etc.) are auto-computed by the database
                 </li>
               </ul>
+
+              <div className="mt-6 space-y-3 text-sm text-blue-900">
+                <h4 className="font-semibold text-blue-900">Row / Column Quick Guide</h4>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                    <p className="font-semibold text-blue-800">Item &amp; Sourcing</p>
+                    <p className="text-blue-700">Item No., Description, Supplier — identifiers only; no math impact.</p>
+                  </div>
+                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                    <p className="font-semibold text-blue-800">Base Cost Inputs</p>
+                    <p className="text-blue-700">FOB drives all downstream costs/prices. Quantity changes per-unit freight/import allocations.</p>
+                  </div>
+                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                    <p className="font-semibold text-blue-800">Tariffs &amp; Import</p>
+                    <p className="text-blue-700">Tariff 105% = FOB × 2.05. Ocean/Import spread over quantity; shifts landed cost and profit.</p>
+                  </div>
+                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                    <p className="font-semibold text-blue-800">Domestic Shipping</p>
+                    <p className="text-blue-700">Zone 5 shipping is per-unit; affects final landed cost and profit, not import math.</p>
+                  </div>
+                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                    <p className="font-semibold text-blue-800">Cost Roll-ups</p>
+                    <p className="text-blue-700">Import Landed = Tariff + Ocean + Import. Final Landed = Import Landed + Shipping.</p>
+                  </div>
+                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                    <p className="font-semibold text-blue-800">Pricing</p>
+                    <p className="text-blue-700">Multiplier changes sell price and profit only. List Price is sell price × 1.2 for MSRP headroom.</p>
+                  </div>
+                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                    <p className="font-semibold text-blue-800">Profit</p>
+                    <p className="text-blue-700">Profit = Sell Price − Final Landed. Independent of list price.</p>
+                  </div>
+                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                    <p className="font-semibold text-blue-800">Change Effects</p>
+                    <p className="text-blue-700">FOB or tariff rate: everything moves. Quantity: only freight/import per-unit. Shipping: final cost/pricing only. Multiplier: price/profit only.</p>
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
         </main>
