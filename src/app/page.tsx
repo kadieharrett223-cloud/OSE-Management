@@ -285,6 +285,12 @@ export default function Dashboard() {
     commission: r.commission,
     invoiceCount: r.orders,
     commissionRate: 0.05,
+    bonusProgress: {
+      salesAmount: 0,
+      bonusThreshold: 150000,
+      percentToThreshold: 0,
+      hasEarnedBonus: false,
+    },
   }));
 
   const totalSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
