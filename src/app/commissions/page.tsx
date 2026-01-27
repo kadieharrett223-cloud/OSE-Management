@@ -2,9 +2,6 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { usePathname } from "next/navigation";
-import { isSalaryRep } from "@/lib/repTypes";
-import { isWholesalerName } from "@/lib/repAliases";
 import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
 interface RepData {
@@ -208,10 +205,8 @@ export default function CommissionsPage() {
       invoiceCount: r.invoiceCount,
       missingSKUCount: 0,
     })) : mockReps;
-      // Filter out salary workers - they're shown in the Salary Bonus tab
-    const commissionedOnly = displayReps.filter(r => !isSalaryRep(r.name) && !isWholesalerName(r.name));
-    // Sort by commission desc by default
-    const sorted = [...commissionedOnly].sort((a, b) => (b.commissionMTD || 0) - (a.commissionMTD || 0));
+    // Show all reps - no filtering
+    const sorted = [...displayReps].sort((a, b) => (b.commissionMTD || 0) - (a.commissionMTD || 0));
     return sorted.filter((r) => r.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [repSalesData, searchTerm]);
 
@@ -248,13 +243,6 @@ export default function CommissionsPage() {
     month: "long",
   });
 
-  const pathname = usePathname();
-  const tabs = [
-    { label: "Commissioned", href: "/commissions" },
-    { label: "Salary Bonus", href: "/commissions/salary-bonus" },
-    { label: "Wholesalers", href: "/admin/wholesalers" },
-  ];
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
@@ -262,32 +250,12 @@ export default function CommissionsPage() {
 
         {/* Main Content */}
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          {/* Chrome-style Tabs */}
-          <div className="bg-slate-800 border-b border-slate-700 px-8">
-            <div className="flex gap-1">
-              {tabs.map((tab) => (
-                <a
-                  key={tab.href}
-                  href={tab.href}
-                  className={`px-6 py-3 text-sm font-medium transition relative ${
-                    pathname === tab.href
-                      ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
-                      : "text-slate-300 hover:text-white hover:bg-slate-700/50"
-                  }`}
-                >
-                  {tab.label}
-                </a>
-              ))}
-            </div>
-          </div>
-
           <div className="mx-auto max-w-7xl px-8 py-8 space-y-6">
             {/* Top Bar */}
             <header>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-blue-700">Commissions</p>
-                  <h1 className="mt-1 text-3xl font-semibold text-slate-900">Sales Rep Dashboard</h1>
+                  <h1 className="text-3xl font-semibold text-slate-900">Commissions</h1>
                   <p className="mt-1 text-sm text-slate-600">Track commissions and invoice details for {monthYearDisplay}.</p>
                 </div>
                 <div className="flex items-center gap-3">
