@@ -10,6 +10,21 @@ interface RepData {
   invoiceCount: number;
 }
 
+interface InvoiceLine {
+  description: string;
+  qty: number;
+  unitPrice: number;
+  lineAmount: number;
+}
+
+interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  txnDate: string;
+  totalAmount: number;
+  lines: InvoiceLine[];
+}
+
 // Mock data for fallback
 const mockReps = [
   { id: "1", name: "John Smith", qboCode: "JS", totalSales: 3250.5, invoiceCount: 12 },
@@ -30,6 +45,9 @@ export default function CommissionsPage() {
   const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
   const [loadingReps, setLoadingReps] = useState(true);
   const [invoiceStatus, setInvoiceStatus] = useState<"paid" | "unpaid" | "all">("paid");
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
 
   // Fetch sales reps for current month
   useEffect(() => {
@@ -64,6 +82,43 @@ export default function CommissionsPage() {
       isMounted = false;
     };
   }, [selectedMonth, invoiceStatus]);
+
+  // Fetch invoices for selected rep
+  useEffect(() => {
+    if (!selectedRepId) {
+      setInvoices([]);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingInvoices(true);
+    setInvoices([]);
+    const { startDate, endDate } = getCommissionDateRange(selectedMonth);
+
+    fetch(
+      `/api/qbo/invoice/by-rep?repName=${encodeURIComponent(selectedRepId)}&startDate=${startDate}&endDate=${endDate}&status=${invoiceStatus}`
+    )
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to fetch invoices");
+        return await res.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.ok && data.invoices) {
+          setInvoices(data.invoices);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch invoices:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingInvoices(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedRepId, selectedMonth, invoiceStatus]);
 
   const startQboConnect = () => {
     setConnectError(null);
@@ -222,6 +277,84 @@ export default function CommissionsPage() {
                       <p className="mt-2 text-sm text-slate-600">{selectedTotals.count} invoices</p>
                     </div>
                   </div>
+
+                  {/* Invoices Table */}
+                  {loadingInvoices ? (
+                    <div className="rounded-2xl bg-white px-6 py-8 shadow-sm ring-1 ring-slate-200 text-center text-slate-600">
+                      Loading invoices...
+                    </div>
+                  ) : invoices.length === 0 ? (
+                    <div className="rounded-2xl bg-white px-6 py-8 shadow-sm ring-1 ring-slate-200 text-center text-slate-600">
+                      No invoices found
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-900">Invoice #</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-900">Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-900">Items</th>
+                              <th className="px-6 py-3 text-right text-xs font-semibold text-slate-900">Total</th>
+                              <th className="px-6 py-3 text-center text-xs font-semibold text-slate-900">Details</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {invoices.map((invoice) => (
+                              <div key={invoice.id}>
+                                <tr>
+                                  <td className="px-6 py-4 text-sm font-semibold text-slate-900">{invoice.invoiceNumber}</td>
+                                  <td className="px-6 py-4 text-sm text-slate-600">
+                                    {new Date(invoice.txnDate).toLocaleDateString("en-US")}
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-slate-600">{invoice.lines.length} items</td>
+                                  <td className="px-6 py-4 text-sm font-semibold text-slate-900 text-right">
+                                    ${money(invoice.totalAmount)}
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <button
+                                      onClick={() => setExpandedInvoice(expandedInvoice === invoice.id ? null : invoice.id)}
+                                      className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                      type="button"
+                                    >
+                                      {expandedInvoice === invoice.id ? "Hide" : "Show"}
+                                    </button>
+                                  </td>
+                                </tr>
+                                {expandedInvoice === invoice.id && (
+                                  <tr className="bg-slate-50">
+                                    <td colSpan={5} className="px-6 py-4">
+                                      <table className="w-full">
+                                        <thead>
+                                          <tr className="border-b border-slate-200">
+                                            <th className="text-left text-xs font-semibold text-slate-700 py-2">Item</th>
+                                            <th className="text-right text-xs font-semibold text-slate-700 py-2">Qty</th>
+                                            <th className="text-right text-xs font-semibold text-slate-700 py-2">Unit Price</th>
+                                            <th className="text-right text-xs font-semibold text-slate-700 py-2">Amount</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200">
+                                          {invoice.lines.map((line, idx) => (
+                                            <tr key={idx}>
+                                              <td className="text-sm text-slate-700 py-2">{line.description}</td>
+                                              <td className="text-sm text-slate-700 py-2 text-right">{line.qty}</td>
+                                              <td className="text-sm text-slate-700 py-2 text-right">${money(line.unitPrice)}</td>
+                                              <td className="text-sm font-semibold text-slate-900 py-2 text-right">${money(line.lineAmount)}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </td>
+                                  </tr>
+                                )}
+                              </div>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

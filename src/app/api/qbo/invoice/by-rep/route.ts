@@ -1,27 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch } from "@/lib/qbo";
-import { getPriceList, matchItemAndCalculateShipping } from "@/lib/shippingDeduction";
-import { getServerSupabaseClient } from "@/lib/supabase";
-import { canonicalizeRep, aliasesForCanonical } from "@/lib/repAliases";
+
+interface InvoiceLine {
+  description: string;
+  qty: number;
+  unitPrice: number;
+  lineAmount: number;
+}
 
 interface InvoiceDetail {
   id: string;
   invoiceNumber: string;
   txnDate: string;
   totalAmount: number;
-  totalCommissionable: number;
-  totalShippingDeducted: number;
-  commission: number;
-  lines: {
-    sku?: string;
-    description: string;
-    qty: number;
-    unitPrice: number;
-    lineAmount: number;
-    shippingDeducted: number;
-    commissionable: number;
-    matched: boolean;
-  }[];
+  lines: InvoiceLine[];
 }
 
 export async function GET(req: NextRequest) {
@@ -38,19 +30,6 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       );
     }
-
-    // Fetch price list for shipping deductions
-    const priceList = await getPriceList();
-    // Commission rate for this rep (canonical + aliases)
-    const supabase = getServerSupabaseClient();
-    const canonical = canonicalizeRep(repName);
-    const aliasList = aliasesForCanonical(canonical);
-    const { data: rateRows } = await supabase
-      .from("rep_commission_rates")
-      .select("rep_name, commission_rate")
-      .in("rep_name", aliasList);
-    const exact = (rateRows || []).find((r: any) => r.rep_name === canonical);
-    const commissionRate = Number((exact?.commission_rate ?? (rateRows?.[0]?.commission_rate)) ?? 0.05);
 
     // Build query for invoices
     let query = "SELECT * FROM Invoice";
@@ -104,104 +83,46 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        // Match against any alias for the canonical rep (case-insensitive contains or exact)
-        const invoiceLower = invoiceRepName.toLowerCase();
-        return aliasList.some((alias) => {
-          const a = alias.toLowerCase();
-          return invoiceLower.includes(a) || invoiceLower === a;
-        });
+        // Direct match on rep name
+        return invoiceRepName === repName;
       })
       .map((inv: any) => {
         const totalAmount = Number(inv.TotalAmt) || 0;
         const balance = Number(inv.Balance) || 0;
         const paidAmount = totalAmount - balance;
 
-        // Parse line items with shipping deduction
-        let totalCommissionable = 0;
-        let totalShippingDeducted = 0;
-        
-        const lines = (inv.Line || []).map((line: any) => {
-          let lineAmount = Number(line.Amount) || 0;
-          let itemName = "";
-          let itemRef = "";
-          let qty = 1;
-          let unitPrice = lineAmount;
-
-          if (line.SalesItemLineDetail) {
+        // Parse line items - just show what was sold
+        const lines: InvoiceLine[] = (inv.Line || [])
+          .filter((line: any) => line.SalesItemLineDetail)
+          .map((line: any) => {
             const detail = line.SalesItemLineDetail;
-            itemName = detail.ItemRef?.name || detail.ItemRef?.value || "";
-            itemRef = detail.ItemRef?.value || "";
-            qty = Number(detail.Qty) || 1;
-            unitPrice = Number(detail.UnitPrice) || lineAmount / qty;
-
-            // Match to price list and calculate shipping deduction
-            const matched = matchItemAndCalculateShipping(
-              itemName,
-              itemRef,
-              qty,
-              unitPrice,
-              priceList
-            );
-
-            totalCommissionable += matched.commissionable;
-            totalShippingDeducted += matched.shippingDeducted;
+            const itemName = detail.ItemRef?.name || detail.ItemRef?.value || "Unknown Item";
+            const qty = Number(detail.Qty) || 1;
+            const unitPrice = Number(detail.UnitPrice) || 0;
+            const lineAmount = Number(line.Amount) || 0;
 
             return {
-              sku: matched.matchedSku || itemName,
-              description: line.Description || itemName || "Item",
+              description: itemName,
               qty,
               unitPrice,
               lineAmount,
-              shippingDeducted: matched.shippingDeducted,
-              commissionable: matched.commissionable,
-              matched: matched.matched,
             };
-          } else {
-            // Not a sales item (discount, tax, etc) — do not count toward commissionable
-            const detailType = line.DetailType || "Other";
-            const rawDescription = line.Description || "";
-            const description = rawDescription
-              ? `${detailType}: ${rawDescription}`
-              : `${detailType} (non-item)`;
-            return {
-              sku: detailType,
-              description,
-              qty: 1,
-              unitPrice: lineAmount,
-              lineAmount,
-              shippingDeducted: 0,
-              commissionable: 0,
-              matched: false,
-            };
-          }
-        });
+          });
 
         return {
           id: inv.Id,
           invoiceNumber: inv.DocNumber || "Unknown",
           txnDate: inv.TxnDate || new Date().toISOString().split("T")[0],
           totalAmount: paidAmount,
-          totalCommissionable,
-          totalShippingDeducted,
-          commission: totalCommissionable * commissionRate,
           lines,
         };
       });
-
-    const totalCommission = repInvoices.reduce(
-      (sum, inv) => sum + inv.commission,
-      0
-    );
 
     return NextResponse.json({
       ok: true,
       repName,
       invoices: repInvoices,
       count: repInvoices.length,
-      totalCommissionable: repInvoices.reduce((sum, inv) => sum + inv.totalCommissionable, 0),
-      totalShippingDeducted: repInvoices.reduce((sum, inv) => sum + inv.totalShippingDeducted, 0),
-      totalCommission,
-      commissionRate,
     });
   } catch (error: any) {
     return NextResponse.json(
