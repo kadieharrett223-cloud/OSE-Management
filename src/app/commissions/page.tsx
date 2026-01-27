@@ -7,9 +7,7 @@ import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commiss
 interface RepData {
   repName: string;
   totalSales: number;
-  commission: number;
   invoiceCount: number;
-  commissionRate: number;
 }
 
 interface InvoiceLine {
@@ -75,19 +73,12 @@ const money = (value: number | undefined) => {
 };
 
 export default function CommissionsPage() {
-  const [selectedRepId, setSelectedRepId] = useState(mockReps[0]?.id);
+  const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
   const [selectedMonth, setSelectedMonth] = useState(getCurrentCommissionMonth());
   const [connectError, setConnectError] = useState<string | null>(null);
   const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
-  const [repInvoices, setRepInvoices] = useState<InvoiceDetail[]>([]);
   const [loadingReps, setLoadingReps] = useState(true);
-  const [loadingInvoices, setLoadingInvoices] = useState(false);
-  const [editingRate, setEditingRate] = useState<string>("");
-  const [currentRate, setCurrentRate] = useState<number>(0.05);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [saveStatus, setSaveStatus] = useState<{ok?: boolean; message?: string}>({});
   const [invoiceStatus, setInvoiceStatus] = useState<"paid" | "unpaid" | "all">("paid");
 
   // Fetch sales reps for current month
@@ -201,12 +192,11 @@ export default function CommissionsPage() {
       id: r.repName,
       name: r.repName,
       qboCode: r.repName.split(" ")[0][0] + (r.repName.split(" ")[1]?.[0] || ""),
-      commissionMTD: r.commission,
+      totalSales: r.totalSales,
       invoiceCount: r.invoiceCount,
-      missingSKUCount: 0,
     })) : mockReps;
     // Show all reps - no filtering
-    const sorted = [...displayReps].sort((a, b) => (b.commissionMTD || 0) - (a.commissionMTD || 0));
+    const sorted = [...displayReps].sort((a, b) => (b.totalSales || 0) - (a.totalSales || 0));
     return sorted.filter((r) => r.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [repSalesData, searchTerm]);
 
@@ -214,11 +204,10 @@ export default function CommissionsPage() {
   
   // Selected totals
   const selectedTotals = useMemo(() => {
-    const totalCommission = repInvoices.reduce((s, i) => s + (i.commission || 0), 0);
-    const totalCommissionable = repInvoices.reduce((s, i) => s + (i.commissionable || 0), 0);
-    const totalShipping = repInvoices.reduce((s, i) => s + (i.shippingDeducted || 0), 0);
-    return { totalCommission, totalCommissionable, totalShipping, count: repInvoices.length };
-  }, [repInvoices]);
+    const totalSales = selectedRep?.totalSales || 0;
+    const count = selectedRep?.invoiceCount || 0;
+    return { totalSales, count };
+  }, [selectedRep]);
 
   const startQboConnect = () => {
     setConnectError(null);
@@ -227,15 +216,6 @@ export default function CommissionsPage() {
     } catch (error) {
       setConnectError(error instanceof Error ? error.message : "Failed to start QuickBooks connect.");
     }
-  };
-
-  const toggleInvoiceExpand = (invId: string) => {
-    setExpandedInvoices((prev) => {
-      const next = new Set(prev);
-      if (next.has(invId)) next.delete(invId);
-      else next.add(invId);
-      return next;
-    });
   };
 
   const monthYearDisplay = new Date(selectedMonth + "-01").toLocaleDateString("en-US", {
@@ -362,8 +342,8 @@ export default function CommissionsPage() {
                       </div>
                       <div className="mt-2 flex gap-4 text-xs">
                         <div>
-                          <p className="text-slate-600">Commission</p>
-                          <p className="font-semibold text-slate-900">${money(rep.commissionMTD)}</p>
+                          <p className="text-slate-600">Sales</p>
+                          <p className="font-semibold text-slate-900">${money(rep.totalSales)}</p>
                         </div>
                         <div>
                           <p className="text-slate-600">Invoices</p>
@@ -382,26 +362,11 @@ export default function CommissionsPage() {
                   <div className="rounded-2xl bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
                       <div>
-                        <p className="text-xs uppercase text-slate-600">Commission MTD</p>
-                        <p className="mt-1 text-2xl font-semibold text-slate-900">${money(selectedTotals.totalCommission)}</p>
+                        <p className="text-xs uppercase text-slate-600">Total Sales MTD</p>
+                        <p className="mt-1 text-2xl font-semibold text-slate-900">${money(selectedTotals.totalSales)}</p>
+                        <p className="mt-1 text-xs text-slate-600">{selectedTotals.count} invoices</p>
                       </div>
-                      <div className="flex items-end gap-3">
-                        <div>
-                          <p className="text-xs uppercase text-slate-600">Commission Rate (%)</p>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={editingRate}
-                            onChange={(e) => setEditingRate(e.target.value)}
-                            className="mt-1 w-28 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900"
-                          />
-                        </div>
-                        <button
-                          onClick={saveCommissionRate}
-                          className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition hover:bg-blue-700"
-                          type="button"
-                        >
-                          Save Rate
+                    </div>
                         </button>
                         <span className="text-sm text-slate-600">Current: {(currentRate * 100).toFixed(2)}%</span>
                         {saveStatus.message && (
@@ -410,115 +375,6 @@ export default function CommissionsPage() {
                           </span>
                         )}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Cluster: Volume & Adjustments */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="rounded-2xl bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200">
-                      <div className="text-xs uppercase text-slate-600">Volume</div>
-                      <div className="mt-2 grid grid-cols-2 gap-4">
-                        <div>
-                          <div className="text-xs text-slate-600">Commissionable Sales</div>
-                          <div className="text-lg font-semibold text-slate-900">${money(selectedTotals.totalCommissionable)}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-slate-600">Invoice Count</div>
-                          <div className="text-lg font-semibold text-slate-900">{selectedTotals.count}</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="rounded-2xl bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200">
-                      <div className="text-xs uppercase text-slate-600">Adjustments</div>
-                      <div className="mt-2 grid grid-cols-2 gap-4">
-                        <div>
-                          <div className="text-xs text-slate-600">Shipping Deducted</div>
-                          <div className="text-lg font-semibold text-blue-700">${money(selectedTotals.totalShipping)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Invoices Table */}
-                  <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-                    <div className="border-b border-slate-200 px-6 py-4">
-                      <h3 className="text-lg font-semibold text-slate-900">Invoices</h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-slate-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left font-semibold text-slate-600">Invoice #</th>
-                            <th className="px-6 py-3 text-left font-semibold text-slate-600">Date</th>
-                            <th className="px-6 py-3 text-right font-semibold text-slate-600">Shipping Deducted</th>
-                            <th className="px-6 py-3 text-right font-semibold text-slate-600">Commission</th>
-                            <th className="px-6 py-3 text-center font-semibold text-slate-600">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {loadingInvoices ? (
-                            <tr>
-                              <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                                Loading invoices...
-                              </td>
-                            </tr>
-                          ) : repInvoices.length === 0 ? (
-                            <tr>
-                              <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                                No invoices for this rep in the selected month
-                              </td>
-                            </tr>
-                          ) : (
-                            repInvoices.map((inv, idx) => (
-                              [
-                                (
-                                  <tr key={inv.id} className={"hover:bg-slate-50 " + (idx % 2 === 1 ? "bg-slate-50/50" : "bg-white") }>
-                                    <td className="px-6 py-4 font-medium text-slate-900">{inv.invoiceNumber}</td>
-                                    <td className="px-6 py-4 text-slate-600">{new Date(inv.txnDate).toLocaleDateString()}</td>
-                                    <td className="px-6 py-4 text-right text-slate-600">${money(inv.shippingDeducted)}</td>
-                                    <td className="px-6 py-4 text-right font-semibold text-emerald-700 text-base">${money(inv.commission)}</td>
-                                    <td className="px-6 py-4 text-center">
-                                      <button
-                                        onClick={() => toggleInvoiceExpand(inv.id)}
-                                        className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                                        type="button"
-                                      >
-                                        {expandedInvoices.has(inv.id) ? "Hide" : "Show"} lines
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ),
-                                expandedInvoices.has(inv.id) ? (
-                                  <tr key={`${inv.id}-detail`} className="bg-blue-50">
-                                    <td colSpan={5} className="px-6 py-4">
-                                      <p className="mb-3 text-xs font-semibold uppercase text-slate-700">Line Items</p>
-                                      <div className="space-y-2">
-                                        {inv.lines.map((line, idx2) => (
-                                          <div key={idx2} className="flex justify-between rounded-lg bg-white px-4 py-2 text-xs">
-                                            <span className="font-medium text-slate-900">{line.sku || line.description}</span>
-                                            <span className="text-slate-600">
-                                              {line.qty} × ${money(line.unitPrice)} = ${money(line.lineAmount)}
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ) : null,
-                              ]
-                            ))
-                          )}
-                          
-                        </tbody>
-                        <tfoot className="bg-white sticky bottom-0">
-                          <tr>
-                            <td className="px-6 py-3 text-left text-slate-600 font-semibold" colSpan={2}>Totals</td>
-                            <td className="px-6 py-3 text-right text-slate-600 font-semibold">${money(selectedTotals.totalShipping)}</td>
-                            <td className="px-6 py-3 text-right text-emerald-700 font-bold">${money(selectedTotals.totalCommission)}</td>
-                            <td className="px-6 py-3"></td>
-                          </tr>
-                        </tfoot>
-                      </table>
                     </div>
                   </div>
                 </div>
