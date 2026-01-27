@@ -352,62 +352,60 @@ export default function CommissionsPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {invoices.map((invoice) => (
-                              <Fragment key={invoice.id}>
-                                <tr>
-                                  <td className="px-6 py-4 text-sm font-semibold text-slate-900">{invoice.invoiceNumber}</td>
-                                  <td className="px-6 py-4 text-sm text-slate-600">
-                                    {new Date(invoice.txnDate).toLocaleDateString("en-US")}
-                                  </td>
-                                  <td className="px-6 py-4 text-sm text-slate-600">{invoice.lines.length} items</td>
-                                  <td className="px-6 py-4 text-sm font-semibold text-slate-900 text-right">
-                                    ${money(invoice.totalAmount)}
-                                  </td>
-                                  <td className="px-6 py-4 text-sm font-semibold text-green-600 text-right">
-                                    ${money(invoice.commission)}
-                                  </td>
-                                  <td className="px-6 py-4 text-center">
-                                    <button
-                                      onClick={() => setExpandedInvoice(expandedInvoice === invoice.id ? null : invoice.id)}
-                                      className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                                      type="button"
-                                    >
-                                      {expandedInvoice === invoice.id ? "Hide" : "Show"}
-                                    </button>
+                            {invoices.map((invoice) => [
+                              <tr key={invoice.id}>
+                                <td className="px-6 py-4 text-sm font-semibold text-slate-900">{invoice.invoiceNumber}</td>
+                                <td className="px-6 py-4 text-sm text-slate-600">
+                                  {new Date(invoice.txnDate).toLocaleDateString("en-US")}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-slate-600">{invoice.lines.length} items</td>
+                                <td className="px-6 py-4 text-sm font-semibold text-slate-900 text-right">
+                                  ${money(invoice.totalAmount)}
+                                </td>
+                                <td className="px-6 py-4 text-sm font-semibold text-green-600 text-right">
+                                  ${money(invoice.commission)}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                  <button
+                                    onClick={() => setExpandedInvoice(expandedInvoice === invoice.id ? null : invoice.id)}
+                                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                    type="button"
+                                  >
+                                    {expandedInvoice === invoice.id ? "Hide" : "Show"}
+                                  </button>
+                                </td>
+                              </tr>,
+                              expandedInvoice === invoice.id && (
+                                <tr key={`${invoice.id}-details`} className="bg-slate-50">
+                                  <td colSpan={6} className="px-6 py-4">
+                                    <table className="w-full">
+                                      <thead>
+                                        <tr className="border-b border-slate-200">
+                                          <th className="text-left text-xs font-semibold text-slate-700 py-2">Item</th>
+                                          <th className="text-right text-xs font-semibold text-slate-700 py-2">Qty</th>
+                                          <th className="text-right text-xs font-semibold text-slate-700 py-2">Unit Price</th>
+                                          <th className="text-right text-xs font-semibold text-slate-700 py-2">Amount</th>
+                                          <th className="text-right text-xs font-semibold text-slate-700 py-2">Shipping Deducted</th>
+                                          <th className="text-right text-xs font-semibold text-slate-700 py-2">Commissionable</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-200">
+                                        {invoice.lines.map((line, idx) => (
+                                          <tr key={idx}>
+                                            <td className="text-sm text-slate-700 py-2">{line.description}</td>
+                                            <td className="text-sm text-slate-700 py-2 text-right">{line.qty}</td>
+                                            <td className="text-sm text-slate-700 py-2 text-right">${money(line.unitPrice)}</td>
+                                            <td className="text-sm font-semibold text-slate-900 py-2 text-right">${money(line.lineAmount)}</td>
+                                            <td className="text-sm text-red-600 py-2 text-right">${money(line.shippingDeducted)}</td>
+                                            <td className="text-sm font-semibold text-green-600 py-2 text-right">${money(line.commissionable)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
                                   </td>
                                 </tr>
-                                {expandedInvoice === invoice.id && (
-                                  <tr className="bg-slate-50">
-                                    <td colSpan={6} className="px-6 py-4">
-                                      <table className="w-full">
-                                        <thead>
-                                          <tr className="border-b border-slate-200">
-                                            <th className="text-left text-xs font-semibold text-slate-700 py-2">Item</th>
-                                            <th className="text-right text-xs font-semibold text-slate-700 py-2">Qty</th>
-                                            <th className="text-right text-xs font-semibold text-slate-700 py-2">Unit Price</th>
-                                            <th className="text-right text-xs font-semibold text-slate-700 py-2">Amount</th>
-                                            <th className="text-right text-xs font-semibold text-slate-700 py-2">Shipping Deducted</th>
-                                            <th className="text-right text-xs font-semibold text-slate-700 py-2">Commissionable</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-200">
-                                          {invoice.lines.map((line, idx) => (
-                                            <tr key={idx}>
-                                              <td className="text-sm text-slate-700 py-2">{line.description}</td>
-                                              <td className="text-sm text-slate-700 py-2 text-right">{line.qty}</td>
-                                              <td className="text-sm text-slate-700 py-2 text-right">${money(line.unitPrice)}</td>
-                                              <td className="text-sm font-semibold text-slate-900 py-2 text-right">${money(line.lineAmount)}</td>
-                                              <td className="text-sm text-red-600 py-2 text-right">${money(line.shippingDeducted)}</td>
-                                              <td className="text-sm font-semibold text-green-600 py-2 text-right">${money(line.commissionable)}</td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </td>
-                                  </tr>
-                                )}
-                              </Fragment>
-                            ))}
+                              ),
+                            ].filter(Boolean)}
                           </tbody>
                         </table>
                       </div>
