@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Sidebar } from "@/components/Sidebar";
 import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
@@ -54,6 +55,7 @@ const money = (value: number | undefined) => {
 };
 
 export default function CommissionsPage() {
+  const { data: session, status } = useSession();
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(getCurrentCommissionMonth());
@@ -71,8 +73,14 @@ export default function CommissionsPage() {
     shippingDeducted: number;
   } | null>(null);
 
-  // Fetch sales reps for current month
+  // Fetch sales reps for current month (only after session is ready)
   useEffect(() => {
+    // Don't fetch until session is loaded
+    if (status === "loading") return;
+    if (status === "unauthenticated") {
+      setLoadingReps(false);
+      return;
+    }
     let isMounted = true;
     const { startDate, endDate } = getCommissionDateRange(selectedMonth);
 
@@ -113,8 +121,15 @@ export default function CommissionsPage() {
     };
   }, [selectedMonth, invoiceStatus]);
 
-  // Fetch invoices for selected rep
+  // Fetch invoices for selected rep (only after session is ready)
   useEffect(() => {
+    // Don't fetch until session is loaded
+    if (status === "loading") return;
+    if (status === "unauthenticated") {
+      setLoadingInvoices(false);
+      return;
+    }
+
     if (!selectedRepId) {
       setInvoices([]);
       setCommissionData(null);
@@ -193,6 +208,20 @@ export default function CommissionsPage() {
     const count = selectedRep?.invoiceCount || 0;
     return { totalSales, count };
   }, [selectedRep]);
+
+  // Show loading state while session is loading
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100">
+        <div className="flex min-h-screen">
+          <Sidebar activePage="Commissions" />
+          <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 flex items-center justify-center">
+            <div className="text-slate-900 text-lg font-semibold">Loading...</div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
