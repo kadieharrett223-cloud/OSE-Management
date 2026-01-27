@@ -1,5 +1,7 @@
 import { Buffer } from "buffer";
 import { getServerSupabaseClient } from "./supabase";
+import fs from "fs";
+import path from "path";
 
 const QBO_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
 const QBO_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
@@ -31,7 +33,7 @@ export type QboTokenResponse = {
   realmId?: string;
 };
 
-type QboTokenRow = {
+export type QboTokenRow = {
   id: string;
   access_token: string | null;
   refresh_token: string | null;
@@ -101,29 +103,68 @@ export async function refreshAccessToken(refreshToken: string): Promise<QboToken
   return (await res.json()) as QboTokenResponse;
 }
 
-async function getTokenRow(): Promise<QboTokenRow | null> {
-  const supabase = getServerSupabaseClient();
-  const { data, error } = await supabase.from("qbo_tokens").select("*").eq("id", "primary").maybeSingle();
-  if (error) throw error;
-  return data as QboTokenRow | null;
+const TOKEN_FILE = path.join(process.cwd(), ".data", "qbo_tokens.json");
+
+function ensureDataDir() {
+  const dir = path.dirname(TOKEN_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 }
 
-async function saveTokenRow(token: QboTokenResponse, state?: string) {
-  const supabase = getServerSupabaseClient();
+async function readTokenFile(): Promise<QboTokenRow | null> {
+  try {
+    const buf = await fs.promises.readFile(TOKEN_FILE, "utf8");
+    const json = JSON.parse(buf);
+    return json as QboTokenRow;
+  } catch {
+    return null;
+  }
+}
+
+async function writeTokenFile(row: QboTokenRow): Promise<void> {
+  ensureDataDir();
+  await fs.promises.writeFile(TOKEN_FILE, JSON.stringify(row, null, 2));
+}
+
+export async function getTokenRow(): Promise<QboTokenRow | null> {
+  try {
+    const supabase = getServerSupabaseClient();
+    const { data, error } = await supabase
+      .from("qbo_tokens")
+      .select("*")
+      .eq("id", "primary")
+      .maybeSingle();
+    if (error) throw error;
+    return data as QboTokenRow | null;
+  } catch (err) {
+    // Fallback to local file storage when Supabase is unreachable
+    return await readTokenFile();
+  }
+}
+
+export async function saveTokenRow(token: QboTokenResponse, state?: string) {
   const expiresAt = new Date(Date.now() + token.expires_in * 1000).toISOString();
   const refreshExpiresAt = new Date(Date.now() + token.x_refresh_token_expires_in * 1000).toISOString();
-
-  const { error } = await supabase.from("qbo_tokens").upsert({
+  const payload: QboTokenRow = {
     id: "primary",
     access_token: token.access_token,
     refresh_token: token.refresh_token,
-    realm_id: token.realmId,
+    realm_id: token.realmId || null,
     token_type: token.token_type,
     expires_at: expiresAt,
     refresh_expires_at: refreshExpiresAt,
     state: state || null,
-  });
-  if (error) throw error;
+  };
+
+  try {
+    const supabase = getServerSupabaseClient();
+    const { error } = await supabase.from("qbo_tokens").upsert(payload);
+    if (error) throw error;
+  } catch (err) {
+    // Fallback to local file storage when Supabase is unreachable
+    await writeTokenFile(payload);
+  }
   return { expiresAt, refreshExpiresAt };
 }
 

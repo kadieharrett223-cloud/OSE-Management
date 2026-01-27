@@ -3,8 +3,7 @@ export const runtime = "nodejs";
 export const fetchCache = "force-no-store";
 
 import { NextRequest, NextResponse } from "next/server";
-import { exchangeCodeForToken } from "@/lib/qbo";
-import { getServerSupabaseClient } from "@/lib/supabase";
+import { exchangeCodeForToken, saveTokenRow } from "@/lib/qbo";
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
@@ -29,25 +28,12 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Persist tokens (soft requirement: SUPABASE_SERVICE_ROLE_KEY must be set)
-    const supabase = getServerSupabaseClient();
-    const expiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString();
-    const refreshExpiresAt = new Date(Date.now() + tokenResponse.x_refresh_token_expires_in * 1000).toISOString();
-
-    const { error: upsertError } = await supabase
-      .from("qbo_tokens")
-      .upsert({
-        id: "primary",
-        access_token: tokenResponse.access_token,
-        refresh_token: tokenResponse.refresh_token,
-        realm_id: tokenResponse.realmId || realmId,
-        token_type: tokenResponse.token_type,
-        expires_at: expiresAt,
-        refresh_expires_at: refreshExpiresAt,
-        state,
-      });
-
-    if (upsertError) throw upsertError;
+    // Persist tokens (Supabase if available, else local file fallback)
+    // Ensure realmId is included in the saved payload
+    if (!tokenResponse.realmId && realmId) {
+      tokenResponse.realmId = realmId;
+    }
+    const { expiresAt, refreshExpiresAt } = await saveTokenRow(tokenResponse, state || undefined);
 
     return NextResponse.json({
       ok: true,
