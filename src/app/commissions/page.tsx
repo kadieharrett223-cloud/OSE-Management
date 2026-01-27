@@ -87,7 +87,7 @@ export default function CommissionsPage() {
       totalSales: r.totalSales,
       invoiceCount: r.invoiceCount,
     })) : mockReps;
-    // Show all reps - no filtering
+    // Show all reps - sorted by sales
     const sorted = [...displayReps].sort((a, b) => (b.totalSales || 0) - (a.totalSales || 0));
     return sorted.filter((r) => r.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [repSalesData, searchTerm]);
@@ -114,7 +114,7 @@ export default function CommissionsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-3xl font-semibold text-slate-900">Commissions</h1>
-                  <p className="mt-1 text-sm text-slate-600">Track commissions and invoice details for {monthYearDisplay}.</p>
+                  <p className="mt-1 text-sm text-slate-600">Track sales by rep for {monthYearDisplay}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div>
@@ -155,34 +155,6 @@ export default function CommissionsPage() {
               </div>
             )}
 
-            {/* Hero Summary Row */}
-            <section className="rounded-2xl bg-white/90 shadow-sm ring-1 ring-slate-200 p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
-                {/* Left: Rep + Owed */}
-                <div className="lg:col-span-2">
-                  <div className="text-sm text-slate-600">{monthYearDisplay}</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">{selectedRep?.name || "Select a rep"}</div>
-                  <div className="mt-3 text-slate-600 text-sm">Total Commission Owed</div>
-                  <div className="text-5xl font-bold text-emerald-700 tracking-tight">${money(selectedTotals.totalCommission)}</div>
-                </div>
-                {/* Right: Secondary metrics */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="rounded-xl bg-slate-50 px-4 py-3">
-                    <div className="text-xs uppercase text-slate-600">Commissionable</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">${money(selectedTotals.totalCommissionable)}</div>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 px-4 py-3">
-                    <div className="text-xs uppercase text-slate-600">Invoices</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">{selectedTotals.count}</div>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 px-4 py-3">
-                    <div className="text-xs uppercase text-slate-600">Shipping</div>
-                    <div className="mt-1 text-lg font-semibold text-blue-700">${money(selectedTotals.totalShipping)}</div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
             {/* Master-Detail */}
             <div className="grid grid-cols-12 gap-6">
               {/* Left: Sales Rep List */}
@@ -198,61 +170,56 @@ export default function CommissionsPage() {
                   />
                 </div>
                 <div className="divide-y divide-slate-100">
-                  {filteredReps.map((rep) => (
-                    <button
-                      key={rep.id}
-                      onClick={() => setSelectedRepId(rep.id)}
-                      className={`w-full text-left px-4 py-5 transition ${
-                        selectedRepId === rep.id
-                          ? "bg-blue-50/70 border-l-4 border-blue-600"
-                          : "hover:bg-slate-50 border-l-4 border-transparent"
-                      }`}
-                      type="button"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-slate-900 truncate">{rep.name}</p>
-                          <p className="text-xs text-slate-600">{rep.qboCode}</p>
+                  {loadingReps ? (
+                    <div className="px-4 py-8 text-center text-slate-600">Loading...</div>
+                  ) : filteredReps.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-slate-600">No reps found</div>
+                  ) : (
+                    filteredReps.map((rep) => (
+                      <button
+                        key={rep.id}
+                        onClick={() => setSelectedRepId(rep.id)}
+                        className={`w-full text-left px-4 py-5 transition ${
+                          selectedRepId === rep.id
+                            ? "bg-blue-50/70 border-l-4 border-blue-600"
+                            : "hover:bg-slate-50 border-l-4 border-transparent"
+                        }`}
+                        type="button"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-900 truncate">{rep.name}</p>
+                            <p className="text-xs text-slate-600">{rep.qboCode}</p>
+                          </div>
+                          <span className="ml-2 shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                            {rep.invoiceCount}
+                          </span>
                         </div>
-                        <span className="ml-2 shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                          {rep.invoiceCount}
-                        </span>
-                      </div>
-                      <div className="mt-2 flex gap-4 text-xs">
-                        <div>
-                          <p className="text-slate-600">Sales</p>
-                          <p className="font-semibold text-slate-900">${money(rep.totalSales)}</p>
+                        <div className="mt-2 flex gap-4 text-xs">
+                          <div>
+                            <p className="text-slate-600">Sales</p>
+                            <p className="font-semibold text-slate-900">${money(rep.totalSales)}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-600">Invoices</p>
+                            <p className="font-semibold text-slate-900">{rep.invoiceCount}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-slate-600">Invoices</p>
-                          <p className="font-semibold text-slate-900">{rep.invoiceCount}</p>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 
               {/* Right: Selected Rep Profile */}
               {selectedRep && (
                 <div className="col-span-12 md:col-span-8 lg:col-span-9 space-y-6">
-                  {/* Cluster: Earnings */}
+                  {/* Summary */}
                   <div className="rounded-2xl bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-                      <div>
-                        <p className="text-xs uppercase text-slate-600">Total Sales MTD</p>
-                        <p className="mt-1 text-2xl font-semibold text-slate-900">${money(selectedTotals.totalSales)}</p>
-                        <p className="mt-1 text-xs text-slate-600">{selectedTotals.count} invoices</p>
-                      </div>
-                    </div>
-                        </button>
-                        <span className="text-sm text-slate-600">Current: {(currentRate * 100).toFixed(2)}%</span>
-                        {saveStatus.message && (
-                          <span className={`text-xs ${saveStatus.ok ? "text-emerald-700" : "text-red-600"}`}>
-                            {saveStatus.message}
-                          </span>
-                        )}
-                      </div>
+                    <div>
+                      <p className="text-xs uppercase text-slate-600">Total Sales MTD</p>
+                      <p className="mt-1 text-3xl font-semibold text-slate-900">${money(selectedTotals.totalSales)}</p>
+                      <p className="mt-2 text-sm text-slate-600">{selectedTotals.count} invoices</p>
                     </div>
                   </div>
                 </div>
