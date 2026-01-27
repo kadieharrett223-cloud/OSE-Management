@@ -58,17 +58,25 @@ export default function CommissionsPage() {
       `/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=${invoiceStatus}&_=${Date.now()}`
     )
       .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to fetch sales by rep");
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("API Error Response:", errorText);
+          throw new Error("Failed to fetch sales by rep");
+        }
         return await res.json();
       })
       .then((data) => {
         if (!isMounted) return;
+        console.log("Received rep sales data:", data);
         if (data.ok && data.reps) {
+          console.log("Setting rep sales data:", data.reps.length, "reps");
           setRepSalesData(data.reps);
           // Set first rep as selected
           if (data.reps.length > 0) {
             setSelectedRepId(data.reps[0].repName);
           }
+        } else {
+          console.error("Invalid data structure:", data);
         }
       })
       .catch((err) => {
