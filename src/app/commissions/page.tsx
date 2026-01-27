@@ -115,77 +115,19 @@ export default function CommissionsPage() {
     };
   }, [selectedMonth, invoiceStatus]);
 
-  // Fetch invoices for selected rep
-  useEffect(() => {
-    if (!selectedRepId) return;
-
-    let isMounted = true;
-    setLoadingInvoices(true);
-    const { startDate, endDate } = getCommissionDateRange(selectedMonth);
-
-    fetch(
-      `/api/qbo/invoice/by-rep?repName=${encodeURIComponent(selectedRepId)}&startDate=${startDate}&endDate=${endDate}&status=${invoiceStatus}&_=${Date.now()}`
-    )
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to fetch invoices");
-        return await res.json();
-      })
-      .then((data) => {
-        if (!isMounted) return;
-        if (data.ok && data.invoices) {
-          // Normalize fields for UI: set invoice-level commissionable and shippingDeducted
-          const invoicesWithDefaults = data.invoices.map((inv: any) => ({
-            ...inv,
-            commissionable: inv.totalCommissionable ?? inv.commissionable ?? 0,
-            shippingDeducted: inv.totalShippingDeducted ?? inv.shippingDeducted ?? 0,
-            commission: inv.commission ?? 0,
-          }));
-          setRepInvoices(invoicesWithDefaults);
-          if (typeof data.commissionRate === "number") {
-            setCurrentRate(data.commissionRate);
-            setEditingRate(String((data.commissionRate * 100).toFixed(2)));
-          }
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to fetch rep invoices:", err);
-        setRepInvoices([]);
-      })
-      .finally(() => {
-        if (isMounted) setLoadingInvoices(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedRepId, selectedMonth, refreshKey, invoiceStatus]);
-
-  // Save commission rate
-  const saveCommissionRate = async () => {
-    const pct = parseFloat(editingRate);
-    if (!isFinite(pct)) return;
-    const rate = Math.max(0, pct) / 100;
+  const startQboConnect = () => {
+    setConnectError(null);
     try {
-      setSaveStatus({});
-      const res = await fetch("/api/reps/commission-rate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repName: selectedRepId, commissionRate: rate }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error || "Failed to save rate");
-      }
-      setCurrentRate(rate);
-      // refresh invoices for updated totals
-      setRefreshKey((k) => k + 1);
-      setSaveStatus({ ok: true, message: "Saved" });
-    } catch (e) {
-      console.error(e);
-      setSaveStatus({ ok: false, message: e instanceof Error ? e.message : "Failed to save" });
+      window.location.href = "/api/qbo/connect";
+    } catch (error) {
+      setConnectError(error instanceof Error ? error.message : "Failed to start QuickBooks connect.");
     }
   };
 
+  const monthYearDisplay = new Date(selectedMonth + "-01").toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+  });
 
   const filteredReps = useMemo(() => {
     const displayReps = repSalesData.length > 0 ? repSalesData.map(r => ({
@@ -208,20 +150,6 @@ export default function CommissionsPage() {
     const count = selectedRep?.invoiceCount || 0;
     return { totalSales, count };
   }, [selectedRep]);
-
-  const startQboConnect = () => {
-    setConnectError(null);
-    try {
-      window.location.href = "/api/qbo/connect";
-    } catch (error) {
-      setConnectError(error instanceof Error ? error.message : "Failed to start QuickBooks connect.");
-    }
-  };
-
-  const monthYearDisplay = new Date(selectedMonth + "-01").toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-  });
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
