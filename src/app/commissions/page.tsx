@@ -119,7 +119,7 @@ export default function CommissionsPage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedMonth, invoiceStatus]);
+  }, [selectedMonth, invoiceStatus, status]);
 
   // Fetch invoices for selected rep (only after session is ready)
   useEffect(() => {
@@ -171,7 +171,7 @@ export default function CommissionsPage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedRepId, selectedMonth, invoiceStatus]);
+  }, [selectedRepId, selectedMonth, invoiceStatus, status]);
 
   const startQboConnect = () => {
     setConnectError(null);
