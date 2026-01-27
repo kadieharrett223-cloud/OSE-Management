@@ -15,6 +15,8 @@ interface InvoiceLine {
   qty: number;
   unitPrice: number;
   lineAmount: number;
+  shippingDeducted: number;
+  commissionable: number;
 }
 
 interface Invoice {
@@ -22,7 +24,21 @@ interface Invoice {
   invoiceNumber: string;
   txnDate: string;
   totalAmount: number;
+  totalCommissionable: number;
+  totalShippingDeducted: number;
+  commission: number;
   lines: InvoiceLine[];
+}
+
+interface InvoiceData {
+  ok: boolean;
+  repName: string;
+  invoices: Invoice[];
+  count: number;
+  commissionRate: number;
+  totalCommission: number;
+  totalCommissionable: number;
+  totalShippingDeducted: number;
 }
 
 // Mock data for fallback
@@ -48,6 +64,12 @@ export default function CommissionsPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
+  const [commissionData, setCommissionData] = useState<{
+    rate: number;
+    total: number;
+    commissionable: number;
+    shippingDeducted: number;
+  } | null>(null);
 
   // Fetch sales reps for current month
   useEffect(() => {
@@ -95,12 +117,14 @@ export default function CommissionsPage() {
   useEffect(() => {
     if (!selectedRepId) {
       setInvoices([]);
+      setCommissionData(null);
       return;
     }
 
     let isMounted = true;
     setLoadingInvoices(true);
     setInvoices([]);
+    setCommissionData(null);
     const { startDate, endDate } = getCommissionDateRange(selectedMonth);
 
     fetch(
@@ -110,10 +134,16 @@ export default function CommissionsPage() {
         if (!res.ok) throw new Error("Failed to fetch invoices");
         return await res.json();
       })
-      .then((data) => {
+      .then((data: InvoiceData) => {
         if (!isMounted) return;
         if (data.ok && data.invoices) {
           setInvoices(data.invoices);
+          setCommissionData({
+            rate: data.commissionRate,
+            total: data.totalCommission,
+            commissionable: data.totalCommissionable,
+            shippingDeducted: data.totalShippingDeducted,
+          });
         }
       })
       .catch((err) => {
@@ -279,10 +309,22 @@ export default function CommissionsPage() {
                 <div className="col-span-12 md:col-span-8 lg:col-span-9 space-y-6">
                   {/* Summary */}
                   <div className="rounded-2xl bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200">
-                    <div>
-                      <p className="text-xs uppercase text-slate-600">Total Sales MTD</p>
-                      <p className="mt-1 text-3xl font-semibold text-slate-900">${money(selectedTotals.totalSales)}</p>
-                      <p className="mt-2 text-sm text-slate-600">{selectedTotals.count} invoices</p>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <p className="text-xs uppercase text-slate-600">Total Sales MTD</p>
+                        <p className="mt-1 text-3xl font-semibold text-slate-900">${money(selectedTotals.totalSales)}</p>
+                        <p className="mt-2 text-sm text-slate-600">{selectedTotals.count} invoices</p>
+                      </div>
+                      {commissionData && (
+                        <div>
+                          <p className="text-xs uppercase text-slate-600">Commission Owed</p>
+                          <p className="mt-1 text-3xl font-semibold text-green-600">${money(commissionData.total)}</p>
+                          <p className="mt-2 text-sm text-slate-600">
+                            Rate: {(commissionData.rate * 100).toFixed(1)}% | 
+                            Shipping Deducted: ${money(commissionData.shippingDeducted)}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -305,6 +347,7 @@ export default function CommissionsPage() {
                               <th className="px-6 py-3 text-left text-xs font-semibold text-slate-900">Date</th>
                               <th className="px-6 py-3 text-left text-xs font-semibold text-slate-900">Items</th>
                               <th className="px-6 py-3 text-right text-xs font-semibold text-slate-900">Total</th>
+                              <th className="px-6 py-3 text-right text-xs font-semibold text-slate-900">Commission</th>
                               <th className="px-6 py-3 text-center text-xs font-semibold text-slate-900">Details</th>
                             </tr>
                           </thead>
@@ -320,6 +363,9 @@ export default function CommissionsPage() {
                                   <td className="px-6 py-4 text-sm font-semibold text-slate-900 text-right">
                                     ${money(invoice.totalAmount)}
                                   </td>
+                                  <td className="px-6 py-4 text-sm font-semibold text-green-600 text-right">
+                                    ${money(invoice.commission)}
+                                  </td>
                                   <td className="px-6 py-4 text-center">
                                     <button
                                       onClick={() => setExpandedInvoice(expandedInvoice === invoice.id ? null : invoice.id)}
@@ -332,7 +378,7 @@ export default function CommissionsPage() {
                                 </tr>
                                 {expandedInvoice === invoice.id && (
                                   <tr className="bg-slate-50">
-                                    <td colSpan={5} className="px-6 py-4">
+                                    <td colSpan={6} className="px-6 py-4">
                                       <table className="w-full">
                                         <thead>
                                           <tr className="border-b border-slate-200">
@@ -340,6 +386,8 @@ export default function CommissionsPage() {
                                             <th className="text-right text-xs font-semibold text-slate-700 py-2">Qty</th>
                                             <th className="text-right text-xs font-semibold text-slate-700 py-2">Unit Price</th>
                                             <th className="text-right text-xs font-semibold text-slate-700 py-2">Amount</th>
+                                            <th className="text-right text-xs font-semibold text-slate-700 py-2">Shipping Deducted</th>
+                                            <th className="text-right text-xs font-semibold text-slate-700 py-2">Commissionable</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200">
@@ -349,6 +397,8 @@ export default function CommissionsPage() {
                                               <td className="text-sm text-slate-700 py-2 text-right">{line.qty}</td>
                                               <td className="text-sm text-slate-700 py-2 text-right">${money(line.unitPrice)}</td>
                                               <td className="text-sm font-semibold text-slate-900 py-2 text-right">${money(line.lineAmount)}</td>
+                                              <td className="text-sm text-red-600 py-2 text-right">${money(line.shippingDeducted)}</td>
+                                              <td className="text-sm font-semibold text-green-600 py-2 text-right">${money(line.commissionable)}</td>
                                             </tr>
                                           ))}
                                         </tbody>
