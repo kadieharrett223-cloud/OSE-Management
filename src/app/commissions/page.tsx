@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
@@ -302,7 +302,7 @@ export default function CommissionsPage() {
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {invoices.map((invoice) => (
-                              <div key={invoice.id}>
+                              <Fragment key={invoice.id}>
                                 <tr>
                                   <td className="px-6 py-4 text-sm font-semibold text-slate-900">{invoice.invoiceNumber}</td>
                                   <td className="px-6 py-4 text-sm text-slate-600">
@@ -348,7 +348,7 @@ export default function CommissionsPage() {
                                     </td>
                                   </tr>
                                 )}
-                              </div>
+                              </Fragment>
                             ))}
                           </tbody>
                         </table>
