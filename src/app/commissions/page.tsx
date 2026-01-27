@@ -10,61 +10,11 @@ interface RepData {
   invoiceCount: number;
 }
 
-interface InvoiceLine {
-  sku?: string;
-  description: string;
-  qty: number;
-  unitPrice: number;
-  lineAmount: number;
-  shippingDeducted: number;
-  commissionable: number;
-  matched: boolean;
-}
-
-interface InvoiceDetail {
-  id: string;
-  invoiceNumber: string;
-  txnDate: string;
-  totalAmount: number;
-  commission: number;
-  commissionable: number;
-  shippingDeducted: number;
-  lines: InvoiceLine[];
-}
-
 // Mock data for fallback
 const mockReps = [
-  { id: "1", name: "John Smith", qboCode: "JS", commissionMTD: 3250.5, invoiceCount: 12, missingSKUCount: 2 },
-  { id: "2", name: "Sarah Johnson", qboCode: "SJ", commissionMTD: 4120.75, invoiceCount: 18, missingSKUCount: 0 },
-  { id: "3", name: "Mike Chen", qboCode: "MC", commissionMTD: 2890.0, invoiceCount: 9, missingSKUCount: 1 },
-];
-
-const mockInvoices = [
-  {
-    id: "inv1",
-    invoiceNumber: "2024-001",
-    txnDate: "2024-01-15",
-    totalAmount: 10000,
-    commission: 450.25,
-    commissionable: 9005,
-    shippingDeducted: 125.5,
-    lines: [
-      { sku: "SKU-A", description: "Product A", qty: 10, unitPrice: 100, lineAmount: 1000, shippingDeducted: 50, commissionable: 950, matched: true },
-      { sku: "SKU-B", description: "Product B", qty: 5, unitPrice: 50, lineAmount: 250, shippingDeducted: 25, commissionable: 225, matched: true },
-    ],
-  },
-  {
-    id: "inv2",
-    invoiceNumber: "2024-002",
-    txnDate: "2024-01-20",
-    totalAmount: 6400,
-    commission: 320.0,
-    commissionable: 6400,
-    shippingDeducted: 80,
-    lines: [
-      { sku: "SKU-C", description: "Product C", qty: 8, unitPrice: 80, lineAmount: 640, shippingDeducted: 80, commissionable: 560, matched: true },
-    ],
-  },
+  { id: "1", name: "John Smith", qboCode: "JS", totalSales: 3250.5, invoiceCount: 12 },
+  { id: "2", name: "Sarah Johnson", qboCode: "SJ", totalSales: 4120.75, invoiceCount: 18 },
+  { id: "3", name: "Mike Chen", qboCode: "MC", totalSales: 2890.0, invoiceCount: 9 },
 ];
 
 const money = (value: number | undefined) => {
