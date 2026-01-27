@@ -214,15 +214,21 @@ export async function GET(req: NextRequest) {
       primaryEntry.invoiceCount += count;
       
       // Commission calculation for primary
-      if (assistantIsSalary) {
-        // Assistant is salary worker helping commissioned primary → 100% commission to primary
-        primaryEntry.commission += commissionable * primaryEntry.commissionRate;
-      } else if (!primaryIsSalary && !assistantKey) {
-        // Solo commissioned rep → gets commission
-        primaryEntry.commission = primaryEntry.totalCommissionable * primaryEntry.commissionRate;
-      } else if (primaryIsSalary) {
+      if (primaryIsSalary) {
         // Primary is salary → no commission, only bonus tracking
         primaryEntry.commission = 0;
+        primaryEntry.bonusProgress = {
+          salesAmount: primaryEntry.totalCommissionable,
+          bonusThreshold: SALARY_BONUS_THRESHOLD,
+          percentToThreshold: (primaryEntry.totalCommissionable / SALARY_BONUS_THRESHOLD) * 100,
+          hasEarnedBonus: primaryEntry.totalCommissionable >= SALARY_BONUS_THRESHOLD,
+        };
+      } else if (assistantIsSalary) {
+        // Assistant is salary worker helping commissioned primary → 100% commission to primary
+        primaryEntry.commission += commissionable * primaryEntry.commissionRate;
+      } else if (!assistantKey) {
+        // Solo commissioned rep → gets commission
+        primaryEntry.commission = primaryEntry.totalCommissionable * primaryEntry.commissionRate;
       } else {
         // Standard commission calculation (both commissioned, or no assistant)
         primaryEntry.commission = primaryEntry.totalCommissionable * primaryEntry.commissionRate;
