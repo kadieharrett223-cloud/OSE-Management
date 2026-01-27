@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getSessionOrBypass } from "@/lib/auth";
 import { authorizedQboFetch } from "@/lib/qbo";
-import { authOptions } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getSessionOrBypass();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

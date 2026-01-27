@@ -520,4 +520,10 @@ WHERE NOT EXISTS (
   SELECT 1 FROM price_list_items WHERE item_no = 'HLCJ-14' AND version_tag = '2025-04-25')
 ON CONFLICT (item_no, version_tag) DO UPDATE
 SET 
-  description = EXCLUDED.description;
+  description = EXCLUDED.description;  Stop-Process -Name "node" -Force; Start-Sleep -Seconds 2
+  cd "C:\Users\Kadie\Documents\MANAGEMENT\New folder"
+  npm run dev
+    Stop-Process -Name "node" -Force
+  Start-Sleep -Seconds 2
+  cd "C:\Users\Kadie\Documents\MANAGEMENT\New folder"
+  npm run dev

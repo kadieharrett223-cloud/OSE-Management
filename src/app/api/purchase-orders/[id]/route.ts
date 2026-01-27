@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
+  const session = await getSessionOrBypass();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
