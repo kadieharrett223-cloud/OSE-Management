@@ -81,7 +81,8 @@ export const authOptions: NextAuthOptions = {
 
 // Helper to bypass auth entirely when AUTH_DISABLED=true (treat as admin)
 export async function getSessionOrBypass() {
-  if (process.env.AUTH_DISABLED === "true") {
+  const authDisabled = process.env.AUTH_DISABLED;
+  if (authDisabled && (authDisabled === "true" || authDisabled === "1" || authDisabled.toLowerCase() === "true")) {
     return {
       user: {
         id: "admin",
