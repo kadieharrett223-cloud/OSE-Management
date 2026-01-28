@@ -10,7 +10,6 @@ import Link from 'next/link';
 export default function SettingsPage() {
   const router = useRouter();
   const session = null;
-  const status: 'authenticated' | 'unauthenticated' = 'unauthenticated';
   const [qboConnected, setQboConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,10 +26,9 @@ export default function SettingsPage() {
       }
     };
 
-    if (status === 'authenticated') {
-      checkQboStatus();
-    }
-  }, [status]);
+    // AUTH_DISABLED is set on production, so always check QBO status
+    checkQboStatus();
+  }, []);
 
   const handleDisconnectQbo = async () => {
     try {
