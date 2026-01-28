@@ -1,44 +1,53 @@
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
-import AzureADProvider from "next-auth/providers/azure-ad";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { createClient } from "@supabase/supabase-js";
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    AzureADProvider({
-      clientId: process.env.AZURE_AD_CLIENT_ID || "",
-      clientSecret: process.env.AZURE_AD_CLIENT_SECRET || "",
-      tenantId: process.env.AZURE_AD_TENANT_ID || "",
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
+        // Check user in Supabase auth_users table
+        const { data: user, error } = await supabase
+          .from("auth_users")
+          .select("*")
+          .eq("email", credentials.email.toLowerCase())
+          .eq("password", credentials.password)
+          .single();
+
+        if (error || !user) return null;
+
+        return {
+          id: user.id,
+          email: user.email,
+          role: user.role || "user",
+        };
+      },
     }),
   ],
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET || "development-secret-do-not-use-in-production",
   callbacks: {
     async signIn({ user }) {
-      const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS ?? process.env.ALLOWED_EMAIL_DOMAIN ?? "")
-        .split(",")
-        .map((d) => d.trim().toLowerCase())
-        .filter(Boolean);
-
-      if (!allowedDomains.length) return true;
-
-      const email = user?.email?.toLowerCase();
-      const domain = email?.split("@")[1];
-      if (!domain) return false;
-
-      return allowedDomains.includes(domain);
+      // Allow all users who successfully authenticated from database
+      return true;
     },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        // Assign admin role to users from allowed domain
-        const email = user.email?.toLowerCase();
-        const domain = email?.split("@")[1];
-        const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS ?? process.env.ALLOWED_EMAIL_DOMAIN ?? "")
-          .split(",")
-          .map((d) => d.trim().toLowerCase())
-          .filter(Boolean);
-        
-        token.role = (allowedDomains.includes(domain || "") ? "admin" : "user") as any;
+        token.role = (user as any).role || "user";
         token.repId = null;
       }
       return token;
