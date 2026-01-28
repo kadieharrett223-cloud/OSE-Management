@@ -9,7 +9,6 @@ import Link from 'next/link';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const session = null;
   const [qboConnected, setQboConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,11 +85,11 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Email</label>
-              <p className="mt-1 text-gray-900">{session.user?.email}</p>
+              <p className="mt-1 text-gray-900">{process.env.ADMIN_EMAIL || 'admin@local'}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Role</label>
-              <p className="mt-1 text-gray-900 capitalize">{session.user?.role || 'N/A'}</p>
+              <p className="mt-1 text-gray-900 capitalize">admin</p>
             </div>
           </div>
         </div>
