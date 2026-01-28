@@ -11,7 +11,9 @@ export async function GET(req: NextRequest) {
     // Require authenticated admin to start QBO connect
     const session: any = await getSessionOrBypass();
     const role = (session?.user?.role ?? "").toString().toLowerCase();
-    if (!session) {
+    
+    // When AUTH_DISABLED, getSessionOrBypass() always returns an admin session
+    if (!session?.user) {
       return NextResponse.json({ error: "Login required" }, { status: 401 });
     }
     if (role !== "admin") {
