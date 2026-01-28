@@ -9,6 +9,7 @@ const navItems = [
    { label: "Calendar", hint: "Sales & notifications", href: "/calendar" },
    { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
    { label: "Purchasing", hint: "POs and payments", href: "/admin/purchasing" },
+   { label: "Settings", hint: "QBO & Shopify config", href: "/settings" },
 ];
 
 export function Sidebar({ activePage }: { activePage: string }) {
