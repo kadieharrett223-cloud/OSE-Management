@@ -164,20 +164,31 @@ export async function getShopifyProducts() {
 /**
  * Update product variant price in Shopify
  */
-export async function updateShopifyPrice(variantId: number, newPrice: number): Promise<void> {
+export async function updateShopifyPrice(
+  variantId: number, 
+  newPrice: number, 
+  compareAtPrice?: number | null
+): Promise<void> {
+  const body: any = {
+    variant: {
+      id: variantId,
+      price: newPrice.toFixed(2),
+    },
+  };
+  
+  // Only set compare_at_price if provided (null will clear it)
+  if (compareAtPrice !== undefined) {
+    body.variant.compare_at_price = compareAtPrice ? compareAtPrice.toFixed(2) : null;
+  }
+  
   await shopifyApiFetch(`/variants/${variantId}.json`, {
     method: "PUT",
-    body: JSON.stringify({
-      variant: {
-        id: variantId,
-        price: newPrice.toFixed(2),
-      },
-    }),
+    body: JSON.stringify(body),
   });
 }
 
 /**
- * Sync prices from price list to Shopify
+ * Sync prices from price list to Shopify using mapped variant IDs
  */
 export async function syncPricesToShopify(): Promise<{
   success: number;
@@ -193,64 +204,56 @@ export async function syncPricesToShopify(): Promise<{
   };
 
   try {
-    // Get price list from Supabase
+    // Get price list items with Shopify mappings
     const { data: priceListItems, error: priceListError } = await supabase
       .from("price_list_items")
-      .select("item_no, list_price")
+      .select("item_no, list_price, sale_price, compare_at_price, shopify_variant_id")
       .eq("is_active", true);
 
     if (priceListError || !priceListItems) {
       throw new Error(`Failed to fetch price list: ${priceListError?.message}`);
     }
 
-    // Create SKU -> Price map
-    const priceMap = new Map<string, number>();
+    console.log(`Loaded ${priceListItems.length} price list items`);
+
+    // Update prices for mapped items
     for (const item of priceListItems) {
-      if (item.item_no && item.list_price) {
-        priceMap.set(item.item_no.trim().toUpperCase(), item.list_price);
+      // Skip if no Shopify mapping
+      if (!item.shopify_variant_id) {
+        result.skipped++;
+        continue;
       }
-    }
 
-    console.log(`Loaded ${priceMap.size} prices from price list`);
+      const variantId = parseInt(item.shopify_variant_id);
+      if (isNaN(variantId)) {
+        result.skipped++;
+        continue;
+      }
 
-    // Get Shopify products
-    const shopifyProducts = await getShopifyProducts();
-    console.log(`Found ${shopifyProducts.length} Shopify products`);
+      // Determine price to use: sale_price if > 0, otherwise list_price
+      const priceToUse = (item.sale_price && item.sale_price > 0) ? item.sale_price : item.list_price;
+      
+      if (!priceToUse) {
+        result.skipped++;
+        console.log(`No valid price for ${item.item_no}`);
+        continue;
+      }
 
-    // Update prices
-    for (const product of shopifyProducts) {
-      for (const variant of product.variants) {
-        if (!variant.sku) {
-          result.skipped++;
-          continue;
-        }
+      try {
+        // If there's a sale (sale_price > 0), set compare_at_price to list_price
+        // If no sale, clear compare_at_price
+        const compareAt = (item.sale_price && item.sale_price > 0) 
+          ? item.list_price 
+          : null;
 
-        const sku = variant.sku.trim().toUpperCase();
-        const newPrice = priceMap.get(sku);
-
-        if (!newPrice) {
-          result.skipped++;
-          console.log(`No price found for SKU: ${sku}`);
-          continue;
-        }
-
-        const currentPrice = parseFloat(variant.price);
-        if (Math.abs(currentPrice - newPrice) < 0.01) {
-          result.skipped++;
-          console.log(`Price unchanged for SKU ${sku}: $${currentPrice}`);
-          continue;
-        }
-
-        try {
-          await updateShopifyPrice(variant.id, newPrice);
-          result.success++;
-          console.log(`Updated ${sku}: $${currentPrice} -> $${newPrice}`);
-        } catch (error: any) {
-          result.failed++;
-          const errorMsg = `Failed to update ${sku}: ${error.message}`;
-          result.errors.push(errorMsg);
-          console.error(errorMsg);
-        }
+        await updateShopifyPrice(variantId, priceToUse, compareAt);
+        result.success++;
+        console.log(`Updated ${item.item_no}: $${priceToUse}${compareAt ? ` (was $${compareAt})` : ''}`);
+      } catch (error: any) {
+        result.failed++;
+        const errorMsg = `Failed to update ${item.item_no}: ${error.message}`;
+        result.errors.push(errorMsg);
+        console.error(errorMsg);
       }
     }
 

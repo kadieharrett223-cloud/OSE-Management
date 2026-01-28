@@ -8,39 +8,29 @@
  * @param yearMonth - Format "YYYY-MM" (e.g., "2026-01")
  * @returns Object with startDate and endDate in "YYYY-MM-DD" format
  * 
- * Example: "2026-01" returns { startDate: "2026-01-05", endDate: "2026-02-04" }
+ * Example: "2026-01" returns { startDate: "2026-01-01", endDate: "2026-01-31" }
  */
 export function getCommissionDateRange(yearMonth: string): { startDate: string; endDate: string } {
   const [year, month] = yearMonth.split("-").map(Number);
   
-  // Start date is the 5th of the selected month
-  const startDate = `${year}-${String(month).padStart(2, "0")}-05`;
+  // Start date is the 1st of the selected month
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   
-  // End date is the 4th of the next month
-  const nextMonth = month === 12 ? 1 : month + 1;
-  const nextYear = month === 12 ? year + 1 : year;
-  const endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-04`;
+  // End date is the last day of the selected month
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
   
   return { startDate, endDate };
 }
 
 /**
  * Get the current commission month in "YYYY-MM" format
- * If today is before the 5th, returns previous month
- * If today is on or after the 5th, returns current month
+ * Returns the current calendar month
  */
 export function getCurrentCommissionMonth(): string {
   const now = new Date();
-  const day = now.getDate();
   const month = now.getMonth() + 1; // 0-indexed
   const year = now.getFullYear();
-  
-  // If before the 5th, use previous month
-  if (day < 5) {
-    const prevMonth = month === 1 ? 12 : month - 1;
-    const prevYear = month === 1 ? year - 1 : year;
-    return `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
-  }
   
   return `${year}-${String(month).padStart(2, "0")}`;
 }

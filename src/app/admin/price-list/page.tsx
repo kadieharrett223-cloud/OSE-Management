@@ -69,7 +69,7 @@ export default function AdminPriceListPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<PriceListItem | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [discountPercentage, setDiscountPercentage] = useState<number>(20); // Default 20% off
+  const [discountPercentage, setDiscountPercentage] = useState<number>(0); // Default 0% (no sale)
   const [showAddModal, setShowAddModal] = useState(false);
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
@@ -214,7 +214,8 @@ export default function AdminPriceListPage() {
     const list_price = base_sell_price * 1.2;
 
     // 6) Actual sell price: List price × (1 - discount/100)
-    const sell_price = list_price * (1 - (discountPercentage || 20) / 100);
+    // If discount is 0, sell_price = list_price (no sale)
+    const sell_price = list_price * (1 - (discountPercentage || 0) / 100);
 
     // 6) Profit: Sell price - Cost with shipping
     const profit = sell_price - cost_with_shipping;

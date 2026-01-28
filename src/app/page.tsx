@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { FormEvent, useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
 const money = (value: number | undefined) => {
   if (value === undefined || value === null || isNaN(value)) return "0.00";
@@ -136,11 +137,8 @@ export default function Dashboard() {
   // Fetch QuickBooks invoice data for current month
   useEffect(() => {
     let isMounted = true;
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const startDate = `${year}-${month}-01`;
-    const endDate = `${year}-${month}-${String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+    const currentMonth = getCurrentCommissionMonth();
+    const { startDate, endDate } = getCommissionDateRange(currentMonth);
     
     // Fetch total sales
     fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`)
@@ -179,56 +177,6 @@ export default function Dashboard() {
       })
       .finally(() => {
         if (isMounted) setLoadingReps(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Load QuickBooks invoice data for current month
-  useEffect(() => {
-    let isMounted = true;
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const startDate = `${year}-${month}-01`;
-    const endDate = `${year}-${month}-${String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
-    
-    // Fetch total sales
-    fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Failed to fetch invoices');
-        return await res.json();
-      })
-      .then((data) => {
-        if (!isMounted) return;
-        if (data.ok) {
-          setQboSales(data.totalPaid || 0);
-          setQboInvoiceCount(data.count || 0);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch QBO invoices:', err);
-      })
-      .finally(() => {
-        if (isMounted) setLoadingQbo(false);
-      });
-
-    // Fetch sales by rep
-    fetch(`/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=paid`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Failed to fetch sales by rep');
-        return await res.json();
-      })
-      .then((data) => {
-        if (!isMounted) return;
-        if (data.ok && data.reps) {
-          setRepSalesData(data.reps);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch rep sales:', err);
       });
 
     return () => {
