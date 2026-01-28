@@ -15,9 +15,6 @@ export async function POST(req: NextRequest) {
     const session: any = await getSessionOrBypass();
     const role = (session?.user?.role ?? "").toString().toLowerCase();
     
-    if (!session?.user) {
-      return NextResponse.json({ error: "Login required" }, { status: 401 });
-    }
     if (role !== "admin") {
       return NextResponse.json({ error: "Admin role required" }, { status: 403 });
     }
