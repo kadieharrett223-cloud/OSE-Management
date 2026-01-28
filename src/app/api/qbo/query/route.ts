@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { authorizedQboFetch } from "@/lib/qbo";
 
 export async function GET(req: NextRequest) {
-  const session = await getSession();
+  const session: any = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
