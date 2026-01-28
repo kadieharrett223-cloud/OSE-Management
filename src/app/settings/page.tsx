@@ -10,7 +10,7 @@ import Link from 'next/link';
 export default function SettingsPage() {
   const router = useRouter();
   const session = null;
-  const status = 'unauthenticated';
+  const status: 'authenticated' | 'unauthenticated' = 'unauthenticated';
   const [qboConnected, setQboConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
