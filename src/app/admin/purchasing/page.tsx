@@ -59,7 +59,8 @@ function titleCase(value: string) {
 }
 
 export default function PurchasingPage() {
-  const { data: session } = useSession();
+  const session = useSession?.();
+  const { data: sessionData } = session || { data: null };
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
   const [priceList, setPriceList] = useState<PriceListItem[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);

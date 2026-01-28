@@ -98,7 +98,8 @@ const buildLinePath = (values: LineSeries, maxValue: number, width: number, heig
 };
 
 export default function Dashboard() {
-  const { data: session } = useSession();
+  const session = useSession?.();
+  const { data: sessionData } = session || { data: null };
   const [sortField, setSortField] = useState<SortField>("sales");
   const [monthlyGoal, setMonthlyGoal] = useState<number>(600000);
   const [goalInput, setGoalInput] = useState<string>("600000");

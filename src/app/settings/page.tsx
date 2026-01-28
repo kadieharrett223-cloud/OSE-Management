@@ -8,7 +8,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function SettingsPage() {
-  const { data: session, status } = useSession();
+  const sessionHook = useSession?.();
+  const { data: session, status } = sessionHook || { data: null, status: 'unauthenticated' };
   const router = useRouter();
   const [qboConnected, setQboConnected] = useState(false);
   const [loading, setLoading] = useState(true);
