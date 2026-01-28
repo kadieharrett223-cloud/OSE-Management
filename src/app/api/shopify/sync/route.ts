@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { syncPricesToShopify } from "@/lib/shopify";
-import { getSessionOrBypass } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -12,7 +12,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export async function POST(req: NextRequest) {
   try {
     // Require admin to sync prices
-    const session: any = await getSessionOrBypass();
+    const session: any = await getSession();
     const role = (session?.user?.role ?? "").toString().toLowerCase();
     
     if (role !== "admin") {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionOrBypass } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
 function isMissingTableError(error: any) {
@@ -21,7 +21,7 @@ function parseYearMonth(params: URLSearchParams) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getSessionOrBypass();
+  const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSessionOrBypass();
+  const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

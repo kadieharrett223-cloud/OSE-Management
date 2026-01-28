@@ -2,12 +2,12 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { getShopifyTokens } from "@/lib/shopify";
-import { getSessionOrBypass } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
     // Require admin
-    const session: any = await getSessionOrBypass();
+    const session: any = await getSession();
     const role = (session?.user?.role ?? "").toString().toLowerCase();
     
     if (role !== "admin") {

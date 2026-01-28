@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionOrBypass } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
 export async function GET(req: NextRequest) {
-  const session = await getSessionOrBypass();
+  const session = await getSession();
 
   const supabase = getServerSupabaseClient();
   const params = req.nextUrl.searchParams;
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSessionOrBypass();
+  const session = await getSession();
 
   const body = await req.json();
   const {

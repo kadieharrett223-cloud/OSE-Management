@@ -79,18 +79,7 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-// Helper to bypass auth entirely when AUTH_DISABLED=true (treat as admin)
-export async function getSessionOrBypass() {
-  const authDisabled = process.env.AUTH_DISABLED;
-  if (authDisabled && (authDisabled === "true" || authDisabled === "1" || authDisabled.toLowerCase() === "true")) {
-    return {
-      user: {
-        id: "admin",
-        email: process.env.ADMIN_EMAIL || "admin@local",
-        role: "admin",
-        repId: null,
-      },
-    } as any;
-  }
+// Get server session with authentication required
+export async function getSession() {
   return getServerSession(authOptions as any);
 }

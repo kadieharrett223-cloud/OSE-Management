@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSessionOrBypass } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const session = await getSessionOrBypass();
+  const session = await getSession();
   if (!session || session.user.role !== "REP") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
