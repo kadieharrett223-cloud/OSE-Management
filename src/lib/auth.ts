@@ -23,11 +23,15 @@ export const authOptions: NextAuthOptions = {
         const { data: user, error } = await supabase
           .from("auth_users")
           .select("*")
-          .eq("email", credentials.email.toLowerCase())
+          .ilike("email", credentials.email)
           .eq("password", credentials.password)
+          .eq("active", true)
           .single();
 
-        if (error || !user) return null;
+        if (error || !user) {
+          console.error("Auth error:", error);
+          return null;
+        }
 
         return {
           id: user.id,

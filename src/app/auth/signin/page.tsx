@@ -92,15 +92,6 @@ function SignInContent() {
               {isLoading ? "Signing in..." : "Sign In"}
             </button>
           </form>
-
-          <div className="pt-4 border-t border-slate-200 text-center">
-            <p className="text-sm text-slate-600">
-              No account yet?{" "}
-              <a href="/auth/signup" className="font-semibold text-blue-600 hover:text-blue-700">
-                Sign up
-              </a>
-            </p>
-          </div>
         </div>
       </div>
     </div>
