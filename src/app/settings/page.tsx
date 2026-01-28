@@ -53,14 +53,6 @@ export default function SettingsPage() {
     );
   }
 
-  if (status !== 'authenticated' || !session) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-red-500">Please log in to access settings.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
