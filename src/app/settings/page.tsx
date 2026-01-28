@@ -10,23 +10,47 @@ import Link from 'next/link';
 export default function SettingsPage() {
   const router = useRouter();
   const [qboConnected, setQboConnected] = useState(false);
+  const [shopifyConnected, setShopifyConnected] = useState(false);
+  const [shopifyShop, setShopifyShop] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [shopInput, setShopInput] = useState('');
 
   useEffect(() => {
-    const checkQboStatus = async () => {
+    const checkStatus = async () => {
       try {
-        const res = await fetch('/api/qbo/refresh', { method: 'POST' });
-        setQboConnected(res.ok);
-      } catch {
-        setQboConnected(false);
+        // Check QBO status
+        const qboRes = await fetch('/api/qbo/refresh', { method: 'POST' });
+        setQboConnected(qboRes.ok);
+
+        // Check Shopify status
+        const shopifyRes = await fetch('/api/shopify/status');
+        if (shopifyRes.ok) {
+          const data = await shopifyRes.json();
+          setShopifyConnected(data.connected);
+          setShopifyShop(data.shop);
+        }
+      } catch (err) {
+        console.error('Failed to check connection status:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    // AUTH_DISABLED is set on production, so always check QBO status
-    checkQboStatus();
+    // AUTH_DISABLED is set on production, so always check status
+    checkStatus();
+
+    // Check for Shopify redirect messages
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('shopify') === 'connected') {
+      setSuccess('Shopify connected successfully!');
+      window.history.replaceState({}, '', '/settings');
+    } else if (params.get('shopify') === 'error') {
+      setError(params.get('message') || 'Failed to connect Shopify');
+      window.history.replaceState({}, '', '/settings');
+    }
   }, []);
 
   const handleDisconnectQbo = async () => {
@@ -38,6 +62,55 @@ export default function SettingsPage() {
       setQboConnected(false);
     } catch (err) {
       setError('Failed to disconnect QuickBooks');
+    }
+  };
+
+  const handleConnectShopify = async () => {
+    try {
+      setError(null);
+      if (!shopInput.trim()) {
+        setError('Please enter your Shopify store domain');
+        return;
+      }
+
+      const res = await fetch('/api/shopify/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop: shopInput.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to connect Shopify');
+      }
+
+      // Redirect to Shopify OAuth
+      window.location.href = data.authUrl;
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect Shopify');
+    }
+  };
+
+  const handleSyncPrices = async () => {
+    try {
+      setError(null);
+      setSuccess(null);
+      setSyncing(true);
+
+      const res = await fetch('/api/shopify/sync', { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to sync prices');
+      }
+
+      setSuccess(
+        `Sync completed: ${data.success} updated, ${data.skipped} skipped, ${data.failed} failed`
+      );
+    } catch (err: any) {
+      setError(err.message || 'Failed to sync prices');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -68,6 +141,12 @@ export default function SettingsPage() {
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-700">{error}</p>
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-700">{success}</p>
           </div>
         )}
 
@@ -115,6 +194,57 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Shopify Section */}
+        <div className="bg-white rounded-lg shadow mb-6 p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Shopify Integration</h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-gray-700 font-medium">Shopify Store Connection</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {shopifyConnected ? `Connected to ${shopifyShop}` : 'Not connected'}
+                </p>
+              </div>
+              <div>
+                {shopifyConnected ? (
+                  <button
+                    onClick={handleSyncPrices}
+                    disabled={syncing}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {syncing ? 'Syncing...' : 'Sync Prices'}
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={shopInput}
+                      onChange={(e) => setShopInput(e.target.value)}
+                      placeholder="your-store.myshopify.com"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <button
+                      onClick={handleConnectShopify}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    >
+                      Connect
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {shopifyConnected && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> Prices will sync from your price list to Shopify based on matching SKUs.
+                  Make sure your Shopify product variants have SKUs that match your price list item numbers.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
