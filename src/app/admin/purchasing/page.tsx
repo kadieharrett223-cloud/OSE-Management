@@ -3,7 +3,6 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import { Sidebar } from "@/components/Sidebar";
 import { usePathname } from "next/navigation";
 
@@ -59,8 +58,6 @@ function titleCase(value: string) {
 }
 
 export default function PurchasingPage() {
-  const session = useSession?.();
-  const { data: sessionData } = session || { data: null };
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
   const [priceList, setPriceList] = useState<PriceListItem[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);

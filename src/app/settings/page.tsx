@@ -2,15 +2,15 @@
 
 export const dynamic = "force-dynamic";
 
-import { useSession, signOut } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function SettingsPage() {
-  const sessionHook = useSession?.();
-  const { data: session, status } = sessionHook || { data: null, status: 'unauthenticated' };
   const router = useRouter();
+  const session = null;
+  const status = 'unauthenticated';
   const [qboConnected, setQboConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

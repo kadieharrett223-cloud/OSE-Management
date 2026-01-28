@@ -3,7 +3,6 @@
 export const dynamic = "force-dynamic";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import { Sidebar } from "@/components/Sidebar";
 
 const money = (value: number | undefined) => {
@@ -98,8 +97,6 @@ const buildLinePath = (values: LineSeries, maxValue: number, width: number, heig
 };
 
 export default function Dashboard() {
-  const session = useSession?.();
-  const { data: sessionData } = session || { data: null };
   const [sortField, setSortField] = useState<SortField>("sales");
   const [monthlyGoal, setMonthlyGoal] = useState<number>(600000);
   const [goalInput, setGoalInput] = useState<string>("600000");
@@ -407,8 +404,7 @@ export default function Dashboard() {
                 <div className="text-xs uppercase font-semibold text-slate-500">Monthly Goal</div>
                 <div className="mt-2 text-2xl font-bold text-slate-900">${money(monthlyGoal)}</div>
                 <div className="mt-1 text-xs text-slate-600">Target for month</div>
-                {session && (
-                  <form className="mt-3 flex gap-2" onSubmit={handleGoalSave}>
+                <form className="mt-3 flex gap-2" onSubmit={handleGoalSave}>
                     <input
                       type="number"
                       step="1000"
@@ -426,7 +422,6 @@ export default function Dashboard() {
                       {updatingGoal ? "Saving" : "Save"}
                     </button>
                   </form>
-                )}
                 {goalStatus && (
                   <div className="mt-1 text-xs text-slate-500">{goalStatus}</div>
                 )}
