@@ -36,7 +36,7 @@ export const authOptions: NextAuthOptions = {
         return {
           id: user.id,
           email: user.email,
-          role: user.role || "user",
+          role: user.role || (process.env.ADMIN_EMAIL && user.email?.toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase() ? "admin" : "user"),
         };
       },
     }),
@@ -54,8 +54,12 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.email = user.email;
         token.role = (user as any).role || "user";
         token.repId = null;
+      }
+      if (token.email && process.env.ADMIN_EMAIL && token.email.toString().toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase()) {
+        token.role = "admin";
       }
       return token;
     },
