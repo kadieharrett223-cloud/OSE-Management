@@ -161,6 +161,65 @@ export async function getShopifyProducts() {
   return data.products;
 }
 
+type ShopifyCollection = {
+  id: number;
+  title: string;
+  handle: string;
+  products_count?: number;
+};
+
+export async function getShopifyCollections(): Promise<ShopifyCollection[]> {
+  const [custom, smart] = await Promise.all([
+    shopifyApiFetch<{ custom_collections: ShopifyCollection[] }>(
+      "/custom_collections.json?limit=250"
+    ),
+    shopifyApiFetch<{ smart_collections: ShopifyCollection[] }>(
+      "/smart_collections.json?limit=250"
+    ),
+  ]);
+
+  return [...(custom.custom_collections || []), ...(smart.smart_collections || [])];
+}
+
+async function fetchProductIdsForCollections(collectionIds: string[]): Promise<number[]> {
+  const allIds: number[] = [];
+
+  for (const collectionId of collectionIds) {
+    const data = await shopifyApiFetch<{ collects: Array<{ product_id: number }> }>(
+      `/collects.json?collection_id=${collectionId}&limit=250`
+    );
+    (data.collects || []).forEach((collect) => allIds.push(collect.product_id));
+  }
+
+  return Array.from(new Set(allIds));
+}
+
+async function fetchProductsByIds(productIds: number[]) {
+  if (productIds.length === 0) return [];
+
+  const chunks: number[][] = [];
+  for (let i = 0; i < productIds.length; i += 250) {
+    chunks.push(productIds.slice(i, i + 250));
+  }
+
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      shopifyApiFetch<{ products: any[] }>(`/products.json?ids=${chunk.join(",")}`)
+    )
+  );
+
+  return results.flatMap((res) => res.products || []);
+}
+
+export async function getShopifyProductsByCollectionIds(collectionIds: string[]) {
+  if (!collectionIds || collectionIds.length === 0) {
+    return getShopifyProducts();
+  }
+
+  const productIds = await fetchProductIdsForCollections(collectionIds);
+  return fetchProductsByIds(productIds);
+}
+
 /**
  * Update product variant price in Shopify
  */

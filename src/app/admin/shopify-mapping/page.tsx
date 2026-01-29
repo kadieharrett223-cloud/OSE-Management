@@ -16,6 +16,12 @@ interface ShopifyProduct {
   }>;
 }
 
+interface ShopifyCollection {
+  id: number;
+  title: string;
+  handle: string;
+}
+
 interface PriceListItem {
   id: string;
   item_no?: string;
@@ -33,6 +39,9 @@ export default function ShopifyMappingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [mappings, setMappings] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [collections, setCollections] = useState<ShopifyCollection[]>([]);
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+  const [savingCollections, setSavingCollections] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -69,6 +78,19 @@ export default function ShopifyMappingPage() {
         }
       });
       setMappings(existingMappings);
+
+      const collectionsRes = await fetch("/api/shopify/collections");
+      if (collectionsRes.ok) {
+        const collectionsData = await collectionsRes.json();
+        setCollections(collectionsData.collections || []);
+      }
+
+      const settingsRes = await fetch("/api/shopify/settings");
+      if (settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        const ids = settingsData.settings?.allowed_collection_ids || [];
+        setSelectedCollections(ids);
+      }
     } catch (error: any) {
       console.error("Failed to load data:", error);
       setError(error.message || "Failed to load data. Please check your Shopify connection in Settings.");
@@ -164,6 +186,60 @@ export default function ShopifyMappingPage() {
           <p className="text-gray-600">
             Map Shopify products to price list items for automatic price syncing
           </p>
+        </div>
+
+        {/* Collection Filter */}
+        <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Visible Shopify Collections</h3>
+          {collections.length === 0 ? (
+            <p className="text-sm text-gray-500">No collections found.</p>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+              {collections.map((collection) => (
+                <label key={collection.id} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    value={collection.id}
+                    checked={selectedCollections.includes(collection.id.toString())}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setSelectedCollections((prev) =>
+                        prev.includes(id)
+                          ? prev.filter((x) => x !== id)
+                          : [...prev, id]
+                      );
+                    }}
+                  />
+                  {collection.title}
+                </label>
+              ))}
+            </div>
+          )}
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={async () => {
+                setSavingCollections(true);
+                try {
+                  const res = await fetch("/api/shopify/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ allowed_collection_ids: selectedCollections }),
+                  });
+                  if (!res.ok) throw new Error("Failed to save collection filter");
+                  await loadData();
+                } catch (e) {
+                  setError("Failed to save collection filter");
+                } finally {
+                  setSavingCollections(false);
+                }
+              }}
+              className="rounded bg-blue-600 px-4 py-2 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
+              disabled={savingCollections}
+            >
+              {savingCollections ? "Saving..." : "Save Collection Filter"}
+            </button>
+            <span className="text-xs text-gray-500">Only products from selected collections will show.</span>
+          </div>
         </div>
 
         {/* Search */}
