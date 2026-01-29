@@ -350,7 +350,6 @@ export default function AdminPriceListPage() {
   const pathname = usePathname();
   const tabs = [
     { label: "Price List", href: "/admin/price-list" },
-    { label: "QBO Mapping", href: "/admin/qbo-mapping" },
   ];
 
   return (
