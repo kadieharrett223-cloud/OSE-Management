@@ -31,6 +31,7 @@ export default function ShopifyMappingPage() {
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [mappings, setMappings] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -38,31 +39,37 @@ export default function ShopifyMappingPage() {
 
   async function loadData() {
     setLoading(true);
+    setError(null);
     try {
       // Load Shopify products
       const shopifyRes = await fetch("/api/shopify/products");
-      if (shopifyRes.ok) {
-        const data = await shopifyRes.json();
-        setShopifyProducts(data.products || []);
+      if (!shopifyRes.ok) {
+        const errorData = await shopifyRes.json();
+        throw new Error(errorData.error || `Shopify API error: ${shopifyRes.status}`);
       }
+      const shopifyData = await shopifyRes.json();
+      setShopifyProducts(shopifyData.products || []);
 
       // Load price list items
       const priceRes = await fetch("/api/price-list");
-      if (priceRes.ok) {
-        const data = await priceRes.json();
-        setPriceListItems(data.items || []);
-        
-        // Build existing mappings
-        const existingMappings: Record<string, string> = {};
-        data.items?.forEach((item: PriceListItem) => {
-          if (item.shopify_variant_id) {
-            existingMappings[item.shopify_variant_id] = item.id;
-          }
-        });
-        setMappings(existingMappings);
+      if (!priceRes.ok) {
+        const errorData = await priceRes.json();
+        throw new Error(errorData.error || `Price list error: ${priceRes.status}`);
       }
-    } catch (error) {
+      const priceData = await priceRes.json();
+      setPriceListItems(priceData.items || []);
+      
+      // Build existing mappings
+      const existingMappings: Record<string, string> = {};
+      priceData.items?.forEach((item: PriceListItem) => {
+        if (item.shopify_variant_id) {
+          existingMappings[item.shopify_variant_id] = item.id;
+        }
+      });
+      setMappings(existingMappings);
+    } catch (error: any) {
       console.error("Failed to load data:", error);
+      setError(error.message || "Failed to load data. Please check your Shopify connection in Settings.");
     } finally {
       setLoading(false);
     }
@@ -109,6 +116,31 @@ export default function ShopifyMappingPage() {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
         <p className="text-gray-600">Loading Shopify products...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="mx-auto max-w-md rounded-lg border border-red-300 bg-red-50 p-6">
+          <h2 className="text-xl font-semibold text-red-900 mb-3">Error Loading Products</h2>
+          <p className="text-red-700 mb-4">{error}</p>
+          <div className="space-y-2">
+            <button
+              onClick={loadData}
+              className="w-full rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+            >
+              Try Again
+            </button>
+            <Link
+              href="/settings"
+              className="block w-full rounded border border-red-600 px-4 py-2 text-center text-red-600 hover:bg-red-50"
+            >
+              Go to Settings to Connect Shopify
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

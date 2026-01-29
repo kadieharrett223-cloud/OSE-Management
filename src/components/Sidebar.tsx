@@ -8,6 +8,7 @@ const navItems = [
    { label: "Commissions", hint: "QBO sync & payouts", href: "/commissions" },
    { label: "Calendar", hint: "Sales & notifications", href: "/calendar" },
    { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
+   { label: "QBO Mapping", hint: "Map QuickBooks items", href: "/admin/qbo-mapping" },
    { label: "Shopify Mapping", hint: "Connect products", href: "/admin/shopify-mapping" },
    { label: "Purchasing", hint: "POs and payments", href: "/admin/purchasing" },
    { label: "Settings", hint: "QBO & Shopify config", href: "/settings" },
