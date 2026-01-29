@@ -9,6 +9,46 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+export async function GET(req: NextRequest) {
+  try {
+    const session: any = await getSession();
+    const role = (session?.user?.role ?? "").toString().toLowerCase();
+    
+    if (role !== "admin") {
+      return NextResponse.json({ error: "Admin role required" }, { status: 403 });
+    }
+
+    // Get preview of price changes
+    const { data: items, error } = await supabase
+      .from("price_list_items")
+      .select("item_no, list_price, sale_price, compare_at_price, shopify_variant_id")
+      .not("shopify_variant_id", "is", null);
+
+    if (error) {
+      throw new Error("Failed to fetch price list items");
+    }
+
+    const preview = items?.map((item: any) => ({
+      item_no: item.item_no,
+      current_price: item.list_price,
+      new_price: item.sale_price > 0 ? item.sale_price : item.list_price,
+      sale_price: item.sale_price || 0,
+      compare_at_price: item.sale_price > 0 ? item.list_price : null,
+    })) || [];
+
+    return NextResponse.json({
+      ok: true,
+      preview,
+    });
+  } catch (error: any) {
+    console.error("Preview error:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to preview sync" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Require admin to sync prices
