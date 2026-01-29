@@ -18,9 +18,10 @@ interface ShopifyProduct {
 
 interface PriceListItem {
   id: string;
-  item_no: string;
+  item_no?: string;
+  sku?: string;
   description: string;
-  list_price: number;
+  list_price?: number;
   shopify_variant_id: string | null;
 }
 
@@ -57,11 +58,12 @@ export default function ShopifyMappingPage() {
         throw new Error(errorData.error || `Price list error: ${priceRes.status}`);
       }
       const priceData = await priceRes.json();
-      setPriceListItems(priceData.items || []);
+      const priceItems: PriceListItem[] = Array.isArray(priceData) ? priceData : (priceData.items || []);
+      setPriceListItems(priceItems);
       
       // Build existing mappings
       const existingMappings: Record<string, string> = {};
-      priceData.items?.forEach((item: PriceListItem) => {
+      priceItems.forEach((item: PriceListItem) => {
         if (item.shopify_variant_id) {
           existingMappings[item.shopify_variant_id] = item.id;
         }
@@ -230,7 +232,7 @@ export default function ShopifyMappingPage() {
                                 {mappedItem.description}
                               </div>
                               <div className="text-xs text-gray-500">
-                                List: ${mappedItem.list_price.toFixed(2)}
+                                List: ${(mappedItem.list_price ?? 0).toFixed(2)}
                               </div>
                             </div>
                           ) : (
@@ -247,7 +249,7 @@ export default function ShopifyMappingPage() {
                             <option value="">-- Select Item --</option>
                             {priceListItems.map((item) => (
                               <option key={item.id} value={item.id}>
-                                {item.item_no} - {item.description}
+                                {(item.item_no || item.sku || "")} - {item.description}
                               </option>
                             ))}
                           </select>

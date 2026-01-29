@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabase
       .from("price_list_items")
-      .select("id, item_no, description, list_price, shipping_included_per_unit, weight_lbs, fob_cost");
+      .select("id, item_no, description, list_price, shipping_included_per_unit, weight_lbs, fob_cost, shopify_variant_id");
 
     if (error) throw error;
 
@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
       shippingIncludedPerUnit: Number(item.shipping_included_per_unit || 0),
       weight_lbs: item.weight_lbs ? Number(item.weight_lbs) : null,
       fob_cost: item.fob_cost ? Number(item.fob_cost) : null,
+      shopify_variant_id: item.shopify_variant_id || null,
     }));
 
     return NextResponse.json(items);
