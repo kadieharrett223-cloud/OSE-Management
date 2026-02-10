@@ -9,6 +9,7 @@ export function TopBar() {
 
   const pages = [
     { label: "Dashboard", href: "/" },
+    { label: "Expenses", href: "/expenses" },
     { label: "Commissions", href: "/commissions" },
     { label: "Calendar", href: "/calendar" },
     { label: "Price List", href: "/admin/price-list" },
