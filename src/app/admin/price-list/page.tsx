@@ -174,6 +174,7 @@ export default function AdminPriceListPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [showGroupFilters, setShowGroupFilters] = useState(false);
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -645,44 +646,56 @@ export default function AdminPriceListPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Filter groups:</span>
+                <div className="mt-4">
                   <button
                     type="button"
-                    onClick={() => setSelectedGroups([])}
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                      selectedGroups.length === 0
-                        ? "border-blue-500 bg-blue-600 text-white"
-                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                    }`}
+                    onClick={() => setShowGroupFilters((prev) => !prev)}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-100"
                   >
-                    All groups
+                    Filter groups
+                    <span className="text-[10px] text-slate-500">{showGroupFilters ? "▲" : "▼"}</span>
                   </button>
-                  {categories.map((cat) => {
-                    const isSelected = selectedGroups.includes(cat.category_name);
-                    return (
+                  {selectedGroups.length > 0 && (
+                    <span className="ml-2 text-xs text-slate-500">Discount applies only to selected groups.</span>
+                  )}
+
+                  {showGroupFilters && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <button
-                        key={cat.id}
                         type="button"
-                        onClick={() => {
-                          setSelectedGroups((prev) =>
-                            isSelected
-                              ? prev.filter((name) => name !== cat.category_name)
-                              : [...prev, cat.category_name]
-                          );
-                        }}
+                        onClick={() => setSelectedGroups([])}
                         className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                          isSelected
+                          selectedGroups.length === 0
                             ? "border-blue-500 bg-blue-600 text-white"
                             : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
                         }`}
                       >
-                        {cat.category_name}
+                        All groups
                       </button>
-                    );
-                  })}
-                  {selectedGroups.length > 0 && (
-                    <span className="text-xs text-slate-500">Discount applies only to selected groups.</span>
+                      {categories.map((cat) => {
+                        const isSelected = selectedGroups.includes(cat.category_name);
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedGroups((prev) =>
+                                isSelected
+                                  ? prev.filter((name) => name !== cat.category_name)
+                                  : [...prev, cat.category_name]
+                              );
+                            }}
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                              isSelected
+                                ? "border-blue-500 bg-blue-600 text-white"
+                                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                            }`}
+                          >
+                            {cat.category_name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
