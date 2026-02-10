@@ -26,6 +26,13 @@ interface RepData {
   };
 }
 
+interface PaymentSummary {
+  customerName: string;
+  totalApplied: number;
+  paymentCount: number;
+  lastTxnDate: string;
+}
+
 interface UnpaidInvoice {
   id: string;
   docNumber: string;
@@ -71,8 +78,6 @@ const mockReps = [
   },
 ];
 
-type SortField = "sales" | "commission" | "orders";
-
 type LineSeries = Array<number | null>;
 
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -98,7 +103,6 @@ const buildLinePath = (values: LineSeries, maxValue: number, width: number, heig
 };
 
 export default function Dashboard() {
-  const [sortField, setSortField] = useState<SortField>("sales");
   const [monthlyGoal, setMonthlyGoal] = useState<number>(600000);
   const [goalInput, setGoalInput] = useState<string>("600000");
   const [goalStatus, setGoalStatus] = useState<string | null>(null);
@@ -107,10 +111,13 @@ export default function Dashboard() {
   const [qboInvoiceCount, setQboInvoiceCount] = useState<number>(0);
   const [loadingQbo, setLoadingQbo] = useState(true);
   const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
-  const [loadingReps, setLoadingReps] = useState(true);
   const [unpaidInvoices, setUnpaidInvoices] = useState<UnpaidInvoice[]>([]);
   const [loadingUnpaid, setLoadingUnpaid] = useState(false);
   const [showAllUnpaid, setShowAllUnpaid] = useState(false);
+  const [paymentsToday, setPaymentsToday] = useState<PaymentSummary[]>([]);
+  const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
+  const [loadingPayments, setLoadingPayments] = useState(true);
+  const [lastPaymentsUpdated, setLastPaymentsUpdated] = useState<Date | null>(null);
 
   // Fetch monthly goal
   useEffect(() => {
@@ -160,7 +167,7 @@ export default function Dashboard() {
         if (isMounted) setLoadingQbo(false);
       });
 
-    // Fetch sales by rep
+    // Fetch sales by rep (for totals)
     fetch(`/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=paid`)
       .then(async (res) => {
         if (!res.ok) throw new Error('Failed to fetch sales by rep');
@@ -174,9 +181,6 @@ export default function Dashboard() {
       })
       .catch((err) => {
         console.error('Failed to fetch rep sales:', err);
-      })
-      .finally(() => {
-        if (isMounted) setLoadingReps(false);
       });
 
     return () => {
@@ -225,24 +229,10 @@ export default function Dashboard() {
     }
   }
 
-  // Use real rep data if available, otherwise fall back to mock
-  const displayReps = repSalesData.length > 0 ? repSalesData : mockReps.map(r => ({
-    repName: r.name,
-    isPrimary: true,
-    totalSales: r.sales,
-    commission: r.commission,
-    invoiceCount: r.orders,
-    commissionRate: 0.05,
-    bonusProgress: {
-      salesAmount: 0,
-      bonusThreshold: 150000,
-      percentToThreshold: 0,
-      hasEarnedBonus: false,
-    },
-  }));
-
   const totalSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
-  const totalCommission = displayReps.reduce((sum, rep) => sum + rep.commission, 0);
+  const totalCommission = repSalesData.length > 0
+    ? repSalesData.reduce((sum, rep) => sum + rep.commission, 0)
+    : mockReps.reduce((sum, rep) => sum + rep.commission, 0);
   const percentOfGoal = monthlyGoal > 0 ? Math.round((totalSales / monthlyGoal) * 100) : 0;
   const dailyPace = totalSales / 15; // 15 days elapsed in month (approx)
   const projectedMonth = dailyPace * 30;
@@ -315,16 +305,74 @@ export default function Dashboard() {
     fetchUnpaidInvoices();
   }, []);
 
-  // Show ALL reps on leaderboard (both salary and commission)
-  const sortedReps = [...displayReps].sort((a, b) => {
-    if (sortField === "sales") return b.totalSales - a.totalSales;
-    if (sortField === "commission") return b.commission - a.commission;
-    return b.invoiceCount - a.invoiceCount;
-  });
+  // Fetch payments made today (live tracking)
+  useEffect(() => {
+    let isMounted = true;
 
-  // Separate primary and bonus reps
-  const commissionReps = displayReps.filter(r => r.isPrimary);
-  const bonusReps = displayReps.filter(r => !r.isPrimary);
+    const fetchPaymentsToday = async () => {
+      setLoadingPayments(true);
+      try {
+        const today = new Date().toLocaleDateString("en-CA");
+        const res = await fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
+        if (!res.ok) throw new Error("Failed to fetch payments");
+        const data = await res.json();
+        const payments = data.payments || [];
+
+        const summaryMap = new Map<string, PaymentSummary>();
+        let totalApplied = 0;
+
+        payments.forEach((payment: any) => {
+          const total = Number(payment.TotalAmt) || 0;
+          const unapplied = Number(payment.UnappliedAmt) || 0;
+          const applied = Math.max(total - unapplied, 0);
+          if (applied <= 0) return;
+
+          const customerName = payment.CustomerRef?.name || "Unknown Customer";
+          totalApplied += applied;
+
+          const existing = summaryMap.get(customerName);
+          if (existing) {
+            existing.totalApplied += applied;
+            existing.paymentCount += 1;
+            if (payment.TxnDate && payment.TxnDate > existing.lastTxnDate) {
+              existing.lastTxnDate = payment.TxnDate;
+            }
+          } else {
+            summaryMap.set(customerName, {
+              customerName,
+              totalApplied: applied,
+              paymentCount: 1,
+              lastTxnDate: payment.TxnDate || today,
+            });
+          }
+        });
+
+        const summary = Array.from(summaryMap.values()).sort((a, b) => b.totalApplied - a.totalApplied);
+
+        if (isMounted) {
+          setPaymentsToday(summary);
+          setPaymentsTotal(totalApplied);
+          setLastPaymentsUpdated(new Date());
+        }
+      } catch (error) {
+        console.error("Failed to fetch payments today:", error);
+        if (isMounted) {
+          setPaymentsToday([]);
+          setPaymentsTotal(0);
+        }
+      } finally {
+        if (isMounted) setLoadingPayments(false);
+      }
+    };
+
+    fetchPaymentsToday();
+    const interval = setInterval(fetchPaymentsToday, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -340,7 +388,7 @@ export default function Dashboard() {
                 <div className="space-y-2">
                   <h1 className="text-3xl font-semibold text-slate-900">Company Performance</h1>
                   <p className="max-w-2xl text-sm text-slate-600">
-                    Year-to-date sales, commission accrual, and sales rep leaderboard. Read-only overview; manage commissions and price list separately.
+                    Year-to-date sales, commission accrual, and live payments received today. Read-only overview; manage commissions and price list separately.
                   </p>
                 </div>
               </div>
@@ -441,29 +489,20 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Sales Rep Leaderboard */}
+            {/* Payments Made Today */}
             <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
               <div className="border-b border-slate-200 px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Sales Rep Leaderboard</h2>
-                    <p className="text-sm text-slate-600">All sales representatives (commission & salary)</p>
+                    <h2 className="text-lg font-semibold text-slate-900">Payments Made Today</h2>
+                    <p className="text-sm text-slate-600">Live tracking of customers who paid today</p>
                   </div>
-                  <div className="flex gap-2">
-                    {(["sales", "commission", "orders"] as const).map((field) => (
-                      <button
-                        key={field}
-                        onClick={() => setSortField(field)}
-                        className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                          sortField === field
-                            ? "bg-blue-600 text-white shadow-md"
-                            : "border border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100"
-                        }`}
-                        type="button"
-                      >
-                        {field === "sales" ? "Sales" : field === "commission" ? "Commission" : "Orders"}
-                      </button>
-                    ))}
+                  <div className="text-right">
+                    <div className="text-xs text-slate-500">Total Received Today</div>
+                    <div className="text-lg font-semibold text-emerald-700">${money(paymentsTotal)}</div>
+                    <div className="text-xs text-slate-500">
+                      {lastPaymentsUpdated ? `Updated ${lastPaymentsUpdated.toLocaleTimeString()}` : "Updating..."}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -473,53 +512,41 @@ export default function Dashboard() {
                   <thead className="border-b border-slate-200 bg-slate-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                        Rep Name
+                        Customer
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Sales
+                        Payments
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Commission
+                        Amount Applied
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Orders
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Rate
+                        Last Payment
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {loadingReps ? (
+                    {loadingPayments ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                          Loading sales rep data...
+                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                          Loading payments...
                         </td>
                       </tr>
-                    ) : commissionReps.length === 0 ? (
+                    ) : paymentsToday.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                          No commission rep data available
+                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                          No payments recorded today
                         </td>
                       </tr>
                     ) : (
-                      [...commissionReps].sort((a, b) => {
-                        if (sortField === "sales") return b.totalSales - a.totalSales;
-                        if (sortField === "commission") return b.commission - a.commission;
-                        return b.invoiceCount - a.invoiceCount;
-                      }).map((rep, idx) => (
-                        <tr key={rep.repName + idx} className="hover:bg-slate-50 transition">
-                          <td className="px-6 py-3 font-medium text-slate-900">{rep.repName}</td>
+                      paymentsToday.map((payment) => (
+                        <tr key={payment.customerName} className="hover:bg-slate-50 transition">
+                          <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
+                          <td className="px-6 py-3 text-right text-slate-600">{payment.paymentCount}</td>
                           <td className="px-6 py-3 text-right font-semibold text-emerald-700">
-                            ${money(rep.totalSales)}
+                            ${money(payment.totalApplied)}
                           </td>
-                          <td className="px-6 py-3 text-right font-semibold text-indigo-700">
-                            ${money(rep.commission)}
-                          </td>
-                          <td className="px-6 py-3 text-right text-slate-600">{rep.invoiceCount}</td>
-                          <td className="px-6 py-3 text-right text-slate-600">
-                            {(rep.commissionRate * 100).toFixed(1)}%
-                          </td>
+                          <td className="px-6 py-3 text-right text-slate-600">{payment.lastTxnDate}</td>
                         </tr>
                       ))
                     )}
@@ -604,107 +631,6 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Bonus Reps Section (SC/CR) */}
-            {bonusReps.length > 0 && (
-              <div className="rounded-xl bg-blue-50 shadow-md ring-1 ring-blue-200">
-                <div className="border-b border-blue-200 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900">Bonus Tracking (Support/Admin)</h2>
-                  <p className="text-sm text-slate-600">Salary employees tracking toward $150k bonus threshold</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
-                  {bonusReps.map((rep) => (
-                    <div key={rep.repName} className="rounded-lg bg-white p-4 border border-blue-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <p className="font-semibold text-slate-900">{rep.repName}</p>
-                          <p className="text-xs text-slate-600">{rep.invoiceCount} invoices processed</p>
-                        </div>
-                        {rep.bonusProgress?.hasEarnedBonus && (
-                          <span className="inline-block rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
-                            Bonus Earned!
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="mb-2">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-slate-600">Bonus Progress</span>
-                          <span className="font-semibold text-slate-900">
-                            ${money(rep.bonusProgress?.salesAmount || 0)} / $150,000
-                          </span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full transition-all ${
-                              rep.bonusProgress?.hasEarnedBonus ? "bg-green-500" : "bg-blue-500"
-                            }`}
-                            style={{
-                              width: `${Math.min(rep.bonusProgress?.percentToThreshold || 0, 100)}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="text-xs text-slate-600">
-                        {rep.bonusProgress?.hasEarnedBonus ? (
-                          <span className="text-green-700 font-semibold">
-                            Earning commission on sales above $150k
-                          </span>
-                        ) : (
-                          <span>
-                            ${money(150000 - (rep.bonusProgress?.salesAmount || 0))} more to earn bonus
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Top Performer</div>
-                <div className="mt-2">
-                  {loadingReps ? (
-                    <div className="text-sm text-slate-400">Loading...</div>
-                  ) : commissionReps.length > 0 ? (
-                    <>
-                      <div className="text-lg font-semibold text-slate-900">
-                        {[...commissionReps].sort((a, b) => b.totalSales - a.totalSales)[0]?.repName}
-                      </div>
-                      <div className="mt-1 text-sm text-slate-600">
-                        ${money([...commissionReps].sort((a, b) => b.totalSales - a.totalSales)[0]?.totalSales || 0)} | {[...commissionReps].sort((a, b) => b.totalSales - a.totalSales)[0]?.invoiceCount} orders
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-sm text-slate-500">No data</div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Avg Sale per Rep</div>
-                <div className="mt-2">
-                  {loadingReps ? (
-                    <div className="text-sm text-slate-400">Loading...</div>
-                  ) : commissionReps.length > 0 ? (
-                    <>
-                      <div className="text-lg font-semibold text-slate-900">
-                        ${money(commissionReps.reduce((s, r) => s + r.totalSales, 0) / commissionReps.length)}
-                      </div>
-                      <div className="mt-1 text-sm text-slate-600">
-                        {commissionReps.length} active reps
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-sm text-slate-500">No data</div>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
         </main>
       </div>

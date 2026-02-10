@@ -33,10 +33,13 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        const normalizedRole = (user.role || "").toString().toUpperCase();
+        const isAdminEmail = !!(process.env.ADMIN_EMAIL && user.email?.toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase());
+
         return {
           id: user.id,
           email: user.email,
-          role: user.role || (process.env.ADMIN_EMAIL && user.email?.toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase() ? "admin" : "user"),
+          role: isAdminEmail ? "ADMIN" : (normalizedRole === "ADMIN" || normalizedRole === "REP" ? normalizedRole : "REP"),
         };
       },
     }),
@@ -55,11 +58,11 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
-        token.role = (user as any).role || "user";
+        token.role = (user as any).role || "REP";
         token.repId = null;
       }
       if (token.email && process.env.ADMIN_EMAIL && token.email.toString().toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase()) {
-        token.role = "admin";
+        token.role = "ADMIN";
       }
       return token;
     },
