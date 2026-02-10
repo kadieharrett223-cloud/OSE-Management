@@ -329,6 +329,39 @@ export default function ViewPO() {
     }
   };
 
+  const handleSaveAllLineItems = async () => {
+    if (!po?.id) return;
+    setSavingLineItem(true);
+    try {
+      const updatedLines = po.lines ? [...po.lines] : [];
+      const newTotal = updatedLines.reduce((sum, line) => sum + (line.line_total || 0), 0);
+
+      const res = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: updatedLines,
+          total_amount: newTotal,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to save line items");
+        return;
+      }
+
+      const result = await res.json();
+      setPO(result.data);
+      alert("Line items saved successfully");
+    } catch (error) {
+      console.error("Error saving line items:", error);
+      alert("Failed to save line items");
+    } finally {
+      setSavingLineItem(false);
+    }
+  };
+
   const handleDeleteLineItem = async (lineId: string) => {
     if (!po?.id || !confirm("Are you sure you want to delete this line item?")) return;
 
@@ -585,12 +618,19 @@ export default function ViewPO() {
           </table>
 
           {/* Line Items Table */}
-          <div className="mb-2 print:hidden">
+          <div className="mb-2 flex items-center gap-2 print:hidden">
             <button
               onClick={() => openLineItemModal()}
-              className="mb-2 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700"
+              className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700"
             >
               + Add Line Item
+            </button>
+            <button
+              onClick={handleSaveAllLineItems}
+              disabled={savingLineItem}
+              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {savingLineItem ? "Saving..." : "Save"}
             </button>
           </div>
           <div className="mb-2">

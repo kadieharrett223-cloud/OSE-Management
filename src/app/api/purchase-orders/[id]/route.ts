@@ -65,20 +65,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       // Delete line items that are no longer present
       const toDelete = Array.from(existingIds).filter(id => !newIds.has(id));
       if (toDelete.length > 0) {
-        await supabase
+        const { error: deleteError } = await supabase
           .from("purchase_order_lines")
           .delete()
           .in("id", toDelete);
+        if (deleteError) throw deleteError;
       }
 
       // Upsert line items
-      for (const line of lines) {
+      for (const [index, line] of lines.entries()) {
         if (line.id.startsWith("new_")) {
           // Insert new line
-          await supabase
+          const { error: insertError } = await supabase
             .from("purchase_order_lines")
             .insert({
               purchase_order_id: params.id,
+              line_number: index + 1,
               sku: line.sku || null,
               description: line.description,
               quantity: line.quantity,
@@ -86,11 +88,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
               line_total: line.line_total,
               weight_lbs: line.weight_lbs || null,
             });
+          if (insertError) throw insertError;
         } else {
           // Update existing line
-          await supabase
+          const { error: updateError } = await supabase
             .from("purchase_order_lines")
             .update({
+              line_number: index + 1,
               sku: line.sku || null,
               description: line.description,
               quantity: line.quantity,
@@ -99,6 +103,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
               weight_lbs: line.weight_lbs || null,
             })
             .eq("id", line.id);
+          if (updateError) throw updateError;
         }
       }
     }
