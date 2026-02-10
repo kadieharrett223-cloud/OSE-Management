@@ -538,9 +538,10 @@ export default function Dashboard() {
           const applied = Math.max(total - unapplied, 0);
           if (applied <= 0) return;
           totalApplied += applied;
+          const customerName = payment.CustomerRef?.name || payment.CustomerRef?.value || 'Unknown';
           itemizedPayments.push({
             id: payment.Id,
-            customerName: payment.CustomerRef?.value ? `Customer ${payment.CustomerRef.value}` : 'Unknown',
+            customerName: customerName,
             appliedAmount: applied,
             totalAmount: total,
             txnDate: payment.TxnDate || today,
