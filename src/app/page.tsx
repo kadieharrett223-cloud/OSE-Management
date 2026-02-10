@@ -548,7 +548,7 @@ export default function Dashboard() {
             </header>
 
             {/* Business Health Snapshot */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                 <div className="text-xs uppercase font-semibold text-slate-500">YTD Sales</div>
                 <div className="mt-2 text-2xl font-bold text-emerald-700">
@@ -564,9 +564,15 @@ export default function Dashboard() {
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Commission Due</div>
-                <div className="mt-2 text-2xl font-bold text-indigo-700">${money(totalCommission)}</div>
-                <div className="mt-1 text-xs text-slate-600">Payroll pressure</div>
+                <div className="text-xs uppercase font-semibold text-slate-500">Customer Payments Today</div>
+                <div className="mt-2 text-2xl font-bold text-emerald-700">${money(paymentsTotal)}</div>
+                <div className="mt-1 text-xs text-slate-600">Customers paying us today</div>
+              </div>
+
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">Vendors Paid Today</div>
+                <div className="mt-2 text-2xl font-bold text-indigo-700">${money(vendorPaymentsTotal)}</div>
+                <div className="mt-1 text-xs text-slate-600">Payments we made today</div>
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
