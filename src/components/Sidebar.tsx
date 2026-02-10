@@ -32,7 +32,7 @@ const navGroups = [
 export function Sidebar({ activePage }: { activePage: string }) {
   return (
     <aside
-      className="flex w-72 flex-col bg-gradient-to-b from-slate-950 via-blue-900 to-blue-700 px-4 py-6 shadow-2xl ring-1 ring-slate-900/30"
+      className="flex w-72 flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-blue-950 px-4 py-6 shadow-2xl ring-1 ring-slate-900/30"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
