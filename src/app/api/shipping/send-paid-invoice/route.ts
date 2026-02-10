@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
   try {
     const { paymentId, customerName } = await req.json();
     const shippingEmail = process.env.SHIPPING_EMAIL || process.env.SMTP_FROM || process.env.SMTP_USER;
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASSWORD;
 
     if (!paymentId) {
       return NextResponse.json({ error: "Payment ID is required" }, { status: 400 });
@@ -27,6 +30,13 @@ export async function POST(req: NextRequest) {
 
     if (!shippingEmail) {
       return NextResponse.json({ error: "Shipping email is not configured" }, { status: 500 });
+    }
+
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      return NextResponse.json(
+        { error: "SMTP is not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD (and SMTP_FROM)." },
+        { status: 500 }
+      );
     }
 
     const { accessToken, realmId } = await ensureAccessToken();
