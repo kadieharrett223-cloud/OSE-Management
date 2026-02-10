@@ -42,6 +42,16 @@ export default function ViewPO() {
   const id = params?.id as string;
   const [po, setPO] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailForm, setEmailForm] = useState({
+    to_email: "",
+    recipient_name: "",
+    subject: "",
+    message: "",
+  });
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [poNotes, setPoNotes] = useState("");
+  const [editingNotes, setEditingNotes] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -50,12 +60,50 @@ export default function ViewPO() {
         .then((result) => {
           if (result.ok) {
             setPO(result.data);
+            setPoNotes(result.data.notes || "");
           }
           setLoading(false);
         })
         .catch(() => setLoading(false));
     }
   }, [id]);
+
+  const handleSendEmail = async () => {
+    if (!emailForm.to_email) {
+      alert("Please enter a recipient email");
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const res = await fetch("/api/purchase-orders/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to_email: emailForm.to_email,
+          recipient_name: emailForm.recipient_name,
+          po_number: po?.po_number,
+          subject: emailForm.subject || `Purchase Order #${po?.po_number}`,
+          message: emailForm.message || `Please find the PO #${po?.po_number} attached.`,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to send email");
+        return;
+      }
+
+      alert(`Email sent to ${emailForm.recipient_name || emailForm.to_email}!`);
+      setShowEmailModal(false);
+      setEmailForm({ to_email: "", recipient_name: "", subject: "", message: "" });
+    } catch (error) {
+      console.error("Email send error:", error);
+      alert("Failed to send email");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
 
   const money = (num: number) => num.toFixed(2);
 
@@ -78,21 +126,81 @@ export default function ViewPO() {
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-6xl mx-auto p-8">
-        {/* Print/Back Buttons */}
-        <div className="flex justify-between mb-4 print:hidden">
+        {/* Print/Back/Email Buttons */}
+        <div className="flex justify-between mb-4 print:hidden gap-2">
           <button
             onClick={() => router.back()}
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             ← Back
           </button>
-          <button
-            onClick={() => window.print()}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-          >
-            Print
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setEditingNotes(!editingNotes)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              {editingNotes ? "Done Editing" : "Add Notes"}
+            </button>
+            <button
+              onClick={() => setShowEmailModal(true)}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              Send Email
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Print
+            </button>
+          </div>
         </div>
+
+        {/* Notes Section */}
+        {editingNotes && (
+          <div className="mb-4 print:hidden rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <label className="block text-sm font-semibold text-amber-900 mb-2">PO Notes</label>
+            <textarea
+              value={poNotes}
+              onChange={(e) => setPoNotes(e.target.value)}
+              placeholder="Add internal notes about this purchase order..."
+              className="w-full rounded-lg border border-amber-300 px-3 py-2 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none"
+              rows={4}
+            />
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={() => {
+                  // Save notes via API
+                  if (po?.id) {
+                    fetch(`/api/purchase-orders/${po.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ notes: poNotes }),
+                    }).then(() => {
+                      alert("Notes saved!");
+                      setEditingNotes(false);
+                    });
+                  }
+                }}
+                className="rounded-lg bg-amber-600 px-3 py-1 text-sm font-semibold text-white hover:bg-amber-700"
+              >
+                Save Notes
+              </button>
+              <button
+                onClick={() => setEditingNotes(false)}
+                className="rounded-lg border border-amber-300 bg-white px-3 py-1 text-sm font-semibold text-amber-900 hover:bg-amber-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        {!editingNotes && poNotes && (
+          <div className="mb-4 print:hidden rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs font-semibold text-amber-900 mb-1">Notes:</p>
+            <p className="text-sm text-amber-800">{poNotes}</p>
+          </div>
+        )}
 
         {/* PO Document */}
         <div className="border border-gray-300 bg-white p-4">
@@ -542,6 +650,81 @@ export default function ViewPO() {
           .leading-relaxed { line-height: 1.5 !important; }
         }
       `}</style>
+
+      {/* Email Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl space-y-4">
+            <h2 className="text-xl font-semibold text-slate-900">Send PO via Email</h2>
+            
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Recipient Name</label>
+              <input
+                type="text"
+                value={emailForm.recipient_name}
+                onChange={(e) => setEmailForm({ ...emailForm, recipient_name: e.target.value })}
+                placeholder="e.g., John Smith"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Email Address *</label>
+              <input
+                type="email"
+                value={emailForm.to_email}
+                onChange={(e) => setEmailForm({ ...emailForm, to_email: e.target.value })}
+                placeholder="john@example.com"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Email Subject</label>
+              <input
+                type="text"
+                value={emailForm.subject}
+                onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
+                placeholder={`Purchase Order #${po?.po_number}`}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Message</label>
+              <textarea
+                value={emailForm.message}
+                onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
+                placeholder="Add a personal message to the supplier..."
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                rows={4}
+              />
+            </div>
+
+            <div className="border-t border-slate-200 pt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmailModal(false);
+                  setEmailForm({ to_email: "", recipient_name: "", subject: "", message: "" });
+                }}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSendEmail}
+                disabled={sendingEmail}
+                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {sendingEmail ? "Sending..." : `Send to ${emailForm.recipient_name || emailForm.to_email || "Supplier"}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
