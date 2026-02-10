@@ -36,7 +36,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
 
   return (
     <aside
-      className={`flex flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-blue-950 px-4 py-6 shadow-2xl ring-1 ring-slate-900/30 transition-all duration-200 ${
+      className={`flex flex-col bg-gradient-to-b from-slate-950 via-blue-900 to-blue-700 px-4 py-6 shadow-2xl ring-1 ring-slate-900/30 transition-all duration-200 ${
         sidebarOpen ? "w-72" : "w-16"
       }`}
     >
