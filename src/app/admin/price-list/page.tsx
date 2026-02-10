@@ -546,58 +546,37 @@ export default function AdminPriceListPage() {
                   </div>
                   <div className="max-h-[75vh] overflow-y-auto px-6 py-6">
                     <div className="rounded-2xl bg-blue-50 p-6 ring-1 ring-blue-200">
-                      <h3 className="font-semibold text-blue-900">💡 Price List Notes</h3>
-                      <ul className="mt-3 space-y-2 text-sm text-blue-800">
-                        <li>
-                          <strong className="text-blue-600">Input fields (blue)</strong>: FOB Cost, Ocean Freight, Importing, Zone 5 Shipping, Multiplier
-                        </li>
-                        <li>
-                          <strong className="text-amber-700">Shipping (amber)</strong>: Critical for commission deductions
-                        </li>
-                        <li>
-                          <strong className="text-emerald-700">Sell Price</strong>: Base sell price (Cost × Multiplier)
-                        </li>
-                        <li>
-                          <strong className="text-slate-700">List Price</strong>: Sell Price × 1.2 (MSRP headroom)
-                        </li>
-                      </ul>
-
-                      <div className="mt-6 space-y-3 text-sm text-blue-900">
-                        <h4 className="font-semibold text-blue-900">Row / Column Quick Guide</h4>
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                            <p className="font-semibold text-blue-800">Item &amp; Sourcing</p>
-                            <p className="text-blue-700">Item No., Description, Supplier — identifiers only; no math impact.</p>
-                          </div>
-                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                            <p className="font-semibold text-blue-800">Base Cost Inputs</p>
-                            <p className="text-blue-700">FOB drives all downstream costs/prices. Quantity changes per-unit freight/import allocations.</p>
-                          </div>
-                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                            <p className="font-semibold text-blue-800">Tariffs &amp; Import</p>
-                            <p className="text-blue-700">Tariff 105% = FOB × 2.05. Ocean/Import spread over quantity; shifts landed cost and profit.</p>
-                          </div>
-                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                            <p className="font-semibold text-blue-800">Domestic Shipping</p>
-                            <p className="text-blue-700">Zone 5 shipping is per-unit; affects final landed cost and profit, not import math.</p>
-                          </div>
-                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                            <p className="font-semibold text-blue-800">Cost Roll-ups</p>
-                            <p className="text-blue-700">Import Landed = Tariff + Ocean + Import. Final Landed = Import Landed + Shipping.</p>
-                          </div>
-                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                            <p className="font-semibold text-blue-800">Pricing</p>
-                            <p className="text-blue-700">Multiplier changes sell price and profit only. List Price is sell price × 1.2.</p>
-                          </div>
-                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                            <p className="font-semibold text-blue-800">Profit</p>
-                            <p className="text-blue-700">Profit = Sell Price − Final Landed. Independent of list price.</p>
-                          </div>
-                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                            <p className="font-semibold text-blue-800">Change Effects</p>
-                            <p className="text-blue-700">FOB or tariff rate: everything moves. Quantity: only freight/import per-unit. Shipping: final cost/pricing only. Multiplier: price/profit only.</p>
-                          </div>
+                      <h3 className="font-semibold text-blue-900">💡 Price List Guide</h3>
+                      <p className="mt-2 text-sm text-blue-800">
+                        Example flow (single item):
+                      </p>
+                      <div className="mt-4 rounded-xl bg-white/80 p-4 ring-1 ring-blue-200/70">
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-blue-900">
+                          <span className="rounded-full bg-blue-100 px-2 py-1">FOB × 2.05</span>
+                          <span className="text-blue-400">→</span>
+                          <span className="rounded-full bg-blue-100 px-2 py-1">Tariff 105%</span>
+                          <span className="text-blue-400">→</span>
+                          <span className="rounded-full bg-blue-100 px-2 py-1">+ Ocean</span>
+                          <span className="text-blue-400">→</span>
+                          <span className="rounded-full bg-blue-100 px-2 py-1">+ Import</span>
+                          <span className="text-blue-400">→</span>
+                          <span className="rounded-full bg-amber-100 px-2 py-1">+ Zone 5</span>
+                          <span className="text-blue-400">→</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-1">Cost w/Shipping</span>
+                          <span className="text-blue-400">→</span>
+                          <span className="rounded-full bg-blue-100 px-2 py-1">× Multiplier</span>
+                          <span className="text-blue-400">→</span>
+                          <span className="rounded-full bg-emerald-100 px-2 py-1">Sell Price</span>
+                          <span className="text-blue-400">→</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-1">× 1.2</span>
+                          <span className="text-blue-400">→</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-1">List Price</span>
+                          <span className="text-blue-400">→</span>
+                          <span className="rounded-full bg-emerald-100 px-2 py-1">Sell − Cost = Profit</span>
                         </div>
+                      </div>
+                      <div className="mt-3 text-xs text-blue-700">
+                        Discount applies to <span className="font-semibold">Sell Price</span> only (List stays at Sell × 1.2).
                       </div>
                     </div>
                   </div>
