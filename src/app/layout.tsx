@@ -34,9 +34,7 @@ export default function RootLayout({
       >
         <Providers>
           <TopBar />
-          <div className="pt-12">
-            {children}
-          </div>
+          {children}
         </Providers>
         <SpeedInsights />
       </body>

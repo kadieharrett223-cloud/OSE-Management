@@ -45,6 +45,13 @@ interface RecentPurchase {
   orderDate: string;
 }
 
+interface VendorPaymentSummary {
+  vendorName: string;
+  totalPaid: number;
+  paymentCount: number;
+  lastTxnDate: string;
+}
+
 const mockReps = [
   {
     id: 1,
@@ -114,6 +121,8 @@ export default function Dashboard() {
   const [partialPaidRemaining, setPartialPaidRemaining] = useState<number>(0);
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
   const [vendorPaymentsTotal, setVendorPaymentsTotal] = useState<number>(0);
+  const [vendorPaymentsToday, setVendorPaymentsToday] = useState<VendorPaymentSummary[]>([]);
+  const [loadingVendorPayments, setLoadingVendorPayments] = useState(true);
   const [recentInvoices, setRecentInvoices] = useState<RecentInvoice[]>([]);
   const [loadingRecentInvoices, setLoadingRecentInvoices] = useState(true);
   const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
@@ -492,6 +501,7 @@ export default function Dashboard() {
     let isMounted = true;
 
     const fetchVendorPaymentsToday = async () => {
+      setLoadingVendorPayments(true);
       try {
         const today = new Date().toLocaleDateString("en-CA");
         const res = await fetch(`/api/qbo/bill-payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
@@ -499,22 +509,51 @@ export default function Dashboard() {
         const data = await res.json();
         const payments = data.payments || [];
 
+        const summaryMap = new Map<string, VendorPaymentSummary>();
         let totalPaid = 0;
 
         payments.forEach((payment: any) => {
           const paid = Number(payment.TotalAmt) || 0;
           if (paid <= 0) return;
+
+          const vendorName =
+            payment.VendorRef?.name ||
+            payment.PayeeRef?.name ||
+            "Unknown Vendor";
+
           totalPaid += paid;
+
+          const existing = summaryMap.get(vendorName);
+          if (existing) {
+            existing.totalPaid += paid;
+            existing.paymentCount += 1;
+            if (payment.TxnDate && payment.TxnDate > existing.lastTxnDate) {
+              existing.lastTxnDate = payment.TxnDate;
+            }
+          } else {
+            summaryMap.set(vendorName, {
+              vendorName,
+              totalPaid: paid,
+              paymentCount: 1,
+              lastTxnDate: payment.TxnDate || today,
+            });
+          }
         });
 
+        const summary = Array.from(summaryMap.values()).sort((a, b) => b.totalPaid - a.totalPaid);
+
         if (isMounted) {
+          setVendorPaymentsToday(summary);
           setVendorPaymentsTotal(totalPaid);
         }
       } catch (error) {
         console.error("Failed to fetch vendor payments today:", error);
         if (isMounted) {
+          setVendorPaymentsToday([]);
           setVendorPaymentsTotal(0);
         }
+      } finally {
+        if (isMounted) setLoadingVendorPayments(false);
       }
     };
 
@@ -533,7 +572,7 @@ export default function Dashboard() {
         <Sidebar activePage="Dashboard" />
         {/* Main Content */}
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
-          <div className="mx-auto max-w-7xl px-8 py-10 space-y-8">
+          <div className="mx-auto max-w-7xl px-8 py-4 space-y-8">
             {/* Header */}
             <header className="flex flex-col gap-3">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-blue-700">Dashboard</p>
@@ -711,11 +750,44 @@ export default function Dashboard() {
             </div>
 
             {/* Bottom Listed Cards */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Vendors Paid Today</div>
-                <div className="mt-2 text-2xl font-bold text-indigo-700">${money(vendorPaymentsTotal)}</div>
-                <div className="mt-1 text-xs text-slate-600">Payments we made today</div>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Vendors Paid Today</h2>
+                  <p className="text-sm text-slate-600">Payments our company made today</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b border-slate-200 bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Vendor</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Payments</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Amount Paid</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Last Payment</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {loadingVendorPayments ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td>
+                        </tr>
+                      ) : vendorPaymentsToday.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No vendor payments recorded today</td>
+                        </tr>
+                      ) : (
+                        vendorPaymentsToday.map((payment) => (
+                          <tr key={payment.vendorName} className="hover:bg-slate-50">
+                            <td className="px-6 py-3 font-medium text-slate-900">{payment.vendorName}</td>
+                            <td className="px-6 py-3 text-right text-slate-600">{payment.paymentCount}</td>
+                            <td className="px-6 py-3 text-right font-semibold text-indigo-700">${money(payment.totalPaid)}</td>
+                            <td className="px-6 py-3 text-right text-slate-600">{payment.lastTxnDate}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                 <div className="text-xs uppercase font-semibold text-slate-500">Partial Paid Remaining</div>

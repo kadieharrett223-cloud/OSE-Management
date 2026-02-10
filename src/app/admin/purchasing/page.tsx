@@ -415,7 +415,7 @@ export default function PurchasingPage() {
             </div>
           </div>
 
-          <div className="mx-auto max-w-7xl px-8 py-10 space-y-8">
+          <div className="mx-auto max-w-7xl px-8 py-4 space-y-8">
             <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h1 className="text-3xl font-semibold text-slate-900">Purchase Orders</h1>

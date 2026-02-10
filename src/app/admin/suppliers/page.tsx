@@ -117,7 +117,7 @@ export default function SuppliersPage() {
             </div>
           </div>
 
-          <div className="mx-auto max-w-5xl px-6 py-8 space-y-8">
+          <div className="mx-auto max-w-5xl px-6 py-4 space-y-8">
             <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-2xl font-semibold">Suppliers</h1>
