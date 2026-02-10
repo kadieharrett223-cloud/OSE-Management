@@ -50,6 +50,16 @@ interface UnpaidInvoice {
   salesRep?: string;
 }
 
+interface PartialPaidInvoice {
+  id: string;
+  docNumber: string;
+  customerName: string;
+  totalAmt: number;
+  balance: number;
+  paidAmt: number;
+  txnDate: string;
+}
+
 const mockReps = [
   {
     id: 1,
@@ -123,6 +133,9 @@ export default function Dashboard() {
   const [unpaidInvoices, setUnpaidInvoices] = useState<UnpaidInvoice[]>([]);
   const [loadingUnpaid, setLoadingUnpaid] = useState(false);
   const [showAllUnpaid, setShowAllUnpaid] = useState(false);
+  const [partialPaidInvoices, setPartialPaidInvoices] = useState<PartialPaidInvoice[]>([]);
+  const [loadingPartialPaid, setLoadingPartialPaid] = useState(false);
+  const [showAllPartialPaid, setShowAllPartialPaid] = useState(false);
   const [paymentsToday, setPaymentsToday] = useState<PaymentSummary[]>([]);
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
   const [loadingPayments, setLoadingPayments] = useState(true);
@@ -316,6 +329,56 @@ export default function Dashboard() {
     };
 
     fetchUnpaidInvoices();
+  }, []);
+
+  // Fetch partially paid invoices for current month
+  useEffect(() => {
+    const fetchPartialPaidInvoices = async () => {
+      setLoadingPartialPaid(true);
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const startDate = `${year}-${month}-01`;
+        const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+        const endDate = `${year}-${month}-${lastDay}`;
+
+        const response = await fetch(
+          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=unpaid`
+        );
+
+        if (!response.ok) throw new Error("Failed to fetch invoices");
+
+        const data = await response.json();
+        const invoices = data.invoices || [];
+
+        const partials: PartialPaidInvoice[] = invoices
+          .map((inv: any) => {
+            const total = Number(inv.TotalAmt) || 0;
+            const balance = Number(inv.Balance) || 0;
+            const paid = total - balance;
+            return {
+              id: inv.Id,
+              docNumber: inv.DocNumber,
+              customerName: inv.CustomerRef?.name || "Unknown",
+              totalAmt: total,
+              balance,
+              paidAmt: paid,
+              txnDate: inv.TxnDate,
+            };
+          })
+          .filter((inv) => inv.paidAmt > 0 && inv.balance > 0);
+
+        setPartialPaidInvoices(partials);
+      } catch (error) {
+        console.error("Error fetching partial paid invoices:", error);
+        setPartialPaidInvoices([]);
+      } finally {
+        setLoadingPartialPaid(false);
+      }
+    };
+
+    fetchPartialPaidInvoices();
   }, []);
 
   // Fetch year-to-date paid sales
@@ -784,6 +847,78 @@ export default function Dashboard() {
                           className="rounded-lg px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 transition"
                         >
                           {showAllUnpaid ? "Show Less" : `View All (${unpaidInvoices.length})`}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Partially Paid Invoices Section */}
+            <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Partially Paid Invoices</h2>
+                  <p className="text-sm text-slate-600">Customers with partial payments this month</p>
+                </div>
+              </div>
+
+              {loadingPartialPaid ? (
+                <div className="px-6 py-8 text-center text-slate-500">Loading partial payments...</div>
+              ) : partialPaidInvoices.length === 0 ? (
+                <div className="px-6 py-8 text-center text-slate-500">No partially paid invoices</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b border-slate-200 bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                          Invoice
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                          Customer
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                          Total
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                          Paid
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                          Balance
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                          Date
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(showAllPartialPaid ? partialPaidInvoices : partialPaidInvoices.slice(0, 15)).map((inv) => (
+                        <tr key={inv.id} className="hover:bg-slate-50 transition">
+                          <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
+                          <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
+                          <td className="px-6 py-3 text-right text-slate-700">${money(inv.totalAmt)}</td>
+                          <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(inv.paidAmt)}</td>
+                          <td className="px-6 py-3 text-right font-semibold text-amber-700">${money(inv.balance)}</td>
+                          <td className="px-6 py-3 text-right text-slate-600">
+                            {new Date(inv.txnDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="border-t border-slate-200 px-6 py-4 bg-slate-50">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-semibold text-slate-900">
+                        Total Remaining: ${money(partialPaidInvoices.reduce((sum, inv) => sum + inv.balance, 0))}
+                      </div>
+                      {partialPaidInvoices.length > 15 && (
+                        <button
+                          onClick={() => setShowAllPartialPaid(!showAllPartialPaid)}
+                          className="rounded-lg px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 transition"
+                        >
+                          {showAllPartialPaid ? "Show Less" : `View All (${partialPaidInvoices.length})`}
                         </button>
                       )}
                     </div>
