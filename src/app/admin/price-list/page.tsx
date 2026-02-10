@@ -173,6 +173,7 @@ export default function AdminPriceListPage() {
   const [discountPercentage, setDiscountPercentage] = useState<number>(0); // Default 0% (no sale)
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -189,6 +190,16 @@ export default function AdminPriceListPage() {
   const updateDiscount = (value: number) => {
     setDiscountPercentage(value);
     localStorage.setItem("priceListDiscount", value.toString());
+  };
+
+  const categoryNameById = new Map(categories.map((cat) => [cat.id, cat.category_name]));
+  const applyDiscountToAll = selectedGroups.length === 0;
+
+  const getDiscountForCategoryId = (categoryId: string | null) => {
+    if (applyDiscountToAll) return discountPercentage;
+    const name = categoryId ? categoryNameById.get(categoryId) : undefined;
+    if (!name) return 0;
+    return selectedGroups.includes(name) ? discountPercentage : 0;
   };
 
   useEffect(() => {
@@ -293,7 +304,7 @@ export default function AdminPriceListPage() {
   };
 
   // Client-side calculation: Tariff = FOB×2, Per Unit = Tariff+Ocean+Import, Cost w/Shipping = Per Unit+Zone5, Sell = Cost×Mult, List = Sell×1.2, Profit = Sell−Cost
-  const computeDerivedFields = (item: PriceListItem): PriceListItem => {
+  const computeDerivedFields = (item: PriceListItem, discountOverride?: number): PriceListItem => {
     const fob_cost = item.fob_cost || 0;
     const ocean_per_unit = item.ocean_frt || 0;  // Already per-unit in DB
     const importing_per_unit = item.importing || 0;  // Already per-unit in DB
@@ -315,8 +326,10 @@ export default function AdminPriceListPage() {
     // 5) List price: Base sell price × 1.2 (fixed, never changes with discount)
     const list_price = base_sell_price * 1.2;
 
+    const appliedDiscount = discountOverride ?? discountPercentage;
+
     // 6) Sell price: Base sell price with discount applied (discount is off sell price, not list)
-    const sell_price = base_sell_price * (1 - (discountPercentage || 0) / 100);
+    const sell_price = base_sell_price * (1 - (appliedDiscount || 0) / 100);
 
     // 7) Profit: Sell price - Cost with shipping
     const profit = sell_price - cost_with_shipping;
@@ -324,7 +337,7 @@ export default function AdminPriceListPage() {
     // Preserve legacy fields for compatibility.
     const rounded_normal_price = sell_price;
     const black_friday_price = list_price * 0.75;
-    const discounted_sale_price = list_price * (1 - (discountPercentage || 0) / 100);
+    const discounted_sale_price = list_price * (1 - (appliedDiscount || 0) / 100);
     const rounded_sale_price = Math.floor(discounted_sale_price / 100) * 100 - 1;
 
     return {
@@ -346,8 +359,8 @@ export default function AdminPriceListPage() {
   const updateEditingItem = (field: keyof PriceListItem, value: string | number | null) => {
     if (!editingItem) return;
     const updated = { ...editingItem, [field]: value === null || value === "" ? null : Number(value) } as PriceListItem;
-    // Recompute derived fields
-    const withDerived = computeDerivedFields(updated);
+    const discount = getDiscountForCategoryId(updated.category_id);
+    const withDerived = computeDerivedFields(updated, discount);
     setEditingItem(withDerived);
   };
 
@@ -460,6 +473,7 @@ export default function AdminPriceListPage() {
   });
 
   const itemsByCategory = sortedCategories
+    .filter((cat) => applyDiscountToAll || selectedGroups.includes(cat.category_name))
     .map((cat) => ({
       category: cat,
       items: filteredItems
@@ -472,7 +486,7 @@ export default function AdminPriceListPage() {
           if (bIdx !== undefined) return 1;
           return (a.display_order ?? 0) - (b.display_order ?? 0);
         })
-        .map((item) => computeDerivedFields(item)),
+        .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id))),
     }))
     .filter(({ items }) => items.length > 0);
 
@@ -629,6 +643,47 @@ export default function AdminPriceListPage() {
                     />
                     <span className="text-sm font-semibold text-emerald-700">% off</span>
                   </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Filter groups:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGroups([])}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                      selectedGroups.length === 0
+                        ? "border-blue-500 bg-blue-600 text-white"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    All groups
+                  </button>
+                  {categories.map((cat) => {
+                    const isSelected = selectedGroups.includes(cat.category_name);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedGroups((prev) =>
+                            isSelected
+                              ? prev.filter((name) => name !== cat.category_name)
+                              : [...prev, cat.category_name]
+                          );
+                        }}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-600 text-white"
+                            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        {cat.category_name}
+                      </button>
+                    );
+                  })}
+                  {selectedGroups.length > 0 && (
+                    <span className="text-xs text-slate-500">Discount applies only to selected groups.</span>
+                  )}
                 </div>
               </div>
 
