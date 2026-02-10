@@ -7,7 +7,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const { data, error } = await supabase
       .from("suppliers")
       .select(
-        `id, name, address, city_state_zip, contact_name, representative, email, phone`
+        `id, name, address, city_state_zip, contact_name, representative, email, phone, notes`
       )
       .eq("id", params.id)
       .single();
@@ -32,6 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         representative: body.representative,
         email: body.email,
         phone: body.phone,
+        notes: body.notes,
       })
       .eq("id", params.id)
       .select()

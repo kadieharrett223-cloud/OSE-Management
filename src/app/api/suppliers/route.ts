@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from("suppliers")
       .select(
-        `id, name, address, city_state_zip, contact_name, representative, email, phone, terms, payment_method, ship_to_name, ship_to_address, ship_to_city_state_zip`
+        `id, name, address, city_state_zip, contact_name, representative, email, phone, terms, payment_method, ship_to_name, ship_to_address, ship_to_city_state_zip, notes`
       )
       .order("name", { ascending: true });
     if (error) throw error;
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     ship_to_name,
     ship_to_address,
     ship_to_city_state_zip,
+    notes,
   } = body;
 
   if (!name) {
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
         ship_to_name,
         ship_to_address,
         ship_to_city_state_zip,
+        notes,
       })
       .select()
       .single();

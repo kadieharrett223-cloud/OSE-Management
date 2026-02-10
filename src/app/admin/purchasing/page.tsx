@@ -11,6 +11,7 @@ type PurchaseOrder = {
   po_number: string;
   vendor_name: string;
   order_date: string;
+  expected_delivery?: string | null;
   total_amount: number;
   status: string;
   lines?: any[];
@@ -40,6 +41,7 @@ type Supplier = {
   ship_to_name?: string;
   ship_to_address?: string;
   ship_to_city_state_zip?: string;
+  notes?: string;
 };
 
 const WEIGHT_LIMIT_LBS = 44000;
@@ -47,6 +49,18 @@ const WEIGHT_LIMIT_LBS = 44000;
 const money = (value: number | undefined) => {
   if (value === undefined || value === null || isNaN(value)) return "0.00";
   return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
+const statusLabel = (status: string) => {
+  if (status === "SUBMITTED") return "Sent";
+  return status ? status.charAt(0) + status.slice(1).toLowerCase() : "";
 };
 
 function titleCase(value: string) {
@@ -65,6 +79,12 @@ export default function PurchasingPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
   const [formData, setFormData] = useState({
     po_number: "",
     vendor_name: "",
@@ -109,6 +129,7 @@ export default function PurchasingPage() {
     ship_to_name: "",
     ship_to_address: "",
     ship_to_city_state_zip: "",
+    notes: "",
   });
 
   useEffect(() => {
@@ -124,6 +145,10 @@ export default function PurchasingPage() {
       setShowForm(true);
     }
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, rangeStart, rangeEnd]);
 
   async function fetchPriceList() {
     try {
@@ -214,6 +239,21 @@ export default function PurchasingPage() {
     }
   }
 
+  async function updatePoStatus(poId: string, status: string) {
+    try {
+      const res = await fetch(`/api/purchase-orders/${poId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Failed to update status");
+      await fetchPOs();
+    } catch (error) {
+      console.error("Failed to update PO status:", error);
+      alert("Failed to update status");
+    }
+  }
+
   async function handleSaveSupplier() {
     try {
       const isEdit = supplierModal.mode === "edit" && supplierModal.supplier?.id;
@@ -245,6 +285,7 @@ export default function PurchasingPage() {
         ship_to_name: "",
         ship_to_address: "",
         ship_to_city_state_zip: "",
+        notes: "",
       });
       await fetchSuppliers();
     } catch (error) {
@@ -322,8 +363,27 @@ export default function PurchasingPage() {
   };
 
   const totalWeight = calculateTotalWeight();
-  const remainingWeight = WEIGHT_LIMIT_LBS - totalWeight;
   const weightPercentage = (totalWeight / WEIGHT_LIMIT_LBS) * 100;
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredPos = pos.filter((po) => {
+    const matchesQuery =
+      !normalizedQuery ||
+      po.po_number.toLowerCase().includes(normalizedQuery) ||
+      po.vendor_name.toLowerCase().includes(normalizedQuery);
+
+    const matchesStatus = statusFilter === "all" || po.status.toLowerCase() === statusFilter;
+
+    const poDate = po.order_date ? new Date(po.order_date).toISOString().slice(0, 10) : "";
+    const matchesStart = !rangeStart || (poDate && poDate >= rangeStart);
+    const matchesEnd = !rangeEnd || (poDate && poDate <= rangeEnd);
+
+    return matchesQuery && matchesStatus && matchesStart && matchesEnd;
+  });
+
+  const totalPages = Math.max(Math.ceil(filteredPos.length / pageSize), 1);
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedPos = filteredPos.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const pathname = usePathname();
   const tabs = [
@@ -356,19 +416,54 @@ export default function PurchasingPage() {
           </div>
 
           <div className="mx-auto max-w-7xl px-8 py-10 space-y-8">
-            <header className="flex items-center justify-between">
+            <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-xs font-medium uppercase tracking-[0.2em] text-blue-700">Purchasing</p>
-                <h1 className="mt-2 text-3xl font-semibold text-slate-900">Purchase Orders</h1>
+                <h1 className="text-3xl font-semibold text-slate-900">Purchase Orders</h1>
+                <p className="text-sm text-slate-600">Manage purchasing with clear status tracking.</p>
               </div>
-              {!showForm && (
-                <button
-                  onClick={() => setShowForm(true)}
-                  className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-blue-700"
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search PO or supplier"
+                  className="w-52 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
-                  Create New PO
-                </button>
-              )}
+                  <option value="all">All Status</option>
+                  <option value="draft">Draft</option>
+                  <option value="submitted">Sent</option>
+                  <option value="received">Received</option>
+                  <option value="paid">Paid</option>
+                </select>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={rangeStart}
+                    onChange={(e) => setRangeStart(e.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <span className="text-xs text-slate-500">to</span>
+                  <input
+                    type="date"
+                    value={rangeEnd}
+                    onChange={(e) => setRangeEnd(e.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                {!showForm && (
+                  <button
+                    onClick={() => setShowForm(true)}
+                    className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-blue-700"
+                  >
+                    Create PO
+                  </button>
+                )}
+              </div>
             </header>
 
             {showForm && (
@@ -461,6 +556,7 @@ export default function PurchasingPage() {
                                 ship_to_name: s?.ship_to_name || "",
                                 ship_to_address: s?.ship_to_address || "",
                                 ship_to_city_state_zip: s?.ship_to_city_state_zip || "",
+                                notes: s?.notes || "",
                               });
                               setSupplierModal({ open: true, mode: "edit", supplier: s || null });
                             }}
@@ -782,6 +878,7 @@ export default function PurchasingPage() {
                     <input className="rounded border border-slate-300 px-3 py-2 text-sm" placeholder="Ship To Name" value={supplierForm.ship_to_name} onChange={(e)=>setSupplierForm({...supplierForm,ship_to_name:e.target.value})} />
                     <input className="rounded border border-slate-300 px-3 py-2 text-sm col-span-2" placeholder="Ship To Address" value={supplierForm.ship_to_address} onChange={(e)=>setSupplierForm({...supplierForm,ship_to_address:e.target.value})} />
                     <input className="rounded border border-slate-300 px-3 py-2 text-sm col-span-2" placeholder="Ship To City, State, ZIP" value={supplierForm.ship_to_city_state_zip} onChange={(e)=>setSupplierForm({...supplierForm,ship_to_city_state_zip:e.target.value})} />
+                    <textarea className="rounded border border-slate-300 px-3 py-2 text-sm col-span-2" placeholder="Notes" value={supplierForm.notes || ""} onChange={(e)=>setSupplierForm({...supplierForm,notes:e.target.value})} rows={2} />
                   </div>
                   <div className="flex gap-2 pt-2">
                     <button type="button" onClick={()=>setSupplierModal({open:false,mode:"create"})} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
@@ -792,50 +889,68 @@ export default function PurchasingPage() {
             )}
 
             <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-              <div className="border-b border-slate-200 px-6 py-4">
-                <h2 className="text-lg font-semibold text-slate-900">All Purchase Orders</h2>
-              </div>
-              {loading ? (
-                <div className="px-6 py-8 text-center text-slate-600">Loading...</div>
-              ) : pos.length === 0 ? (
-                <div className="px-6 py-8 text-center text-slate-600">No purchase orders yet</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="border-b border-slate-200 bg-slate-50">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="border-b border-slate-200 bg-slate-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">PO #</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Supplier</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Expected</th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total</th>
+                      <th className="px-6 py-3 text-center text-xs font-semibold uppercase text-slate-500">Status</th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loading ? (
+                      Array.from({ length: 6 }).map((_, idx) => (
+                        <tr key={`skeleton-${idx}`} className="animate-pulse">
+                          <td className="px-6 py-4"><div className="h-3 w-24 rounded bg-slate-200" /></td>
+                          <td className="px-6 py-4"><div className="h-3 w-40 rounded bg-slate-200" /></td>
+                          <td className="px-6 py-4"><div className="h-3 w-28 rounded bg-slate-200" /></td>
+                          <td className="px-6 py-4"><div className="h-3 w-28 rounded bg-slate-200" /></td>
+                          <td className="px-6 py-4 text-right"><div className="ml-auto h-3 w-20 rounded bg-slate-200" /></td>
+                          <td className="px-6 py-4 text-center"><div className="mx-auto h-3 w-16 rounded bg-slate-200" /></td>
+                          <td className="px-6 py-4 text-right"><div className="ml-auto h-3 w-24 rounded bg-slate-200" /></td>
+                        </tr>
+                      ))
+                    ) : filteredPos.length === 0 ? (
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">PO #</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Vendor</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Date</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Paid</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Balance</th>
-                        <th className="px-6 py-3 text-center text-xs font-semibold uppercase text-slate-500">Status</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
+                        <td colSpan={7} className="px-6 py-12 text-center text-slate-600">
+                          <div className="text-lg font-semibold text-slate-900">No purchase orders yet</div>
+                          <div className="mt-2 text-sm text-slate-600">Create your first PO to start tracking purchasing.</div>
+                          <div className="mt-4">
+                            <button
+                              onClick={() => setShowForm(true)}
+                              className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-blue-700"
+                            >
+                              Create your first PO
+                            </button>
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {pos.map((po) => (
+                    ) : (
+                      pagedPos.map((po) => (
                         <tr key={po.id} className="hover:bg-slate-50">
                           <td className="px-6 py-3 font-medium text-slate-900">{po.po_number}</td>
                           <td className="px-6 py-3 text-slate-600">{po.vendor_name}</td>
-                          <td className="px-6 py-3 text-slate-600">{po.order_date}</td>
+                          <td className="px-6 py-3 text-slate-600">{formatDate(po.order_date)}</td>
+                          <td className="px-6 py-3 text-slate-600">{formatDate(po.expected_delivery)}</td>
                           <td className="px-6 py-3 text-right font-semibold text-slate-900">${money(po.total_amount)}</td>
-                          <td className="px-6 py-3 text-right text-emerald-700">${money(totalPaid(po))}</td>
-                          <td className="px-6 py-3 text-right font-semibold text-slate-900">${money(balance(po))}</td>
                           <td className="px-6 py-3 text-center">
                             <span
                               className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
                                 po.status === "RECEIVED"
-                                  ? "bg-green-100 text-green-800"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : po.status === "PAID"
+                                  ? "bg-indigo-100 text-indigo-800"
                                   : po.status === "SUBMITTED"
                                   ? "bg-blue-100 text-blue-800"
-                                  : po.status === "CANCELLED"
-                                  ? "bg-red-100 text-red-800"
                                   : "bg-slate-100 text-slate-800"
                               }`}
                             >
-                              {po.status}
+                              {statusLabel(po.status)}
                             </span>
                           </td>
                           <td className="px-6 py-3 text-right">
@@ -846,18 +961,52 @@ export default function PurchasingPage() {
                               >
                                 View
                               </button>
-                              <button
-                                onClick={() => setSelectedPO(po)}
-                                className="text-sm font-semibold text-blue-600 hover:text-blue-700"
-                              >
-                                Add Payment
-                              </button>
+                              {po.status !== "RECEIVED" && (
+                                <button
+                                  onClick={() => updatePoStatus(po.id, "RECEIVED")}
+                                  className="text-sm font-semibold text-emerald-600 hover:text-emerald-700"
+                                >
+                                  Mark Received
+                                </button>
+                              )}
+                              {po.status !== "PAID" && (
+                                <button
+                                  onClick={() => updatePoStatus(po.id, "PAID")}
+                                  className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+                                >
+                                  Mark Paid
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {!loading && filteredPos.length > 0 && (
+                <div className="flex items-center justify-between border-t border-slate-200 px-6 py-3 text-sm text-slate-600">
+                  <div>
+                    Showing {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filteredPos.length)} of {filteredPos.length}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                      disabled={safePage === 1}
+                      className="rounded border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-600 disabled:opacity-40"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-xs text-slate-500">Page {safePage} of {totalPages}</span>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                      disabled={safePage === totalPages}
+                      className="rounded border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-600 disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

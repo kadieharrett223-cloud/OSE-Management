@@ -3,6 +3,7 @@ import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Providers } from "./providers";
+import { TopBar } from "@/components/TopBar";
 
 const geistSans = Inter({
   variable: "--font-geist-sans",
@@ -32,7 +33,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          {children}
+          <TopBar />
+          <div className="pt-12">
+            {children}
+          </div>
         </Providers>
         <SpeedInsights />
       </body>
