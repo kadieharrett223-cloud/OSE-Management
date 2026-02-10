@@ -210,20 +210,20 @@ export default function AdminPriceListPage() {
     // 4) Base sell price (before discount): Cost with shipping × Multiplier
     const base_sell_price = cost_with_shipping * multiplier;
 
-    // 5) List price: Base sell price × 1.2 (fixed, never changes with discount)
-    const list_price = base_sell_price * 1.2;
+    // 5) Sell price: Base sell price (standard everyday sell price)
+    const sell_price = base_sell_price;
 
-    // 6) Actual sell price: List price × (1 - discount/100)
-    // If discount is 0, sell_price = list_price (no sale)
-    const sell_price = list_price * (1 - (discountPercentage || 0) / 100);
+    // 6) List price: Sell price × 1.2 (fixed, never changes with discount)
+    const list_price = sell_price * 1.2;
 
-    // 6) Profit: Sell price - Cost with shipping
+    // 7) Profit: Sell price - Cost with shipping
     const profit = sell_price - cost_with_shipping;
 
     // Preserve legacy fields for compatibility.
     const rounded_normal_price = sell_price;
     const black_friday_price = list_price * 0.75;
-    const rounded_sale_price = Math.floor(black_friday_price / 100) * 100 - 1;
+    const discounted_sale_price = list_price * (1 - (discountPercentage || 0) / 100);
+    const rounded_sale_price = Math.floor(discounted_sale_price / 100) * 100 - 1;
 
     return {
       ...item,
@@ -343,7 +343,7 @@ export default function AdminPriceListPage() {
     category: cat,
     items: filteredItems
       .filter((item) => item.category_id === cat.id)
-      .sort((a, b) => (a.list_price || 0) - (b.list_price || 0))
+      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
       .map((item) => computeDerivedFields(item)),
   })).filter(({ items }) => items.length > 0);
 
