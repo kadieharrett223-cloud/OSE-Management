@@ -611,16 +611,14 @@ export default function ViewPO() {
                 <td className="border-r border-gray-400 px-2 py-1.5 font-bold uppercase text-[8px] tracking-wide">Buyer</td>
                 <td className="border-r border-gray-400 px-2 py-1.5 font-bold uppercase text-[8px] tracking-wide">Date</td>
                 <td className="border-r border-gray-400 px-2 py-1.5 font-bold uppercase text-[8px] tracking-wide">Vendor No</td>
-                <td className="border-r border-gray-400 px-2 py-1.5 font-bold uppercase text-[8px] tracking-wide">Terms</td>
-                <td className="px-2 py-1.5 font-bold uppercase text-[8px] tracking-wide">Ship via</td>
+                <td className="px-2 py-1.5 font-bold uppercase text-[8px] tracking-wide">Terms</td>
               </tr>
               <tr>
                 <td className="border-r border-gray-300 px-2 py-2">{po.po_number}</td>
                 <td className="border-r border-gray-300 px-2 py-2">{po.authorized_by || "—"}</td>
                 <td className="border-r border-gray-300 px-2 py-2">{po.order_date}</td>
                 <td className="border-r border-gray-300 px-2 py-2">{po.vendor_contact_name || "—"}</td>
-                <td className="border-r border-gray-300 px-2 py-2">{po.terms || "—"}</td>
-                <td className="px-2 py-2">{po.payment_method || "—"}</td>
+                <td className="px-2 py-2">{po.terms || "—"}</td>
               </tr>
             </tbody>
           </table>
