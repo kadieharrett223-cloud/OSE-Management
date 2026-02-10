@@ -39,15 +39,84 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const supabase = getServerSupabaseClient();
 
   try {
+    const { lines, ...poData } = body;
+
+    // Update PO fields
     const { data, error } = await supabase
       .from("purchase_orders")
-      .update(body)
+      .update(poData)
       .eq("id", params.id)
       .select()
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ ok: true, data });
+
+    // Update line items if provided
+    if (lines && Array.isArray(lines)) {
+      // Get existing line IDs
+      const { data: existingLines } = await supabase
+        .from("purchase_order_lines")
+        .select("id")
+        .eq("purchase_order_id", params.id);
+
+      const existingIds = new Set(existingLines?.map(l => l.id) || []);
+      const newIds = new Set(lines.filter(l => !l.id.startsWith("new_")).map(l => l.id));
+
+      // Delete line items that are no longer present
+      const toDelete = Array.from(existingIds).filter(id => !newIds.has(id));
+      if (toDelete.length > 0) {
+        await supabase
+          .from("purchase_order_lines")
+          .delete()
+          .in("id", toDelete);
+      }
+
+      // Upsert line items
+      for (const line of lines) {
+        if (line.id.startsWith("new_")) {
+          // Insert new line
+          await supabase
+            .from("purchase_order_lines")
+            .insert({
+              purchase_order_id: params.id,
+              sku: line.sku || null,
+              description: line.description,
+              quantity: line.quantity,
+              unit_price: line.unit_price,
+              line_total: line.line_total,
+              weight_lbs: line.weight_lbs || null,
+            });
+        } else {
+          // Update existing line
+          await supabase
+            .from("purchase_order_lines")
+            .update({
+              sku: line.sku || null,
+              description: line.description,
+              quantity: line.quantity,
+              unit_price: line.unit_price,
+              line_total: line.line_total,
+              weight_lbs: line.weight_lbs || null,
+            })
+            .eq("id", line.id);
+        }
+      }
+    }
+
+    // Fetch updated PO with lines
+    const { data: updatedPO, error: fetchError } = await supabase
+      .from("purchase_orders")
+      .select(`
+        *,
+        lines:purchase_order_lines(*),
+        payments:purchase_order_payments(*)
+      `)
+      .eq("id", params.id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    return NextResponse.json({ ok: true, data: updatedPO });
   } catch (error: any) {
     console.error("Update purchase order error:", error);
     return NextResponse.json({ error: error.message || "Failed to update" }, { status: 500 });

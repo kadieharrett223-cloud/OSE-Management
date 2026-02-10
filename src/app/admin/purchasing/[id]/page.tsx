@@ -64,6 +64,16 @@ export default function ViewPO() {
     terms: "",
     expected_delivery: "",
   });
+  const [showLineItemModal, setShowLineItemModal] = useState(false);
+  const [editingLineItem, setEditingLineItem] = useState<any>(null);
+  const [lineItemForm, setLineItemForm] = useState({
+    sku: "",
+    description: "",
+    quantity: 0,
+    unit_price: 0,
+    weight_lbs: 0,
+  });
+  const [savingLineItem, setSavingLineItem] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -177,6 +187,116 @@ export default function ViewPO() {
       alert("Failed to update purchase order");
     } finally {
       setEditingPO(false);
+    }
+  };
+
+  const openLineItemModal = (line?: any) => {
+    if (line) {
+      setEditingLineItem(line);
+      setLineItemForm({
+        sku: line.sku || "",
+        description: line.description || "",
+        quantity: line.quantity || 0,
+        unit_price: line.unit_price || 0,
+        weight_lbs: line.weight_lbs || 0,
+      });
+    } else {
+      setEditingLineItem(null);
+      setLineItemForm({
+        sku: "",
+        description: "",
+        quantity: 0,
+        unit_price: 0,
+        weight_lbs: 0,
+      });
+    }
+    setShowLineItemModal(true);
+  };
+
+  const handleSaveLineItem = async () => {
+    if (!po?.id || !lineItemForm.description || lineItemForm.quantity <= 0 || lineItemForm.unit_price <= 0) {
+      alert("Please fill in all required fields (Description, Quantity, Unit Price)");
+      return;
+    }
+
+    setSavingLineItem(true);
+    try {
+      const lineTotal = lineItemForm.quantity * lineItemForm.unit_price;
+      const updatedLines = po.lines ? [...po.lines] : [];
+
+      if (editingLineItem) {
+        // Edit existing line item
+        const index = updatedLines.findIndex(l => l.id === editingLineItem.id);
+        if (index >= 0) {
+          updatedLines[index] = {
+            ...editingLineItem,
+            ...lineItemForm,
+            line_total: lineTotal,
+          };
+        }
+      } else {
+        // Add new line item
+        updatedLines.push({
+          id: `new_${Date.now()}`,
+          ...lineItemForm,
+          line_total: lineTotal,
+        });
+      }
+
+      // Calculate new total
+      const newTotal = updatedLines.reduce((sum, line) => sum + line.line_total, 0);
+
+      const res = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: updatedLines,
+          total_amount: newTotal,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to save line item");
+        return;
+      }
+
+      const result = await res.json();
+      setPO(result.data);
+      setShowLineItemModal(false);
+      alert("Line item saved successfully");
+    } catch (error) {
+      console.error("Error saving line item:", error);
+      alert("Failed to save line item");
+    } finally {
+      setSavingLineItem(false);
+    }
+  };
+
+  const handleDeleteLineItem = async (lineId: string) => {
+    if (!po?.id || !confirm("Are you sure you want to delete this line item?")) return;
+
+    try {
+      const updatedLines = po.lines.filter(l => l.id !== lineId);
+      const newTotal = updatedLines.reduce((sum, line) => sum + line.line_total, 0);
+
+      const res = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: updatedLines,
+          total_amount: newTotal,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to delete line item");
+
+      const result = await res.json();
+      setPO(result.data);
+      alert("Line item deleted successfully");
+    } catch (error) {
+      console.error("Error deleting line item:", error);
+      alert("Failed to delete line item");
     }
   };
 
@@ -409,6 +529,14 @@ export default function ViewPO() {
           </table>
 
           {/* Line Items Table */}
+          <div className="mb-2 print:hidden">
+            <button
+              onClick={() => openLineItemModal()}
+              className="mb-2 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700"
+            >
+              + Add Line Item
+            </button>
+          </div>
           <div className="mb-2">
             <table className="w-full border-collapse border border-gray-400 text-[9px]">
               <thead>
@@ -431,7 +559,8 @@ export default function ViewPO() {
                   <th className="border-r border-gray-400 px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-20">
                     Unit Price
                   </th>
-                  <th className="px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-24">Amount</th>
+                  <th className="border-r border-gray-400 px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-24">Amount</th>
+                  <th className="px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-16 print:hidden">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -458,10 +587,26 @@ export default function ViewPO() {
                     <td className="px-2 py-1.5 text-right text-slate-900 align-top font-semibold">
                       ${money(line.line_total)}
                     </td>
+                    <td className="border-l border-gray-300 px-1 py-1.5 text-center align-top print:hidden">
+                      <button
+                        onClick={() => openLineItemModal(line)}
+                        className="text-blue-600 hover:text-blue-800 font-semibold text-[8px] px-1"
+                        title="Edit"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        onClick={() => handleDeleteLineItem(line.id)}
+                        className="text-red-600 hover:text-red-800 font-semibold text-[8px] px-1"
+                        title="Delete"
+                      >
+                        ✕
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 <tr className="border-t-2 border-gray-500">
-                  <td colSpan={6} className="px-2 py-2 text-right text-xs font-bold text-slate-900 uppercase tracking-wide">
+                  <td colSpan={7} className="px-2 py-2 text-right text-xs font-bold text-slate-900 uppercase tracking-wide">
                     Total Net (USD)
                   </td>
                   <td className="px-2 py-2 text-right text-sm font-bold text-slate-900">
@@ -920,6 +1065,102 @@ export default function ViewPO() {
                 className="flex-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
               >
                 {editingPO ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Line Item Modal */}
+      {showLineItemModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+            <h2 className="text-xl font-bold text-slate-900 mb-4">
+              {editingLineItem ? "Edit Line Item" : "Add Line Item"}
+            </h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">SKU / Part Number</label>
+                <input
+                  type="text"
+                  value={lineItemForm.sku}
+                  onChange={(e) => setLineItemForm({ ...lineItemForm, sku: e.target.value })}
+                  placeholder="e.g., SKU-12345"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Description *</label>
+                <textarea
+                  value={lineItemForm.description}
+                  onChange={(e) => setLineItemForm({ ...lineItemForm, description: e.target.value })}
+                  placeholder="Item description"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Quantity *</label>
+                  <input
+                    type="number"
+                    value={lineItemForm.quantity}
+                    onChange={(e) => setLineItemForm({ ...lineItemForm, quantity: Number(e.target.value) })}
+                    placeholder="0"
+                    min="0"
+                    step="1"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Unit Price *</label>
+                  <input
+                    type="number"
+                    value={lineItemForm.unit_price}
+                    onChange={(e) => setLineItemForm({ ...lineItemForm, unit_price: Number(e.target.value) })}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Weight (lbs)</label>
+                <input
+                  type="number"
+                  value={lineItemForm.weight_lbs}
+                  onChange={(e) => setLineItemForm({ ...lineItemForm, weight_lbs: Number(e.target.value) })}
+                  placeholder="0"
+                  min="0"
+                  step="0.1"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              {lineItemForm.quantity > 0 && lineItemForm.unit_price > 0 && (
+                <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+                  <p className="text-sm font-semibold text-blue-900">
+                    Line Total: ${(lineItemForm.quantity * lineItemForm.unit_price).toFixed(2)}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowLineItemModal(false)}
+                disabled={savingLineItem}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveLineItem}
+                disabled={savingLineItem}
+                className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {savingLineItem ? "Saving..." : "Save Item"}
               </button>
             </div>
           </div>
