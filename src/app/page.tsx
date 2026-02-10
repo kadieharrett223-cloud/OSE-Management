@@ -128,7 +128,8 @@ export default function Dashboard() {
   const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
   const [loadingRecentPurchases, setLoadingRecentPurchases] = useState(true);
   const [qboSyncStatus, setQboSyncStatus] = useState<"idle" | "ok" | "error">("idle");
-  const [salesTrend, setSalesTrend] = useState<number[]>([]);
+  const [currentMonthTrend, setCurrentMonthTrend] = useState<number[]>([]);
+  const [lastMonthTrend, setLastMonthTrend] = useState<number[]>([]);
 
   // Fetch monthly goal
   useEffect(() => {
@@ -419,38 +420,89 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Monthly sales trend (last 8 months)
+  // Monthly performance comparison (last month vs this month)
   useEffect(() => {
     let isMounted = true;
 
-    const fetchSalesTrend = async () => {
-      try {
-        const end = new Date();
-        const endDate = end.toISOString().slice(0, 10);
-        const start = new Date(end.getFullYear(), end.getMonth() - 7, 1);
-        const startDate = start.toISOString().slice(0, 10);
-        const res = await fetch(`/api/qbo/invoice/monthly?startDate=${startDate}&endDate=${endDate}`);
-        if (!res.ok) throw new Error("Failed to fetch monthly trend");
-        const data = await res.json();
-        const monthlyPaid = data.monthlyPaid || {};
+    const buildCumulativeSeries = (invoices: any[], days: number, startDate: Date) => {
+      const dailyTotals = Array.from({ length: days }, () => 0);
 
-        const series: number[] = [];
-        for (let i = 7; i >= 0; i -= 1) {
-          const d = new Date(end.getFullYear(), end.getMonth() - i, 1);
-          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-          series.push(Number(monthlyPaid[key] || 0));
+      invoices.forEach((inv: any) => {
+        const date = new Date(inv.TxnDate);
+        const dayIndex = Math.max(0, Math.min(days - 1, date.getDate() - 1));
+        const total = Number(inv.TotalAmt) || 0;
+        dailyTotals[dayIndex] += total;
+      });
+
+      const cumulative: number[] = [];
+      let running = 0;
+      for (let i = 0; i < days; i += 1) {
+        running += dailyTotals[i];
+        cumulative.push(running);
+      }
+
+      return cumulative;
+    };
+
+    const fetchMonthlyComparison = async () => {
+      try {
+        const today = new Date();
+        const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const currentMonthEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const daysSoFar = today.getDate();
+
+        const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+        const lastMonthDays = lastMonthEnd.getDate();
+        const compareDays = Math.min(daysSoFar, lastMonthDays);
+
+        const currentStart = currentMonthStart.toISOString().slice(0, 10);
+        const currentEnd = currentMonthEnd.toISOString().slice(0, 10);
+        const lastStart = lastMonthStart.toISOString().slice(0, 10);
+        const lastEnd = new Date(lastMonthStart.getFullYear(), lastMonthStart.getMonth(), compareDays)
+          .toISOString()
+          .slice(0, 10);
+
+        const [currentRes, lastRes] = await Promise.all([
+          fetch(`/api/qbo/invoice/query?startDate=${currentStart}&endDate=${currentEnd}&status=paid&_=${Date.now()}`),
+          fetch(`/api/qbo/invoice/query?startDate=${lastStart}&endDate=${lastEnd}&status=paid&_=${Date.now()}`),
+        ]);
+
+        if (!currentRes.ok || !lastRes.ok) {
+          console.error("Monthly comparison fetch failed:", currentRes.status, lastRes.status);
+          throw new Error("Failed to fetch monthly comparison");
         }
 
-        if (isMounted) setSalesTrend(series);
+        const currentData = await currentRes.json();
+        const lastData = await lastRes.json();
+
+        const currentInvoices = currentData.invoices || [];
+        const lastInvoices = lastData.invoices || [];
+
+        console.log(`[dashboard] Monthly data - current: ${currentInvoices.length} invoices, last month: ${lastInvoices.length} invoices`);
+
+        const currentSeries = buildCumulativeSeries(currentInvoices, daysSoFar, currentMonthStart);
+        const lastSeries = buildCumulativeSeries(lastInvoices, compareDays, lastMonthStart);
+
+        if (isMounted) {
+          setCurrentMonthTrend(currentSeries);
+          setLastMonthTrend(lastSeries);
+        }
       } catch (error) {
-        console.error("Failed to fetch sales trend:", error);
-        if (isMounted) setSalesTrend([]);
+        console.error("Failed to fetch monthly comparison:", error);
+        if (isMounted) {
+          setCurrentMonthTrend([]);
+          setLastMonthTrend([]);
+        }
       }
     };
 
-    fetchSalesTrend();
+    fetchMonthlyComparison();
+    const interval = setInterval(fetchMonthlyComparison, 60000); // Refresh every minute
+
     return () => {
       isMounted = false;
+      clearInterval(interval);
     };
   }, []);
 
@@ -625,21 +677,49 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900">Monthly Performance</h2>
-                    <p className="text-sm text-slate-600">Sales trend (last 8 months)</p>
+                    <p className="text-sm text-slate-600">Last month vs this month (so far)</p>
                   </div>
                   <div className="text-right text-xs text-slate-500">
                     {money(totalSales)} of {money(monthlyGoal)}
                   </div>
                 </div>
                 <div className="mt-6">
-                  <svg viewBox="0 0 320 140" className="h-32 w-full">
-                    <path
-                      d={buildLinePath(salesTrend, Math.max(...salesTrend, 1), 320, 140, 12)}
-                      fill="none"
-                      stroke="#2563eb"
-                      strokeWidth="3"
-                    />
-                  </svg>
+                  {currentMonthTrend.length === 0 && lastMonthTrend.length === 0 ? (
+                    <div className="h-32 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
+                      Loading trend data...
+                    </div>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 320 140" className="h-32 w-full">
+                        {lastMonthTrend.length > 0 && (
+                          <path
+                            d={buildLinePath(lastMonthTrend, Math.max(...lastMonthTrend.filter(v => v !== null && v !== undefined), 1), 320, 140, 12)}
+                            fill="none"
+                            stroke="#94a3b8"
+                            strokeWidth="3"
+                          />
+                        )}
+                        {currentMonthTrend.length > 0 && (
+                          <path
+                            d={buildLinePath(currentMonthTrend, Math.max(...currentMonthTrend.filter(v => v !== null && v !== undefined), 1), 320, 140, 12)}
+                            fill="none"
+                            stroke="#2563eb"
+                            strokeWidth="3"
+                          />
+                        )}
+                      </svg>
+                      <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-slate-400" />
+                          Last month
+                        </span>
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-blue-600" />
+                          This month
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

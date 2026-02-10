@@ -83,7 +83,7 @@ export function TopBar() {
             placeholder="Search..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full rounded-full border border-slate-800 bg-slate-900/70 px-4 py-1.5 text-sm text-slate-100 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="w-full rounded-full border border-slate-700 bg-slate-800/60 px-4 py-1.5 text-sm text-slate-100 placeholder:text-slate-300 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
           />
           {normalizedQuery && (
             <div className="absolute left-0 right-0 mt-2 rounded-xl border border-slate-800 bg-slate-950 shadow-lg">
