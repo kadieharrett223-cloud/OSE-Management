@@ -389,6 +389,14 @@ export default function ViewPO() {
     }
   };
 
+  const containerMaxLbs = 44000;
+  const totalWeightLbs = (po?.lines || []).reduce((sum, line) => {
+    const weightEach = Number(line.weight_lbs) || 0;
+    const qty = Number(line.quantity) || 0;
+    return sum + weightEach * qty;
+  }, 0);
+  const remainingWeightLbs = Math.max(containerMaxLbs - totalWeightLbs, 0);
+
   const money = (num: number) => num.toFixed(2);
 
   if (loading) {
@@ -707,6 +715,14 @@ export default function ViewPO() {
                   </td>
                   <td className="px-2 py-2 text-right text-sm font-bold text-slate-900">
                     ${money(po.total_amount)}
+                  </td>
+                </tr>
+                <tr className="border-t border-gray-300">
+                  <td colSpan={7} className="px-2 py-2 text-right text-[10px] font-semibold text-slate-700 uppercase tracking-wide">
+                    Container Weight Remaining
+                  </td>
+                  <td className="px-2 py-2 text-right text-[10px] font-semibold text-slate-900">
+                    {remainingWeightLbs.toLocaleString()} lbs (of {containerMaxLbs.toLocaleString()} lbs)
                   </td>
                 </tr>
               </tbody>
