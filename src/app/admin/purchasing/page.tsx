@@ -85,6 +85,15 @@ export default function PurchasingPage() {
   const [rangeEnd, setRangeEnd] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+  const [teamTasks, setTeamTasks] = useState<any[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [newTaskForm, setNewTaskForm] = useState({
+    title: "",
+    description: "",
+    priority: "medium",
+    assigned_to: "",
+  });
   const [formData, setFormData] = useState({
     po_number: "",
     vendor_name: "",
@@ -149,6 +158,28 @@ export default function PurchasingPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter, rangeStart, rangeEnd]);
+
+  // Fetch team tasks
+  useEffect(() => {
+    const fetchTeamTasks = async () => {
+      setLoadingTasks(true);
+      try {
+        const res = await fetch("/api/team/tasks?_=" + Date.now());
+        if (!res.ok) throw new Error("Failed to fetch tasks");
+        const data = await res.json();
+        setTeamTasks(data.tasks || []);
+      } catch (error) {
+        console.error("Failed to fetch team tasks:", error);
+        setTeamTasks([]);
+      } finally {
+        setLoadingTasks(false);
+      }
+    };
+
+    fetchTeamTasks();
+    const interval = setInterval(fetchTeamTasks, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   async function fetchPriceList() {
     try {
@@ -317,6 +348,66 @@ export default function PurchasingPage() {
       notes: "",
       lines: [{ sku: "", description: "", quantity: 1, unit_price: 0, weight_lbs: 0 }],
     });
+  }
+
+  async function handleCreateTask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newTaskForm.title.trim()) {
+      alert("Please enter a task title");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/team/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newTaskForm,
+          created_by: "Team", // In production, use actual user email
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to create task");
+        return;
+      }
+
+      setNewTaskForm({ title: "", description: "", priority: "medium", assigned_to: "" });
+      setShowTaskForm(false);
+
+      // Refresh tasks
+      const tasksRes = await fetch("/api/team/tasks?_=" + Date.now());
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json();
+        setTeamTasks(tasksData.tasks || []);
+      }
+    } catch (error) {
+      console.error("Create task error:", error);
+      alert("Failed to create task");
+    }
+  }
+
+  async function handleUpdateTaskStatus(taskId: string, newStatus: string) {
+    try {
+      const res = await fetch(`/api/team/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update task");
+
+      // Refresh tasks
+      const tasksRes = await fetch("/api/team/tasks?_=" + Date.now());
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json();
+        setTeamTasks(tasksData.tasks || []);
+      }
+    } catch (error) {
+      console.error("Update task error:", error);
+      alert("Failed to update task");
+    }
   }
 
   function addLine() {
@@ -1009,6 +1100,155 @@ export default function PurchasingPage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Team Tasks Section */}
+            <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+              <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Team Task List</h2>
+                  <p className="text-sm text-slate-600">Shared updates on POs and manufacturers</p>
+                </div>
+                {!showTaskForm && (
+                  <button
+                    onClick={() => setShowTaskForm(true)}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                  >
+                    + New Task
+                  </button>
+                )}
+              </div>
+
+              {showTaskForm && (
+                <div className="border-b border-slate-200 bg-slate-50 px-6 py-4 space-y-3">
+                  <form onSubmit={handleCreateTask} className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">Task Title</label>
+                      <input
+                        type="text"
+                        value={newTaskForm.title}
+                        onChange={(e) => setNewTaskForm({ ...newTaskForm, title: e.target.value })}
+                        placeholder="e.g., Follow up with manufacturer on shipment"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
+                      <textarea
+                        value={newTaskForm.description}
+                        onChange={(e) => setNewTaskForm({ ...newTaskForm, description: e.target.value })}
+                        placeholder="Add details about this task..."
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        rows={2}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Priority</label>
+                        <select
+                          value={newTaskForm.priority}
+                          onChange={(e) => setNewTaskForm({ ...newTaskForm, priority: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Assign To</label>
+                        <input
+                          type="text"
+                          value={newTaskForm.assigned_to}
+                          onChange={(e) => setNewTaskForm({ ...newTaskForm, assigned_to: e.target.value })}
+                          placeholder="Team member name"
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowTaskForm(false)}
+                        className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                      >
+                        Create Task
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                {loadingTasks ? (
+                  <div className="px-6 py-8 text-center text-slate-500">Loading tasks...</div>
+                ) : teamTasks.length === 0 ? (
+                  <div className="px-6 py-8 text-center text-slate-500">No tasks yet. Create one to get started!</div>
+                ) : (
+                  <table className="w-full">
+                    <thead className="border-b border-slate-200 bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Task</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Assigned To</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Priority</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {teamTasks.map((task) => (
+                        <tr key={task.id} className="hover:bg-slate-50">
+                          <td className="px-6 py-3">
+                            <div className="font-medium text-slate-900">{task.title}</div>
+                            {task.description && <div className="text-xs text-slate-600 mt-1">{task.description}</div>}
+                          </td>
+                          <td className="px-6 py-3 text-slate-600">{task.assigned_to || "—"}</td>
+                          <td className="px-6 py-3">
+                            <span
+                              className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
+                                task.priority === "high"
+                                  ? "bg-red-100 text-red-800"
+                                  : task.priority === "medium"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-slate-100 text-slate-800"
+                              }`}
+                            >
+                              {task.priority}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3">
+                            <select
+                              value={task.status}
+                              onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
+                              className={`rounded-lg border px-2 py-1 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                                task.status === "completed"
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : task.status === "in-progress"
+                                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                                  : "border-slate-200 bg-white text-slate-700"
+                              }`}
+                            >
+                              <option value="open">Open</option>
+                              <option value="in-progress">In Progress</option>
+                              <option value="completed">Completed</option>
+                            </select>
+                          </td>
+                          <td className="px-6 py-3 text-sm text-slate-600">
+                            {new Date(task.created_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
 
             {selectedPO && (
