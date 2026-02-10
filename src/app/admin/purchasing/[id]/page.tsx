@@ -499,7 +499,7 @@ export default function ViewPO() {
         )}
 
         {/* PO Document */}
-        <div className="border border-gray-300 bg-white p-4">
+        <div className="border border-gray-300 bg-white p-4 print:text-[10px] print:[&_td]:text-[10px] print:[&_th]:text-[9px] print:[&_p]:text-[10px] print:[&_span]:text-[10px]">
           {/* Header Section */}
           <div className="grid grid-cols-2 gap-6 pb-3 mb-3 border-b border-gray-300">
             <div>
