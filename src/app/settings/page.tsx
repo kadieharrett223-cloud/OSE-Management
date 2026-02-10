@@ -3,12 +3,13 @@
 export const dynamic = "force-dynamic";
 
 import { signOut } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function SettingsPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [qboConnected, setQboConnected] = useState(false);
   const [shopifyConnected, setShopifyConnected] = useState(false);
   const [shopifyShop, setShopifyShop] = useState<string | null>(null);
@@ -159,6 +160,30 @@ export default function SettingsPage() {
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="mb-6 border-b border-gray-200">
+          <nav className="flex gap-4">
+            <Link
+              href="/settings"
+              className={`pb-3 px-1 border-b-2 text-sm font-medium transition ${
+                pathname === "/settings"
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              Settings
+            </Link>
+            <Link
+              href="/admin/mapping"
+              className={`pb-3 px-1 border-b-2 text-sm font-medium transition ${
+                pathname === "/admin/mapping"
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              Product Mapping
+            </Link>
+          </nav>
+        </div>
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-700">{error}</p>
@@ -273,12 +298,6 @@ export default function SettingsPage() {
         <div className="bg-white rounded-lg shadow mb-6 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">App</h2>
           <div className="space-y-3">
-            <Link
-              href="/admin/mapping"
-              className="block text-blue-600 hover:text-blue-700 text-sm"
-            >
-              Product Mapping
-            </Link>
             <Link
               href="/eula"
               className="block text-blue-600 hover:text-blue-700 text-sm"
