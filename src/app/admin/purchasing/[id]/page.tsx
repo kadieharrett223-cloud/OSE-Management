@@ -74,6 +74,9 @@ export default function ViewPO() {
     weight_lbs: 0,
   });
   const [savingLineItem, setSavingLineItem] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -211,6 +214,41 @@ export default function ViewPO() {
       });
     }
     setShowLineItemModal(true);
+  };
+
+  const handleSearchProducts = async (searchTerm: string) => {
+    if (searchTerm.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      const res = await fetch(`/api/price-list/search?q=${encodeURIComponent(searchTerm)}`);
+      if (!res.ok) throw new Error("Search failed");
+      
+      const data = await res.json();
+      setSearchResults(data.results || []);
+      setShowSearchResults(true);
+    } catch (error) {
+      console.error("Error searching products:", error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleSelectProduct = (product: any) => {
+    setLineItemForm({
+      sku: product.item_no || "",
+      description: product.description || "",
+      quantity: lineItemForm.quantity || 1,
+      unit_price: product.fob_port_cost || product.cost_with_shipping || 0,
+      weight_lbs: lineItemForm.weight_lbs || 0,
+    });
+    setShowSearchResults(false);
+    setSearchResults([]);
   };
 
   const handleSaveLineItem = async () => {
@@ -1090,14 +1128,44 @@ export default function ViewPO() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Description *</label>
-                <textarea
-                  value={lineItemForm.description}
-                  onChange={(e) => setLineItemForm({ ...lineItemForm, description: e.target.value })}
-                  placeholder="Item description"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                  rows={3}
-                />
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Description * (Search Price List)</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={lineItemForm.description}
+                    onChange={(e) => {
+                      setLineItemForm({ ...lineItemForm, description: e.target.value });
+                      handleSearchProducts(e.target.value);
+                    }}
+                    onFocus={() => lineItemForm.description.length >= 2 && setShowSearchResults(true)}
+                    placeholder="Search products by name or SKU..."
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  />
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 border border-slate-300 rounded-lg bg-white shadow-lg z-10 max-h-48 overflow-y-auto">
+                      {searchResults.map((product) => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => handleSelectProduct(product)}
+                          className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-200 last:border-b-0"
+                        >
+                          <div className="font-semibold text-sm text-slate-900">{product.item_no}</div>
+                          <div className="text-xs text-slate-600">{product.description}</div>
+                          <div className="text-xs text-slate-500">
+                            FOB: ${(product.fob_port_cost || product.cost_with_shipping || 0).toFixed(2)} 
+                            {product.list_price && ` | List: $${product.list_price.toFixed(2)}`}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {showSearchResults && searchLoading && (
+                    <div className="absolute top-full left-0 right-0 mt-1 border border-slate-300 rounded-lg bg-white shadow-lg z-10 p-3">
+                      <div className="text-sm text-slate-600">Searching...</div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
