@@ -661,8 +661,7 @@ export default function ViewPO() {
                   <th className="border-r border-gray-400 px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-20">
                     Unit Price
                   </th>
-                  <th className="border-r border-gray-400 px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-24">Amount</th>
-                  <th className="px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-16 print:hidden">Actions</th>
+                  <th className="px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-24">Amount</th>
                 </tr>
               </thead>
               <tbody>
@@ -675,7 +674,25 @@ export default function ViewPO() {
                       {line.sku || "—"}
                     </td>
                     <td className="border-r border-gray-300 px-2 py-1.5 text-slate-800 align-top whitespace-pre-wrap leading-tight">
-                      {line.description}
+                      <div className="flex items-start justify-between gap-2">
+                        <span>{line.description}</span>
+                        <span className="shrink-0 space-x-1 print:hidden">
+                          <button
+                            onClick={() => openLineItemModal(line)}
+                            className="text-blue-600 hover:text-blue-800 font-semibold text-[8px] px-1"
+                            title="Edit"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            onClick={() => handleDeleteLineItem(line.id)}
+                            className="text-red-600 hover:text-red-800 font-semibold text-[8px] px-1"
+                            title="Delete"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      </div>
                     </td>
                     <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-900 align-top font-medium">
                       {line.quantity}
@@ -689,26 +706,10 @@ export default function ViewPO() {
                     <td className="px-2 py-1.5 text-right text-slate-900 align-top font-semibold">
                       ${money(line.line_total)}
                     </td>
-                    <td className="border-l border-gray-300 px-1 py-1.5 text-center align-top print:hidden">
-                      <button
-                        onClick={() => openLineItemModal(line)}
-                        className="text-blue-600 hover:text-blue-800 font-semibold text-[8px] px-1"
-                        title="Edit"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        onClick={() => handleDeleteLineItem(line.id)}
-                        className="text-red-600 hover:text-red-800 font-semibold text-[8px] px-1"
-                        title="Delete"
-                      >
-                        ✕
-                      </button>
-                    </td>
                   </tr>
                 ))}
                 <tr className="border-t-2 border-gray-500">
-                  <td colSpan={7} className="px-2 py-2 text-right text-xs font-bold text-slate-900 uppercase tracking-wide">
+                  <td colSpan={6} className="px-2 py-2 text-right text-xs font-bold text-slate-900 uppercase tracking-wide">
                     Total Net (USD)
                   </td>
                   <td className="px-2 py-2 text-right text-sm font-bold text-slate-900">
@@ -716,7 +717,7 @@ export default function ViewPO() {
                   </td>
                 </tr>
                 <tr className="border-t border-gray-300">
-                  <td colSpan={7} className="px-2 py-2 text-right text-[10px] font-semibold text-slate-700 uppercase tracking-wide">
+                  <td colSpan={6} className="px-2 py-2 text-right text-[10px] font-semibold text-slate-700 uppercase tracking-wide">
                     Container Weight Remaining
                   </td>
                   <td className="px-2 py-2 text-right text-[10px] font-semibold text-slate-900">
