@@ -367,7 +367,7 @@ export default function Dashboard() {
               txnDate: inv.TxnDate,
             };
           })
-          .filter((inv) => inv.paidAmt > 0 && inv.balance > 0);
+          .filter((inv: PartialPaidInvoice) => inv.paidAmt > 0 && inv.balance > 0);
 
         setPartialPaidInvoices(partials);
       } catch (error) {

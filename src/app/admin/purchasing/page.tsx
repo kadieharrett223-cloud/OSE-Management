@@ -117,6 +117,14 @@ export default function PurchasingPage() {
     fetchSuppliers();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") === "1") {
+      setShowForm(true);
+    }
+  }, []);
+
   async function fetchPriceList() {
     try {
       const res = await fetch("/api/price-list");
