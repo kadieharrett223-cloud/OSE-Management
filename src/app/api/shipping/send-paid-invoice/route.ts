@@ -87,11 +87,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const invoiceLabel = uniqueInvoiceIds.length === 1
+      ? uniqueInvoiceIds[0]
+      : uniqueInvoiceIds.join(", ");
+
     await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: shippingEmail,
-      subject: `Paid Invoice${uniqueInvoiceIds.length > 1 ? "s" : ""} for ${customerName || "Customer"}`,
-      text: `Attached are paid invoice PDF(s) for ${customerName || "the customer"}. Payment ID: ${paymentId}.`,
+      subject: `Lift Order ${invoiceLabel}`,
+      text: `Attached are paid invoice PDF(s) for ${customerName || "the customer"}. Invoice(s): ${invoiceLabel}. Payment ID: ${paymentId}.`,
       attachments,
     });
 
