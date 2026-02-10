@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorizedQboFetch } from "@/lib/qbo";
+import { authorizedQboFetch, QboApiError } from "@/lib/qbo";
 
 interface RepSales {
   repName: string;
@@ -98,6 +98,9 @@ export async function GET(req: NextRequest) {
       totalInvoices: invoices.length,
     });
   } catch (error: any) {
+    if (error instanceof QboApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return NextResponse.json(
       { error: error.message || "Failed to fetch sales by rep" },
       { status: 500 }

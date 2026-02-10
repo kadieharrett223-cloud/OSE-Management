@@ -8,6 +8,30 @@ const QBO_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer
 const QBO_API_BASE = process.env.QBO_ENVIRONMENT === "production"
   ? "https://quickbooks.api.intuit.com"
   : "https://sandbox-quickbooks.api.intuit.com";
+const QBO_MIN_INTERVAL_MS = Number.parseInt(process.env.QBO_MIN_INTERVAL_MS || "600", 10);
+const QBO_MAX_RETRIES = Number.parseInt(process.env.QBO_MAX_RETRIES || "2", 10);
+const QBO_RETRY_BASE_MS = Number.parseInt(process.env.QBO_RETRY_BASE_MS || "500", 10);
+
+let qboQueue: Promise<unknown> = Promise.resolve();
+let nextAllowedAt = 0;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function enqueueQbo<T>(fn: () => Promise<T>): Promise<T> {
+  const run = async () => {
+    const now = Date.now();
+    const delay = Math.max(0, nextAllowedAt - now);
+    if (delay > 0) {
+      await sleep(delay);
+    }
+    nextAllowedAt = Date.now() + Math.max(0, QBO_MIN_INTERVAL_MS);
+    return fn();
+  };
+  qboQueue = qboQueue.then(run, run);
+  return qboQueue as Promise<T>;
+}
 
 export function requireEnv(name: string): string {
   const val = process.env[name];
@@ -196,21 +220,73 @@ function extractTid(res: Response) {
   return res.headers.get("intuit_tid") || res.headers.get("Intuit-Tid") || undefined;
 }
 
-export async function qboApiFetch<T>(realmId: string, path: string, init: RequestInit = {}): Promise<T> {
-  const url = `${QBO_API_BASE}${path}`;
-  const res = await fetch(url, init);
-  const tid = extractTid(res);
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("QBO API error", {
-      status: res.status,
-      statusText: res.statusText,
-      url,
-      tid,
-      body: text,
-    });
-    throw new Error(`QBO API error ${res.status}${tid ? ` (tid ${tid})` : ""}: ${text}`);
+export class QboApiError extends Error {
+  status: number;
+  statusText: string;
+  url: string;
+  tid?: string;
+  body?: string;
+
+  constructor(params: { status: number; statusText: string; url: string; tid?: string; body?: string }) {
+    const tidLabel = params.tid ? ` (tid ${params.tid})` : "";
+    super(`QBO API error ${params.status}${tidLabel}: ${params.body || params.statusText}`);
+    this.name = "QboApiError";
+    this.status = params.status;
+    this.statusText = params.statusText;
+    this.url = params.url;
+    this.tid = params.tid;
+    this.body = params.body;
   }
+}
+
+async function qboApiFetchRaw(realmId: string, path: string, init: RequestInit = {}): Promise<Response> {
+  const url = `${QBO_API_BASE}${path}`;
+
+  return enqueueQbo(async () => {
+    for (let attempt = 0; attempt <= QBO_MAX_RETRIES; attempt += 1) {
+      const res = await fetch(url, init);
+      const tid = extractTid(res);
+
+      if (res.ok) {
+        return res;
+      }
+
+      if (res.status === 429 && attempt < QBO_MAX_RETRIES) {
+        const retryAfterHeader = res.headers.get("retry-after");
+        const retryAfterMs = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) * 1000 : undefined;
+        const backoffMs = retryAfterMs ?? Math.round(QBO_RETRY_BASE_MS * Math.pow(2, attempt) + Math.random() * 150);
+        console.warn("QBO rate limited, retrying", {
+          attempt: attempt + 1,
+          backoffMs,
+          url,
+          tid,
+        });
+        await sleep(backoffMs);
+        continue;
+      }
+
+      const text = await res.text();
+      console.error("QBO API error", {
+        status: res.status,
+        statusText: res.statusText,
+        url,
+        tid,
+        body: text,
+      });
+      throw new QboApiError({ status: res.status, statusText: res.statusText, url, tid, body: text });
+    }
+
+    throw new QboApiError({
+      status: 429,
+      statusText: "Too Many Requests",
+      url,
+      body: "QBO rate limit retries exhausted",
+    });
+  });
+}
+
+export async function qboApiFetch<T>(realmId: string, path: string, init: RequestInit = {}): Promise<T> {
+  const res = await qboApiFetchRaw(realmId, path, init);
   return (await res.json()) as T;
 }
 
@@ -223,6 +299,22 @@ export async function authorizedQboFetch<T>(path: string, init: RequestInit = {}
     headers.set("Content-Type", "application/json");
   }
   return qboApiFetch<T>(realmId, `/v3/company/${realmId}${path}`, {
+    ...init,
+    headers,
+  });
+}
+
+export async function authorizedQboFetchRaw(path: string, init: RequestInit = {}) {
+  const { accessToken, realmId } = await ensureAccessToken();
+  const headers = new Headers(init.headers || {});
+  headers.set("Authorization", `Bearer ${accessToken}`);
+  if (!headers.has("Accept")) {
+    headers.set("Accept", "application/json");
+  }
+  if (init.body) {
+    headers.set("Content-Type", "application/json");
+  }
+  return qboApiFetchRaw(realmId, `/v3/company/${realmId}${path}`, {
     ...init,
     headers,
   });

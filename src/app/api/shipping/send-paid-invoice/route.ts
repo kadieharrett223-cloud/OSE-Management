@@ -1,20 +1,6 @@
 import nodemailer from "nodemailer";
 import { NextRequest, NextResponse } from "next/server";
-import { ensureAccessToken } from "@/lib/qbo";
-
-const QBO_API_BASE = process.env.QBO_ENVIRONMENT === "production"
-  ? "https://quickbooks.api.intuit.com"
-  : "https://sandbox-quickbooks.api.intuit.com";
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || "587"),
-  secure: process.env.SMTP_SECURE === "true",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
+import { authorizedQboFetch, authorizedQboFetchRaw, QboApiError } from "@/lib/qbo";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,6 +9,9 @@ export async function POST(req: NextRequest) {
     const smtpHost = process.env.SMTP_HOST;
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASSWORD;
+    const smtpPort = parseInt(process.env.SMTP_PORT || "587");
+    const smtpSecure = process.env.SMTP_SECURE === "true";
+    const smtpFrom = process.env.SMTP_FROM || process.env.SMTP_USER;
 
     if (!paymentId) {
       return NextResponse.json({ error: "Payment ID is required" }, { status: 400 });
@@ -39,24 +28,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { accessToken, realmId } = await ensureAccessToken();
-
-    const paymentRes = await fetch(
-      `${QBO_API_BASE}/v3/company/${realmId}/payment/${paymentId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/json",
-        },
-      }
-    );
-
-    if (!paymentRes.ok) {
-      const text = await paymentRes.text();
-      return NextResponse.json({ error: `Failed to fetch payment: ${text}` }, { status: 500 });
+    if (!smtpFrom) {
+      return NextResponse.json(
+        { error: "SMTP_FROM is not configured (or SMTP_USER is missing)." },
+        { status: 500 }
+      );
     }
 
-    const paymentData = await paymentRes.json();
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    });
+
+    try {
+      await transporter.verify();
+    } catch (verifyError: any) {
+      const message = verifyError?.message || "SMTP verification failed";
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
+
+    const paymentData = await authorizedQboFetch<any>(`/payment/${paymentId}`);
     const payment = paymentData?.Payment;
 
     const linkedInvoices = (payment?.Line || [])
@@ -74,20 +70,11 @@ export async function POST(req: NextRequest) {
     const attachments = [] as Array<{ filename: string; content: Buffer; contentType: string }>;
 
     for (const invoiceId of uniqueInvoiceIds) {
-      const pdfRes = await fetch(
-        `${QBO_API_BASE}/v3/company/${realmId}/invoice/${invoiceId}/pdf`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            Accept: "application/pdf",
-          },
-        }
-      );
-
-      if (!pdfRes.ok) {
-        const text = await pdfRes.text();
-        return NextResponse.json({ error: `Failed to fetch invoice PDF: ${text}` }, { status: 500 });
-      }
+      const pdfRes = await authorizedQboFetchRaw(`/invoice/${invoiceId}/pdf`, {
+        headers: {
+          Accept: "application/pdf",
+        },
+      });
 
       const buffer = Buffer.from(await pdfRes.arrayBuffer());
       attachments.push({
@@ -101,16 +88,24 @@ export async function POST(req: NextRequest) {
       ? uniqueInvoiceIds[0]
       : uniqueInvoiceIds.join(", ");
 
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: shippingEmail,
-      subject: `Lift Order ${invoiceLabel}`,
-      text: `Attached are paid invoice PDF(s) for ${customerName || "the customer"}. Invoice(s): ${invoiceLabel}. Payment ID: ${paymentId}.`,
-      attachments,
-    });
+    try {
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: shippingEmail,
+        subject: `Lift Order ${invoiceLabel}`,
+        text: `Attached are paid invoice PDF(s) for ${customerName || "the customer"}. Invoice(s): ${invoiceLabel}. Payment ID: ${paymentId}.`,
+        attachments,
+      });
+    } catch (sendError: any) {
+      const message = sendError?.message || "Failed to send email";
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
 
     return NextResponse.json({ ok: true, invoiceIds: uniqueInvoiceIds });
   } catch (error: any) {
+    if (error instanceof QboApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error("[shipping] Send invoice error:", error);
     return NextResponse.json({ error: error.message || "Failed to send invoice" }, { status: 500 });
   }
