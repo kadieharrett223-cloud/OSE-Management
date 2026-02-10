@@ -2,6 +2,10 @@ import nodemailer from "nodemailer";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch, authorizedQboFetchRaw, QboApiError } from "@/lib/qbo";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const fetchCache = "force-no-store";
+
 export async function POST(req: NextRequest) {
   try {
     const { paymentId, customerName } = await req.json();
@@ -18,7 +22,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (!shippingEmail) {
-      return NextResponse.json({ error: "Shipping email is not configured" }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: "Shipping email is not configured",
+          shippingEmailSet: Boolean(process.env.SHIPPING_EMAIL),
+          smtpFromSet: Boolean(process.env.SMTP_FROM),
+          smtpUserSet: Boolean(process.env.SMTP_USER),
+        },
+        { status: 500 }
+      );
     }
 
     if (!smtpHost || !smtpUser || !smtpPass) {
