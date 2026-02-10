@@ -274,6 +274,12 @@ export default function SettingsPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-6">App</h2>
           <div className="space-y-3">
             <Link
+              href="/admin/mapping"
+              className="block text-blue-600 hover:text-blue-700 text-sm"
+            >
+              Product Mapping
+            </Link>
+            <Link
               href="/eula"
               className="block text-blue-600 hover:text-blue-700 text-sm"
             >

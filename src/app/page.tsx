@@ -110,8 +110,8 @@ const buildLinePath = (values: LineSeries, maxValue: number, width: number, heig
 };
 
 export default function Dashboard() {
-  const [monthlyGoal, setMonthlyGoal] = useState<number>(600000);
-  const [goalInput, setGoalInput] = useState<string>("600000");
+  const [monthlyGoal, setMonthlyGoal] = useState<number>(430000);
+  const [goalInput, setGoalInput] = useState<string>("430000");
   const [goalStatus, setGoalStatus] = useState<string | null>(null);
   const [updatingGoal, setUpdatingGoal] = useState(false);
   const [qboSales, setQboSales] = useState<number | null>(null);
