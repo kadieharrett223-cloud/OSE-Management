@@ -2,64 +2,56 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export async function GET(req: NextRequest) {
+  console.log("[SEARCH] Request received");
+  
   try {
     const searchParams = req.nextUrl.searchParams;
     const query = searchParams.get("q") || "";
 
-    if (!query || query.length < 1) {
+    console.log("[SEARCH] Query:", query);
+
+    if (!query || query.trim().length === 0) {
+      console.log("[SEARCH] Query empty, returning empty results");
       return NextResponse.json({ results: [] });
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-    );
+    // Use service role key for better permissions
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    console.log("Searching price_list for:", query);
+    console.log("[SEARCH] URL check:", url ? "exists" : "MISSING");
+    console.log("[SEARCH] Key check:", serviceKey ? "exists" : "MISSING");
 
-    // First try searching by item_no
-    let { data, error } = await supabase
+    if (!url || !serviceKey) {
+      throw new Error(`Missing Supabase credentials: URL=${!!url}, KEY=${!!serviceKey}`);
+    }
+
+    const supabase = createClient(url, serviceKey);
+    console.log("[SEARCH] Supabase client created with service role");
+
+    // Try a simple query first
+    const { data, error } = await supabase
       .from("price_list")
       .select("id, item_no, description, cost_with_shipping, fob_port_cost, list_price, category_id")
       .ilike("item_no", `%${query}%`)
       .limit(10);
 
+    console.log("[SEARCH] Query error:", error?.message || "none");
+    console.log("[SEARCH] Data length:", data?.length);
+
     if (error) {
-      console.error("Item_no search error:", error);
-      // Try description search as fallback
-      const { data: descData, error: descError } = await supabase
-        .from("price_list")
-        .select("id, item_no, description, cost_with_shipping, fob_port_cost, list_price, category_id")
-        .ilike("description", `%${query}%`)
-        .limit(10);
-      
-      if (descError) {
-        console.error("Description search error:", descError);
-        throw descError;
-      }
-      data = descData;
-    } else if (!data || data.length === 0) {
-      // If no item_no matches, try description
-      const { data: descData, error: descError } = await supabase
-        .from("price_list")
-        .select("id, item_no, description, cost_with_shipping, fob_port_cost, list_price, category_id")
-        .ilike("description", `%${query}%`)
-        .limit(10);
-      
-      if (!descError) {
-        data = descData;
-      }
+      console.error("[SEARCH] Supabase error:", error);
+      throw error;
     }
 
-    console.log("Found results:", data?.length || 0);
-    
-    return NextResponse.json({ 
-      results: data || [] 
-    });
+    console.log("[SEARCH] Returning", data?.length || 0, "results");
+    return NextResponse.json({ results: data || [] });
   } catch (error: any) {
-    console.error("Price list search error:", error);
+    console.error("[SEARCH] CAUGHT ERROR:", error);
+    console.error("[SEARCH] Error message:", error.message);
+    
     return NextResponse.json(
-      { error: error.message || "Search failed", details: error },
+      { error: error.message || "Search failed" },
       { status: 500 }
     );
   }

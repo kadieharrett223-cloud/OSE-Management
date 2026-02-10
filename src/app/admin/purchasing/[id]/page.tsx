@@ -77,6 +77,7 @@ export default function ViewPO() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [priceList, setPriceList] = useState<any[]>([]);
 
   useEffect(() => {
     if (id) {
@@ -100,6 +101,18 @@ export default function ViewPO() {
         .catch(() => setLoading(false));
     }
   }, [id]);
+
+  // Load price list for autocomplete
+  useEffect(() => {
+    fetch("/api/price-list")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && Array.isArray(data.data)) {
+          setPriceList(data.data);
+        }
+      })
+      .catch((err) => console.error("Failed to load price list:", err));
+  }, []);
 
   const handleSendEmail = async () => {
     if (!emailForm.to_email) {
@@ -1116,91 +1129,84 @@ export default function ViewPO() {
       {/* Line Item Modal */}
       {showLineItemModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+          <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg">
             <h2 className="text-xl font-bold text-slate-900 mb-4">
               {editingLineItem ? "Edit Line Item" : "Add Line Item"}
             </h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-semibold text-slate-900 mb-1">Part Number / SKU *</label>
-                <div className="relative">
+            <div className="border border-slate-300 rounded overflow-hidden">
+              <div className="grid grid-cols-12 gap-0 bg-slate-100 border-b border-slate-300">
+                <div className="col-span-3 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Part Number</div>
+                <div className="col-span-4 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
+                <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">QTY</div>
+                <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">Unit Price</div>
+                <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right">Amount</div>
+              </div>
+              <div className="grid grid-cols-12 gap-0 border-b border-slate-200 bg-slate-50 p-0">
+                <div className="col-span-3 border-r border-slate-200 p-2">
                   <input
                     type="text"
+                    list="sku-list-edit"
+                    placeholder="Enter or search SKU"
                     value={lineItemForm.sku}
                     onChange={(e) => {
-                      setLineItemForm({ ...lineItemForm, sku: e.target.value });
-                      handleSearchProducts(e.target.value);
+                      const sku = e.target.value;
+                      setLineItemForm({ ...lineItemForm, sku });
+                      // Auto-fill from price list when exact match
+                      const found = priceList.find(item => item.item_no?.toLowerCase() === sku.toLowerCase());
+                      if (found) {
+                        setLineItemForm(prev => ({
+                          ...prev,
+                          sku: found.item_no || "",
+                          description: found.description || "",
+                          unit_price: found.fob_port_cost || found.cost_with_shipping || 0,
+                        }));
+                      }
                     }}
-                    onFocus={() => lineItemForm.sku.length >= 2 && setShowSearchResults(true)}
-                    placeholder="Start typing to search..."
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent text-slate-900"
+                    required
                   />
-                  {showSearchResults && searchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 border border-slate-300 rounded-lg bg-white shadow-lg z-10 max-h-48 overflow-y-auto">
-                      {searchResults.map((product) => (
-                        <button
-                          key={product.id}
-                          type="button"
-                          onClick={() => handleSelectProduct(product)}
-                          className="w-full text-left px-3 py-2 hover:bg-blue-100 border-b border-slate-200 last:border-b-0"
-                        >
-                          <div className="font-semibold text-sm text-slate-900">{product.item_no}</div>
-                          <div className="text-xs text-slate-700">{product.description}</div>
-                          <div className="text-xs text-slate-600">
-                            FOB: ${(product.fob_port_cost || product.cost_with_shipping || 0).toFixed(2)} 
-                            {product.list_price && ` | List: $${product.list_price.toFixed(2)}`}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {showSearchResults && searchLoading && (
-                    <div className="absolute top-full left-0 right-0 mt-1 border border-slate-300 rounded-lg bg-white shadow-lg z-10 p-3">
-                      <div className="text-sm text-slate-700">Searching...</div>
-                    </div>
-                  )}
+                  <datalist id="sku-list-edit">
+                    {priceList.map((item) => (
+                      <option key={item.id} value={item.item_no || ""}>{item.description}</option>
+                    ))}
+                  </datalist>
+                </div>
+                <div className="col-span-4 border-r border-slate-200 p-2">
+                  <input
+                    type="text"
+                    placeholder="Description"
+                    value={lineItemForm.description}
+                    onChange={(e) => setLineItemForm({ ...lineItemForm, description: e.target.value })}
+                    className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent text-slate-900"
+                    required
+                  />
+                </div>
+                <div className="col-span-1 border-r border-slate-200 p-2">
+                  <input
+                    type="number"
+                    step="1"
+                    value={lineItemForm.quantity}
+                    onChange={(e) => setLineItemForm({ ...lineItemForm, quantity: Number(e.target.value) })}
+                    className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent text-slate-900"
+                    required
+                  />
+                </div>
+                <div className="col-span-2 border-r border-slate-200 p-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={lineItemForm.unit_price}
+                    onChange={(e) => setLineItemForm({ ...lineItemForm, unit_price: Number(e.target.value) })}
+                    className="w-full border-0 px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent text-slate-900"
+                    required
+                  />
+                </div>
+                <div className="col-span-2 p-2 text-right">
+                  <span className="text-sm font-semibold text-slate-900">
+                    ${(lineItemForm.quantity * lineItemForm.unit_price).toFixed(2)}
+                  </span>
                 </div>
               </div>
-
-              {lineItemForm.description && (
-                <>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-900 mb-1">Description</label>
-                    <div className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900">
-                      {lineItemForm.description}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-900 mb-1">Quantity *</label>
-                      <input
-                        type="number"
-                        value={lineItemForm.quantity}
-                        onChange={(e) => setLineItemForm({ ...lineItemForm, quantity: Number(e.target.value) })}
-                        placeholder="0"
-                        min="0"
-                        step="1"
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-900 mb-1">Unit Price</label>
-                      <div className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900">
-                        ${lineItemForm.unit_price.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {lineItemForm.quantity > 0 && (
-                    <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-                      <p className="text-sm font-semibold text-green-900">
-                        Line Total: ${(lineItemForm.quantity * lineItemForm.unit_price).toFixed(2)}
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
             </div>
             <div className="flex gap-3 mt-6">
               <button
@@ -1214,7 +1220,7 @@ export default function ViewPO() {
               <button
                 type="button"
                 onClick={handleSaveLineItem}
-                disabled={savingLineItem || !lineItemForm.description || lineItemForm.quantity <= 0}
+                disabled={savingLineItem || !lineItemForm.sku || !lineItemForm.description || lineItemForm.quantity <= 0}
                 className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
               >
                 {savingLineItem ? "Saving..." : "Save Item"}
