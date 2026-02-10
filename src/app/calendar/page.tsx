@@ -59,7 +59,7 @@ export default function CalendarPage() {
         }
         const data = await response.json();
         const bills: QboBill[] = data?.bills || [];
-        const mapped = bills
+        const mapped: Notification[] = bills
           .filter((bill) => bill.DueDate)
           .map((bill, index) => ({
             id: `bill-${bill.Id}-${index}`,
