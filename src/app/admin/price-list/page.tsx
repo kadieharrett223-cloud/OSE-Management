@@ -312,11 +312,11 @@ export default function AdminPriceListPage() {
     // 4) Base sell price (before discount): Cost with shipping × Multiplier
     const base_sell_price = cost_with_shipping * multiplier;
 
-    // 5) Sell price: Base sell price (standard everyday sell price)
-    const sell_price = base_sell_price;
+    // 5) List price: Base sell price × 1.2 (fixed, never changes with discount)
+    const list_price = base_sell_price * 1.2;
 
-    // 6) List price: Sell price × 1.2 (fixed, never changes with discount)
-    const list_price = sell_price * 1.2;
+    // 6) Sell price: Base sell price with discount applied (discount is off sell price, not list)
+    const sell_price = base_sell_price * (1 - (discountPercentage || 0) / 100);
 
     // 7) Profit: Sell price - Cost with shipping
     const profit = sell_price - cost_with_shipping;
