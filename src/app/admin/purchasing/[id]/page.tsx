@@ -1118,28 +1118,18 @@ export default function ViewPO() {
             </h2>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">SKU / Part Number</label>
-                <input
-                  type="text"
-                  value={lineItemForm.sku}
-                  onChange={(e) => setLineItemForm({ ...lineItemForm, sku: e.target.value })}
-                  placeholder="e.g., SKU-12345"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Description * (Search Price List)</label>
+                <label className="block text-sm font-semibold text-slate-900 mb-1">Part Number / SKU *</label>
                 <div className="relative">
                   <input
                     type="text"
-                    value={lineItemForm.description}
+                    value={lineItemForm.sku}
                     onChange={(e) => {
-                      setLineItemForm({ ...lineItemForm, description: e.target.value });
+                      setLineItemForm({ ...lineItemForm, sku: e.target.value });
                       handleSearchProducts(e.target.value);
                     }}
-                    onFocus={() => lineItemForm.description.length >= 2 && setShowSearchResults(true)}
-                    placeholder="Search products by name or SKU..."
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    onFocus={() => lineItemForm.sku.length >= 2 && setShowSearchResults(true)}
+                    placeholder="Start typing to search..."
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                   />
                   {showSearchResults && searchResults.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-1 border border-slate-300 rounded-lg bg-white shadow-lg z-10 max-h-48 overflow-y-auto">
@@ -1148,11 +1138,11 @@ export default function ViewPO() {
                           key={product.id}
                           type="button"
                           onClick={() => handleSelectProduct(product)}
-                          className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-200 last:border-b-0"
+                          className="w-full text-left px-3 py-2 hover:bg-blue-100 border-b border-slate-200 last:border-b-0"
                         >
                           <div className="font-semibold text-sm text-slate-900">{product.item_no}</div>
-                          <div className="text-xs text-slate-600">{product.description}</div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-slate-700">{product.description}</div>
+                          <div className="text-xs text-slate-600">
                             FOB: ${(product.fob_port_cost || product.cost_with_shipping || 0).toFixed(2)} 
                             {product.list_price && ` | List: $${product.list_price.toFixed(2)}`}
                           </div>
@@ -1162,55 +1152,50 @@ export default function ViewPO() {
                   )}
                   {showSearchResults && searchLoading && (
                     <div className="absolute top-full left-0 right-0 mt-1 border border-slate-300 rounded-lg bg-white shadow-lg z-10 p-3">
-                      <div className="text-sm text-slate-600">Searching...</div>
+                      <div className="text-sm text-slate-700">Searching...</div>
                     </div>
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Quantity *</label>
-                  <input
-                    type="number"
-                    value={lineItemForm.quantity}
-                    onChange={(e) => setLineItemForm({ ...lineItemForm, quantity: Number(e.target.value) })}
-                    placeholder="0"
-                    min="0"
-                    step="1"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Unit Price *</label>
-                  <input
-                    type="number"
-                    value={lineItemForm.unit_price}
-                    onChange={(e) => setLineItemForm({ ...lineItemForm, unit_price: Number(e.target.value) })}
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Weight (lbs)</label>
-                <input
-                  type="number"
-                  value={lineItemForm.weight_lbs}
-                  onChange={(e) => setLineItemForm({ ...lineItemForm, weight_lbs: Number(e.target.value) })}
-                  placeholder="0"
-                  min="0"
-                  step="0.1"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-              {lineItemForm.quantity > 0 && lineItemForm.unit_price > 0 && (
-                <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
-                  <p className="text-sm font-semibold text-blue-900">
-                    Line Total: ${(lineItemForm.quantity * lineItemForm.unit_price).toFixed(2)}
-                  </p>
-                </div>
+
+              {lineItemForm.description && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-900 mb-1">Description</label>
+                    <div className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900">
+                      {lineItemForm.description}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-900 mb-1">Quantity *</label>
+                      <input
+                        type="number"
+                        value={lineItemForm.quantity}
+                        onChange={(e) => setLineItemForm({ ...lineItemForm, quantity: Number(e.target.value) })}
+                        placeholder="0"
+                        min="0"
+                        step="1"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-900 mb-1">Unit Price</label>
+                      <div className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900">
+                        ${lineItemForm.unit_price.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {lineItemForm.quantity > 0 && (
+                    <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                      <p className="text-sm font-semibold text-green-900">
+                        Line Total: ${(lineItemForm.quantity * lineItemForm.unit_price).toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <div className="flex gap-3 mt-6">
@@ -1218,14 +1203,14 @@ export default function ViewPO() {
                 type="button"
                 onClick={() => setShowLineItemModal(false)}
                 disabled={savingLineItem}
-                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSaveLineItem}
-                disabled={savingLineItem}
+                disabled={savingLineItem || !lineItemForm.description || lineItemForm.quantity <= 0}
                 className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
               >
                 {savingLineItem ? "Saving..." : "Save Item"}
