@@ -52,7 +52,7 @@ export function TopBar() {
   }, []);
 
   return (
-    <div className="sticky top-0 z-40 w-full border-b border-slate-900/60 bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-slate-100 print:hidden">
+    <div className="sticky top-0 z-40 w-full border-b border-slate-900/60 bg-gradient-to-r from-slate-950 via-blue-900 to-blue-700 text-slate-100 print:hidden">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-2">
         <div className="flex items-center gap-3 text-sm">
           <span className="font-semibold text-blue-100">QBO:</span>
