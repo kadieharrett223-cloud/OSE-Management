@@ -33,6 +33,13 @@ interface PaymentSummary {
   lastTxnDate: string;
 }
 
+interface VendorPaymentSummary {
+  vendorName: string;
+  totalPaid: number;
+  paymentCount: number;
+  lastTxnDate: string;
+}
+
 interface UnpaidInvoice {
   id: string;
   docNumber: string;
@@ -120,6 +127,10 @@ export default function Dashboard() {
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
   const [loadingPayments, setLoadingPayments] = useState(true);
   const [lastPaymentsUpdated, setLastPaymentsUpdated] = useState<Date | null>(null);
+  const [vendorPaymentsToday, setVendorPaymentsToday] = useState<VendorPaymentSummary[]>([]);
+  const [vendorPaymentsTotal, setVendorPaymentsTotal] = useState<number>(0);
+  const [loadingVendorPayments, setLoadingVendorPayments] = useState(true);
+  const [lastVendorPaymentsUpdated, setLastVendorPaymentsUpdated] = useState<Date | null>(null);
 
   // Fetch monthly goal
   useEffect(() => {
@@ -406,6 +417,77 @@ export default function Dashboard() {
     };
   }, []);
 
+  // Fetch payments made to vendors today (live tracking)
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchVendorPaymentsToday = async () => {
+      setLoadingVendorPayments(true);
+      try {
+        const today = new Date().toLocaleDateString("en-CA");
+        const res = await fetch(`/api/qbo/bill-payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
+        if (!res.ok) throw new Error("Failed to fetch vendor payments");
+        const data = await res.json();
+        const payments = data.payments || [];
+
+        const summaryMap = new Map<string, VendorPaymentSummary>();
+        let totalPaid = 0;
+
+        payments.forEach((payment: any) => {
+          const paid = Number(payment.TotalAmt) || 0;
+          if (paid <= 0) return;
+
+          const vendorName =
+            payment.VendorRef?.name ||
+            payment.PayeeRef?.name ||
+            "Unknown Vendor";
+
+          totalPaid += paid;
+
+          const existing = summaryMap.get(vendorName);
+          if (existing) {
+            existing.totalPaid += paid;
+            existing.paymentCount += 1;
+            if (payment.TxnDate && payment.TxnDate > existing.lastTxnDate) {
+              existing.lastTxnDate = payment.TxnDate;
+            }
+          } else {
+            summaryMap.set(vendorName, {
+              vendorName,
+              totalPaid: paid,
+              paymentCount: 1,
+              lastTxnDate: payment.TxnDate || today,
+            });
+          }
+        });
+
+        const summary = Array.from(summaryMap.values()).sort((a, b) => b.totalPaid - a.totalPaid);
+
+        if (isMounted) {
+          setVendorPaymentsToday(summary);
+          setVendorPaymentsTotal(totalPaid);
+          setLastVendorPaymentsUpdated(new Date());
+        }
+      } catch (error) {
+        console.error("Failed to fetch vendor payments today:", error);
+        if (isMounted) {
+          setVendorPaymentsToday([]);
+          setVendorPaymentsTotal(0);
+        }
+      } finally {
+        if (isMounted) setLoadingVendorPayments(false);
+      }
+    };
+
+    fetchVendorPaymentsToday();
+    const interval = setInterval(fetchVendorPaymentsToday, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
@@ -455,11 +537,11 @@ export default function Dashboard() {
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Sales Accrued (YTD)</div>
+                <div className="text-xs uppercase font-semibold text-slate-500">Sales This Year So Far</div>
                 <div className="mt-2 text-2xl font-bold text-indigo-700">
                   {loadingYtd ? <span className="text-slate-400">Loading...</span> : `$${money(ytdSales ?? 0)}`}
                 </div>
-                <div className="mt-1 text-xs text-slate-600">Paid invoices year-to-date</div>
+                <div className="mt-1 text-xs text-slate-600">Paid invoices for the current year</div>
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
@@ -558,6 +640,72 @@ export default function Dashboard() {
                           <td className="px-6 py-3 text-right text-slate-600">{payment.paymentCount}</td>
                           <td className="px-6 py-3 text-right font-semibold text-emerald-700">
                             ${money(payment.totalApplied)}
+                          </td>
+                          <td className="px-6 py-3 text-right text-slate-600">{payment.lastTxnDate}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Vendor Payments Today */}
+            <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Payments Made to Vendors Today</h2>
+                    <p className="text-sm text-slate-600">Live tracking of payments sent to vendors</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-500">Total Paid Today</div>
+                    <div className="text-lg font-semibold text-indigo-700">${money(vendorPaymentsTotal)}</div>
+                    <div className="text-xs text-slate-500">
+                      {lastVendorPaymentsUpdated ? `Updated ${lastVendorPaymentsUpdated.toLocaleTimeString()}` : "Updating..."}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="border-b border-slate-200 bg-slate-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                        Vendor
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                        Payments
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                        Amount Paid
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                        Last Payment
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loadingVendorPayments ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                          Loading vendor payments...
+                        </td>
+                      </tr>
+                    ) : vendorPaymentsToday.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                          No vendor payments recorded today
+                        </td>
+                      </tr>
+                    ) : (
+                      vendorPaymentsToday.map((payment) => (
+                        <tr key={payment.vendorName} className="hover:bg-slate-50 transition">
+                          <td className="px-6 py-3 font-medium text-slate-900">{payment.vendorName}</td>
+                          <td className="px-6 py-3 text-right text-slate-600">{payment.paymentCount}</td>
+                          <td className="px-6 py-3 text-right font-semibold text-indigo-700">
+                            ${money(payment.totalPaid)}
                           </td>
                           <td className="px-6 py-3 text-right text-slate-600">{payment.lastTxnDate}</td>
                         </tr>
