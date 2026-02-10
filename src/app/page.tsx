@@ -110,6 +110,8 @@ export default function Dashboard() {
   const [qboSales, setQboSales] = useState<number | null>(null);
   const [qboInvoiceCount, setQboInvoiceCount] = useState<number>(0);
   const [loadingQbo, setLoadingQbo] = useState(true);
+  const [ytdSales, setYtdSales] = useState<number | null>(null);
+  const [loadingYtd, setLoadingYtd] = useState(true);
   const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
   const [unpaidInvoices, setUnpaidInvoices] = useState<UnpaidInvoice[]>([]);
   const [loadingUnpaid, setLoadingUnpaid] = useState(false);
@@ -305,6 +307,36 @@ export default function Dashboard() {
     fetchUnpaidInvoices();
   }, []);
 
+  // Fetch year-to-date paid sales
+  useEffect(() => {
+    let isMounted = true;
+    const fetchYtdSales = async () => {
+      setLoadingYtd(true);
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const startDate = `${year}-01-01`;
+        const endDate = now.toISOString().slice(0, 10);
+        const res = await fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`);
+        if (!res.ok) throw new Error("Failed to fetch YTD sales");
+        const data = await res.json();
+        if (isMounted) {
+          setYtdSales(Number(data.totalPaid || 0));
+        }
+      } catch (error) {
+        console.error("Failed to fetch YTD sales:", error);
+        if (isMounted) setYtdSales(null);
+      } finally {
+        if (isMounted) setLoadingYtd(false);
+      }
+    };
+
+    fetchYtdSales();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Fetch payments made today (live tracking)
   useEffect(() => {
     let isMounted = true;
@@ -423,9 +455,11 @@ export default function Dashboard() {
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Commission Accrued</div>
-                <div className="mt-2 text-2xl font-bold text-indigo-700">${money(totalCommission)}</div>
-                <div className="mt-1 text-xs text-slate-600">Payroll liability</div>
+                <div className="text-xs uppercase font-semibold text-slate-500">Sales Accrued (YTD)</div>
+                <div className="mt-2 text-2xl font-bold text-indigo-700">
+                  {loadingYtd ? <span className="text-slate-400">Loading...</span> : `$${money(ytdSales ?? 0)}`}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">Paid invoices year-to-date</div>
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
