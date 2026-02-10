@@ -16,6 +16,16 @@ interface Notification {
   date: string;
   recurring: "none" | "daily" | "weekly" | "biweekly" | "monthly" | "yearly";
   notes?: string;
+  source?: "user" | "bill";
+}
+
+interface QboBill {
+  Id: string;
+  DocNumber?: string;
+  DueDate?: string;
+  Balance?: number;
+  TotalAmt?: number;
+  VendorRef?: { value: string; name?: string };
 }
 
 const money = (value: number) =>
@@ -31,6 +41,7 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [dailySales, setDailySales] = useState<DailySales[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [billNotifications, setBillNotifications] = useState<Notification[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingNotification, setEditingNotification] = useState<Notification | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,6 +49,34 @@ export default function CalendarPage() {
   const monthlyTotal = useMemo(() => {
     return dailySales.reduce((sum, day) => sum + (day.totalSales || 0), 0);
   }, [dailySales]);
+
+  useEffect(() => {
+    const fetchBills = async () => {
+      try {
+        const response = await fetch("/api/qbo/bill/query?status=unpaid");
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        const bills: QboBill[] = data?.bills || [];
+        const mapped = bills
+          .filter((bill) => bill.DueDate)
+          .map((bill, index) => ({
+            id: `bill-${bill.Id}-${index}`,
+            title: `Bill due: ${bill.VendorRef?.name || "Vendor"}`,
+            date: bill.DueDate as string,
+            recurring: "none",
+            notes: `Balance $${money(Number(bill.Balance) || 0)}`,
+            source: "bill" as const,
+          }));
+        setBillNotifications(mapped);
+      } catch (error) {
+        console.warn("[calendar] Failed to load bills from QBO", error);
+      }
+    };
+
+    fetchBills();
+  }, []);
 
   // Load notifications from localStorage and add default notifications
   useEffect(() => {
@@ -287,7 +326,8 @@ export default function CalendarPage() {
 
   const getNotificationsForDate = (date: Date) => {
     const dateStr = date.toISOString().split("T")[0];
-    return notifications.filter(n => {
+    const combined = [...notifications, ...billNotifications];
+    return combined.filter(n => {
       if (n.recurring === "none") return n.date === dateStr;
       if (n.recurring === "daily") return true;
       if (n.recurring === "weekly") return date.getDay() === new Date(n.date).getDay();
@@ -412,22 +452,27 @@ export default function CalendarPage() {
                     <div className="space-y-1">
                       {dayNotifications.slice(0, 2).map((notif) => {
                         const isHoliday = notif.notes?.includes("Federal Holiday");
+                        const isBill = notif.source === "bill";
                         return (
                           <div
                             key={notif.id}
-                            className={`cursor-pointer truncate rounded px-1.5 py-0.5 text-[10px] hover:opacity-80 ${
-                              isHoliday 
-                                ? "bg-red-100 text-red-800" 
-                                : "bg-blue-100 text-blue-800"
+                            className={`truncate rounded px-1.5 py-0.5 text-[10px] hover:opacity-80 ${
+                              isHoliday
+                                ? "bg-red-100 text-red-800"
+                                : isBill
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-blue-100 text-blue-800"
                             }`}
                             onClick={() => {
+                              if (isBill) return;
                               setEditingNotification(notif);
                               setShowAddModal(true);
                             }}
                             title={notif.title}
                           >
                             {isHoliday && "🇺🇸 "}
-                            {notif.recurring !== "none" && !isHoliday && "🔁 "}
+                            {isBill && "💳 "}
+                            {notif.recurring !== "none" && !isHoliday && !isBill && "🔁 "}
                             {notif.title}
                           </div>
                         );
