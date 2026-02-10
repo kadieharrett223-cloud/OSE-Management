@@ -52,6 +52,14 @@ interface VendorPaymentSummary {
   lastTxnDate: string;
 }
 
+interface CustomerPayment {
+  id: string;
+  customerName: string;
+  appliedAmount: number;
+  totalAmount: number;
+  txnDate: string;
+}
+
 const mockReps = [
   {
     id: 1,
@@ -120,6 +128,8 @@ export default function Dashboard() {
   const [partialPaidCount, setPartialPaidCount] = useState<number>(0);
   const [partialPaidRemaining, setPartialPaidRemaining] = useState<number>(0);
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
+  const [customerPaymentsToday, setCustomerPaymentsToday] = useState<CustomerPayment[]>([]);
+  const [loadingCustomerPayments, setLoadingCustomerPayments] = useState(true);
   const [vendorPaymentsTotal, setVendorPaymentsTotal] = useState<number>(0);
   const [vendorPaymentsToday, setVendorPaymentsToday] = useState<VendorPaymentSummary[]>([]);
   const [loadingVendorPayments, setLoadingVendorPayments] = useState(true);
@@ -511,6 +521,7 @@ export default function Dashboard() {
     let isMounted = true;
 
     const fetchPaymentsToday = async () => {
+      setLoadingCustomerPayments(true);
       try {
         const today = new Date().toLocaleDateString("en-CA");
         const res = await fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
@@ -519,6 +530,7 @@ export default function Dashboard() {
         const payments = data.payments || [];
 
         let totalApplied = 0;
+        const itemizedPayments: CustomerPayment[] = [];
 
         payments.forEach((payment: any) => {
           const total = Number(payment.TotalAmt) || 0;
@@ -526,15 +538,26 @@ export default function Dashboard() {
           const applied = Math.max(total - unapplied, 0);
           if (applied <= 0) return;
           totalApplied += applied;
+          itemizedPayments.push({
+            id: payment.Id,
+            customerName: payment.CustomerRef?.value ? `Customer ${payment.CustomerRef.value}` : 'Unknown',
+            appliedAmount: applied,
+            totalAmount: total,
+            txnDate: payment.TxnDate || today,
+          });
         });
 
         if (isMounted) {
           setPaymentsTotal(totalApplied);
+          setCustomerPaymentsToday(itemizedPayments);
+          setLoadingCustomerPayments(false);
         }
       } catch (error) {
         console.error("Failed to fetch payments today:", error);
         if (isMounted) {
           setPaymentsTotal(0);
+          setCustomerPaymentsToday([]);
+          setLoadingCustomerPayments(false);
         }
       }
     };
@@ -833,6 +856,42 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
                 <div className="border-b border-slate-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
+                  <p className="text-sm text-slate-600">Payments received from customers today</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b border-slate-200 bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Applied</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {loadingCustomerPayments ? (
+                        <tr>
+                          <td colSpan={3} className="px-6 py-6 text-center text-slate-500">Loading...</td>
+                        </tr>
+                      ) : customerPaymentsToday.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
+                        </tr>
+                      ) : (
+                        customerPaymentsToday.map((payment) => (
+                          <tr key={payment.id} className="hover:bg-slate-50">
+                            <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
+                            <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
+                            <td className="px-6 py-3 text-right text-slate-600">${money(payment.totalAmount)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-6 py-4">
                   <h2 className="text-lg font-semibold text-slate-900">Vendors Paid Today</h2>
                   <p className="text-sm text-slate-600">Payments our company made today</p>
                 </div>
@@ -868,11 +927,6 @@ export default function Dashboard() {
                     </tbody>
                   </table>
                 </div>
-              </div>
-              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Partial Paid Remaining</div>
-                <div className="mt-2 text-2xl font-bold text-amber-700">${money(partialPaidRemaining)}</div>
-                <div className="mt-1 text-xs text-slate-600">{partialPaidCount} invoices still open</div>
               </div>
             </div>
 
