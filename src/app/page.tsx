@@ -400,27 +400,6 @@ export default function Dashboard() {
                 <div className="text-xs uppercase font-semibold text-slate-500">Monthly Goal</div>
                 <div className="mt-2 text-2xl font-bold text-slate-900">${money(monthlyGoal)}</div>
                 <div className="mt-1 text-xs text-slate-600">Target for month</div>
-                <form className="mt-3 flex gap-2" onSubmit={handleGoalSave}>
-                    <input
-                      type="number"
-                      step="1000"
-                      min="0"
-                      value={goalInput}
-                      onChange={(e) => setGoalInput(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                      aria-label="Monthly goal"
-                    />
-                    <button
-                      type="submit"
-                      disabled={updatingGoal}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {updatingGoal ? "Saving" : "Save"}
-                    </button>
-                  </form>
-                {goalStatus && (
-                  <div className="mt-1 text-xs text-slate-500">{goalStatus}</div>
-                )}
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
