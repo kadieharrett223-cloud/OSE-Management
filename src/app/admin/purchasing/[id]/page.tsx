@@ -813,7 +813,7 @@ export default function ViewPO() {
               <ul className="list-none space-y-0 ml-2">
                 <li>Purchasing: Peter Harrett phone: 866-774-4531 ext 1. email peter@olympic-equipment.com.</li>
                 <li>Purchasing: Kadie Harrett, phone 866-774-4531 ext 1. email kadie@olympic-equipment.com.</li>
-                <li>Customer Service: Jared Henderson phone: 866-774-4531 ext 2. email customerservice@olympic-equipment.com.</li>
+                <li>Customer Service: Shandra Colville phone: 866-774-4531 ext 2. email customerservice@olympic-equipment.com.</li>
                 <li>Bookeeping: Emma Nagel: phone 866-774-4531 ext 13. Email: bookkeeping@olympic-equipment.com</li>
               </ul>
             </section>
