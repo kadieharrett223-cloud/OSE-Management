@@ -217,6 +217,7 @@ export default function ViewPO() {
   };
 
   const handleSearchProducts = async (searchTerm: string) => {
+    console.log("Searching for:", searchTerm);
     if (searchTerm.length < 2) {
       setSearchResults([]);
       setShowSearchResults(false);
@@ -224,13 +225,16 @@ export default function ViewPO() {
     }
 
     setSearchLoading(true);
+    setShowSearchResults(true);
     try {
-      const res = await fetch(`/api/price-list/search?q=${encodeURIComponent(searchTerm)}`);
-      if (!res.ok) throw new Error("Search failed");
+      const url = `/api/price-list/search?q=${encodeURIComponent(searchTerm)}`;
+      console.log("Fetching from:", url);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Search failed: ${res.status}`);
       
       const data = await res.json();
+      console.log("Search results:", data);
       setSearchResults(data.results || []);
-      setShowSearchResults(true);
     } catch (error) {
       console.error("Error searching products:", error);
       setSearchResults([]);
