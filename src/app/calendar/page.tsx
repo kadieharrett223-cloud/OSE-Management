@@ -327,26 +327,27 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar activePage="Calendar" />
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="flex min-h-screen">
+        <Sidebar activePage="Calendar" />
 
-      <main className="flex-1 p-8 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-        <div className="mx-auto max-w-7xl">
-          {/* Header */}
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">Sales Calendar</h1>
-              <p className="text-slate-600">
-                Daily sales tracking and recurring notifications
-                {loading && <span className="ml-2 text-blue-600">Loading sales data...</span>}
-              </p>
-              {!loading && dailySales.length > 0 && (
-                <div className="mt-1 text-sm font-semibold text-emerald-700">
-                  Month total: ${money(monthlyTotal)}
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3">
+        <main className="flex-1 p-8 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
+          <div className="mx-auto max-w-7xl">
+            {/* Header */}
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900">Sales Calendar</h1>
+                <p className="text-slate-600">
+                  Daily sales tracking and recurring notifications
+                  {loading && <span className="ml-2 text-blue-600">Loading sales data...</span>}
+                </p>
+                {!loading && dailySales.length > 0 && (
+                  <div className="mt-1 text-sm font-semibold text-emerald-700">
+                    Month total: ${money(monthlyTotal)}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-3">
               <input
                 type="month"
                 value={selectedMonth}
@@ -497,8 +498,9 @@ export default function CalendarPage() {
           </div>
         </div>
       </main>
+    </div>
 
-      {/* Add/Edit Modal */}
+    {/* Add/Edit Modal */}
       {showAddModal && editingNotification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">

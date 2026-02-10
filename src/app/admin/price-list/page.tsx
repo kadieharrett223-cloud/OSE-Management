@@ -353,31 +353,32 @@ export default function AdminPriceListPage() {
   ];
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar activePage="Price List" />
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="flex min-h-screen">
+        <Sidebar activePage="Price List" />
 
-      {/* Main Content */}
-      <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          {/* Chrome-style Tabs */}
-          <div className="bg-slate-800 border-b border-slate-700 px-8">
-            <div className="flex gap-1">
-              {tabs.map((tab) => (
-                <a
-                  key={tab.href}
-                  href={tab.href}
-                  className={`px-6 py-3 text-sm font-medium transition relative ${
-                    pathname === tab.href
-                      ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
-                      : "text-slate-300 hover:text-white hover:bg-slate-700/50"
-                  }`}
-                >
-                  {tab.label}
-                </a>
-              ))}
+        {/* Main Content */}
+        <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
+            {/* Chrome-style Tabs */}
+            <div className="bg-slate-800 border-b border-slate-700 px-8">
+              <div className="flex gap-1">
+                {tabs.map((tab) => (
+                  <a
+                    key={tab.href}
+                    href={tab.href}
+                    className={`px-6 py-3 text-sm font-medium transition relative ${
+                      pathname === tab.href
+                        ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
+                        : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                    }`}
+                  >
+                    {tab.label}
+                  </a>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="mx-auto px-8 py-10 space-y-6">
+            <div className="mx-auto px-8 py-10 space-y-6">
             {/* Header */}
             <header className="flex items-start justify-between">
               <div>
@@ -911,6 +912,7 @@ export default function AdminPriceListPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
