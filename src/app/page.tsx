@@ -271,7 +271,7 @@ export default function Dashboard() {
         const endDate = `${year}-${month}-${lastDay}`;
 
         const response = await fetch(
-          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=all`
+          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}`
         );
         
         if (!response.ok) throw new Error("Failed to fetch monthly sales");
