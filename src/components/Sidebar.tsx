@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 const navGroups = [
   {
     title: "Operations",
@@ -32,43 +30,28 @@ const navGroups = [
 ];
 
 export function Sidebar({ activePage }: { activePage: string }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-
   return (
     <aside
-      className={`flex flex-col bg-gradient-to-b from-slate-950 via-blue-900 to-blue-700 px-4 py-6 shadow-2xl ring-1 ring-slate-900/30 transition-all duration-200 ${
-        sidebarOpen ? "w-72" : "w-16"
-      }`}
+      className="flex w-72 flex-col bg-gradient-to-b from-slate-950 via-blue-900 to-blue-700 px-4 py-6 shadow-2xl ring-1 ring-slate-900/30"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/20 text-sm font-semibold text-blue-100 ring-1 ring-blue-300/30">
             OSE
           </div>
-          {sidebarOpen && (
-            <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-blue-200">Management</p>
-              <p className="text-lg font-semibold text-white">Performance Hub</p>
-            </div>
-          )}
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-blue-200">Management</p>
+            <p className="text-lg font-semibold text-white">Performance Hub</p>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setSidebarOpen((v) => !v)}
-          className="rounded-lg border border-slate-800/70 bg-slate-900/50 px-2 py-1 text-xs text-slate-200 transition hover:border-blue-400/60 hover:text-white"
-        >
-          {sidebarOpen ? "⟨" : "⟩"}
-        </button>
       </div>
 
       <nav className="mt-6 space-y-4">
         {navGroups.map((group) => (
           <div key={group.title} className="space-y-2">
-            {sidebarOpen && (
-              <p className="px-2 text-[10px] uppercase tracking-[0.3em] text-blue-200/80">
-                {group.title}
-              </p>
-            )}
+            <p className="px-2 text-[10px] uppercase tracking-[0.3em] text-blue-200/80">
+              {group.title}
+            </p>
             {group.items.map((item) => (
               <a
                 key={item.label}
@@ -81,10 +64,10 @@ export function Sidebar({ activePage }: { activePage: string }) {
                 title={item.label}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{sidebarOpen ? item.label : item.label.slice(0, 1)}</span>
-                  {sidebarOpen && <span className="text-[10px] uppercase tracking-wide text-blue-200">view</span>}
+                  <span className="font-medium">{item.label}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-blue-200">view</span>
                 </div>
-                {sidebarOpen && <p className="text-xs text-slate-300">{item.hint}</p>}
+                <p className="text-xs text-slate-300">{item.hint}</p>
               </a>
             ))}
           </div>

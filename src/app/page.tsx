@@ -132,6 +132,7 @@ export default function Dashboard() {
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
   const [customerPaymentsToday, setCustomerPaymentsToday] = useState<CustomerPayment[]>([]);
   const [loadingCustomerPayments, setLoadingCustomerPayments] = useState(true);
+  const [sendingPaymentId, setSendingPaymentId] = useState<string | null>(null);
   const [vendorPaymentsTotal, setVendorPaymentsTotal] = useState<number>(0);
   const [vendorPaymentsToday, setVendorPaymentsToday] = useState<VendorPaymentSummary[]>([]);
   const [loadingVendorPayments, setLoadingVendorPayments] = useState(true);
@@ -678,6 +679,29 @@ export default function Dashboard() {
     };
   }, []);
 
+  const handleSendPaymentToShipping = async (payment: CustomerPayment) => {
+    if (!payment?.id) return;
+    setSendingPaymentId(payment.id);
+    try {
+      const res = await fetch("/api/shipping/send-paid-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentId: payment.id, customerName: payment.customerName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data?.error || "Failed to send invoice to shipping");
+        return;
+      }
+      alert("Invoice sent to shipping");
+    } catch (error) {
+      console.error("Failed to send invoice to shipping:", error);
+      alert("Failed to send invoice to shipping");
+    } finally {
+      setSendingPaymentId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
@@ -905,16 +929,17 @@ export default function Dashboard() {
                         <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Applied</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total Amount</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Send</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {loadingCustomerPayments ? (
                         <tr>
-                          <td colSpan={3} className="px-6 py-6 text-center text-slate-500">Loading...</td>
+                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td>
                         </tr>
                       ) : customerPaymentsToday.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
+                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
                         </tr>
                       ) : (
                         customerPaymentsToday.map((payment) => (
@@ -922,6 +947,15 @@ export default function Dashboard() {
                             <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
                             <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
                             <td className="px-6 py-3 text-right text-slate-600">${money(payment.totalAmount)}</td>
+                            <td className="px-6 py-3 text-right">
+                              <button
+                                onClick={() => handleSendPaymentToShipping(payment)}
+                                disabled={sendingPaymentId === payment.id}
+                                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                              >
+                                {sendingPaymentId === payment.id ? "Sending..." : "Send PDF"}
+                              </button>
+                            </td>
                           </tr>
                         ))
                       )}

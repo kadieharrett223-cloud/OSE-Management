@@ -107,9 +107,10 @@ export default function ViewPO() {
     fetch("/api/price-list")
       .then((res) => res.json())
       .then((data) => {
-        if (data.ok && Array.isArray(data.data)) {
-          setPriceList(data.data);
-        }
+        // API returns array directly, or wrapped in object
+        const items = Array.isArray(data) ? data : (data.data || []);
+        console.log("Loaded price list items:", items.length);
+        setPriceList(items);
       })
       .catch((err) => console.error("Failed to load price list:", err));
   }, []);
@@ -1152,13 +1153,13 @@ export default function ViewPO() {
                       const sku = e.target.value;
                       setLineItemForm({ ...lineItemForm, sku });
                       // Auto-fill from price list when exact match
-                      const found = priceList.find(item => item.item_no?.toLowerCase() === sku.toLowerCase());
+                      const found = priceList.find(item => (item.sku || item.item_no)?.toLowerCase() === sku.toLowerCase());
                       if (found) {
                         setLineItemForm(prev => ({
                           ...prev,
-                          sku: found.item_no || "",
+                          sku: found.sku || found.item_no || "",
                           description: found.description || "",
-                          unit_price: found.fob_port_cost || found.cost_with_shipping || 0,
+                          unit_price: found.fob_cost || found.cost_with_shipping || 0,
                         }));
                       }
                     }}
@@ -1167,7 +1168,7 @@ export default function ViewPO() {
                   />
                   <datalist id="sku-list-edit">
                     {priceList.map((item) => (
-                      <option key={item.id} value={item.item_no || ""}>{item.description}</option>
+                      <option key={item.id} value={item.sku || item.item_no || ""}>{item.description}</option>
                     ))}
                   </datalist>
                 </div>
