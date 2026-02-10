@@ -584,12 +584,12 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Payments Made Today */}
+            {/* Customer Payments */}
             <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
               <div className="border-b border-slate-200 px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Payments Made Today</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">Customer Payments</h2>
                     <p className="text-sm text-slate-600">Live tracking of customers who paid today</p>
                   </div>
                   <div className="text-right">
@@ -650,12 +650,12 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Vendor Payments Today */}
+            {/* Payment Made Today */}
             <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
               <div className="border-b border-slate-200 px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Payments Made to Vendors Today</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">Payment Made Today</h2>
                     <p className="text-sm text-slate-600">Live tracking of payments sent to vendors</p>
                   </div>
                   <div className="text-right">
