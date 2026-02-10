@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
@@ -26,38 +26,23 @@ interface RepData {
   };
 }
 
-interface PaymentSummary {
+interface RecentInvoice {
+  id: string;
+  docNumber: string;
   customerName: string;
-  totalApplied: number;
-  paymentCount: number;
-  lastTxnDate: string;
+  totalAmt: number;
+  balance: number;
+  txnDate: string;
+  status: "Paid" | "Open";
 }
 
-interface VendorPaymentSummary {
+interface RecentPurchase {
+  id: string;
+  poNumber: string;
   vendorName: string;
-  totalPaid: number;
-  paymentCount: number;
-  lastTxnDate: string;
-}
-
-interface UnpaidInvoice {
-  id: string;
-  docNumber: string;
-  customerName: string;
-  totalAmt: number;
-  balance: number;
-  txnDate: string;
-  salesRep?: string;
-}
-
-interface PartialPaidInvoice {
-  id: string;
-  docNumber: string;
-  customerName: string;
-  totalAmt: number;
-  balance: number;
-  paidAmt: number;
-  txnDate: string;
+  totalAmount: number;
+  status: string;
+  orderDate: string;
 }
 
 const mockReps = [
@@ -97,8 +82,6 @@ const mockReps = [
 
 type LineSeries = Array<number | null>;
 
-const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
 const buildLinePath = (values: LineSeries, maxValue: number, width: number, height: number, padding: number) => {
   const usableWidth = width - padding * 2;
   const usableHeight = height - padding * 2;
@@ -121,29 +104,22 @@ const buildLinePath = (values: LineSeries, maxValue: number, width: number, heig
 
 export default function Dashboard() {
   const [monthlyGoal, setMonthlyGoal] = useState<number>(430000);
-  const [goalInput, setGoalInput] = useState<string>("430000");
-  const [goalStatus, setGoalStatus] = useState<string | null>(null);
-  const [updatingGoal, setUpdatingGoal] = useState(false);
   const [qboSales, setQboSales] = useState<number | null>(null);
-  const [qboInvoiceCount, setQboInvoiceCount] = useState<number>(0);
-  const [loadingQbo, setLoadingQbo] = useState(true);
   const [ytdSales, setYtdSales] = useState<number | null>(null);
   const [loadingYtd, setLoadingYtd] = useState(true);
   const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
-  const [unpaidInvoices, setUnpaidInvoices] = useState<UnpaidInvoice[]>([]);
-  const [loadingUnpaid, setLoadingUnpaid] = useState(false);
-  const [showAllUnpaid, setShowAllUnpaid] = useState(false);
-  const [partialPaidInvoices, setPartialPaidInvoices] = useState<PartialPaidInvoice[]>([]);
-  const [loadingPartialPaid, setLoadingPartialPaid] = useState(false);
-  const [showAllPartialPaid, setShowAllPartialPaid] = useState(false);
-  const [paymentsToday, setPaymentsToday] = useState<PaymentSummary[]>([]);
+  const [outstandingTotal, setOutstandingTotal] = useState<number>(0);
+  const [outstandingCount, setOutstandingCount] = useState<number>(0);
+  const [partialPaidCount, setPartialPaidCount] = useState<number>(0);
+  const [partialPaidRemaining, setPartialPaidRemaining] = useState<number>(0);
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
-  const [loadingPayments, setLoadingPayments] = useState(true);
-  const [lastPaymentsUpdated, setLastPaymentsUpdated] = useState<Date | null>(null);
-  const [vendorPaymentsToday, setVendorPaymentsToday] = useState<VendorPaymentSummary[]>([]);
   const [vendorPaymentsTotal, setVendorPaymentsTotal] = useState<number>(0);
-  const [loadingVendorPayments, setLoadingVendorPayments] = useState(true);
-  const [lastVendorPaymentsUpdated, setLastVendorPaymentsUpdated] = useState<Date | null>(null);
+  const [recentInvoices, setRecentInvoices] = useState<RecentInvoice[]>([]);
+  const [loadingRecentInvoices, setLoadingRecentInvoices] = useState(true);
+  const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
+  const [loadingRecentPurchases, setLoadingRecentPurchases] = useState(true);
+  const [qboSyncStatus, setQboSyncStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [salesTrend, setSalesTrend] = useState<number[]>([]);
 
   // Fetch monthly goal
   useEffect(() => {
@@ -158,7 +134,6 @@ export default function Dashboard() {
         if (!isMounted || !goal?.goal_amount) return;
         const value = Number(goal.goal_amount);
         setMonthlyGoal(value);
-        setGoalInput(String(value));
       })
       .catch(() => undefined);
 
@@ -183,15 +158,12 @@ export default function Dashboard() {
         if (!isMounted) return;
         if (data.ok) {
           setQboSales(data.totalPaid || 0);
-          setQboInvoiceCount(data.count || 0);
         }
       })
       .catch((err) => {
         console.error('Failed to fetch QBO invoices:', err);
       })
-      .finally(() => {
-        if (isMounted) setLoadingQbo(false);
-      });
+      .finally(() => undefined);
 
     // Fetch sales by rep (for totals)
     fetch(`/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=paid`)
@@ -214,59 +186,26 @@ export default function Dashboard() {
     };
   }, []);
 
-  async function handleGoalSave(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setGoalStatus(null);
-    setUpdatingGoal(true);
-    try {
-      const numericGoal = Number(goalInput);
-      console.log("[dashboard] Saving goal:", numericGoal);
-      const res = await fetch(`/api/goals/monthly`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goalAmount: numericGoal }),
-      });
-      const payload = await res.json().catch(() => null);
-      console.log("[dashboard] Full payload:", payload);
-      console.log("[dashboard] Payload keys:", Object.keys(payload || {}));
-      console.log("[dashboard] res.status:", res.status, "res.ok:", res.ok);
-      if (!res.ok) {
-        throw new Error(payload?.error || `HTTP ${res.status}`);
-      }
-      // The API returns { ok: true, goal: data }
-      const saved = payload?.goal;
-      console.log("[dashboard] Saved goal object:", saved);
-      if (saved?.goal_amount) {
-        console.log("[dashboard] Updating monthly goal to:", saved.goal_amount);
-        setMonthlyGoal(Number(saved.goal_amount));
-        setGoalInput(String(saved.goal_amount));
-        setGoalStatus("Saved!");
-        // Clear status after 2 seconds
-        setTimeout(() => setGoalStatus(null), 2000);
-      } else {
-        console.warn("[dashboard] Response missing goal_amount:", saved);
-        setGoalStatus("Save failed: No goal amount returned");
-      }
-    } catch (err: any) {
-      console.error("[dashboard] Save error:", err);
-      setGoalStatus(err?.message || "Save failed");
-    } finally {
-      setUpdatingGoal(false);
-    }
-  }
-
   const totalSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
   const totalCommission = repSalesData.length > 0
     ? repSalesData.reduce((sum, rep) => sum + rep.commission, 0)
     : mockReps.reduce((sum, rep) => sum + rep.commission, 0);
   const percentOfGoal = monthlyGoal > 0 ? Math.round((totalSales / monthlyGoal) * 100) : 0;
-  const dailyPace = totalSales / 15; // 15 days elapsed in month (approx)
-  const projectedMonth = dailyPace * 30;
+  const attentionItems = [
+    outstandingCount > 0
+      ? `Outstanding invoices: $${money(outstandingTotal)} across ${outstandingCount} open invoices.`
+      : null,
+    partialPaidCount > 0
+      ? `Partially paid invoices: ${partialPaidCount} open with $${money(partialPaidRemaining)} remaining.`
+      : null,
+    qboSyncStatus === "error" ? "QuickBooks sync needs attention. Check connection." : null,
+    paymentsTotal > 0 ? `Payments received today: $${money(paymentsTotal)}.` : null,
+    vendorPaymentsTotal > 0 ? `Vendor payments sent today: $${money(vendorPaymentsTotal)}.` : null,
+  ].filter(Boolean) as string[];
 
   // Fetch unpaid invoices for current month
   useEffect(() => {
     const fetchUnpaidInvoices = async () => {
-      setLoadingUnpaid(true);
       try {
         const now = new Date();
         const year = now.getFullYear();
@@ -283,48 +222,15 @@ export default function Dashboard() {
         
         const data = await response.json();
         const invoices = data.invoices || [];
+        const totalOutstanding = invoices.reduce((sum: number, inv: any) => sum + (Number(inv.Balance) || 0), 0);
 
-        const formatted: UnpaidInvoice[] = invoices.map((inv: any) => {
-          // Extract sales rep using same logic as sales-by-rep route
-          let rep = "Unassigned";
-          
-          // First check CustomField
-          if (inv.CustomField && Array.isArray(inv.CustomField)) {
-            const repField = inv.CustomField.find((f: any) => 
-              f.Name === "Sales Rep" || f.Name === "SalesRep" || f.Name === "Rep"
-            );
-            if (repField && repField.StringValue) {
-              rep = repField.StringValue.trim();
-            }
-          }
-          
-          // Fall back to CustomerMemo if not found
-          if (rep === "Unassigned" && inv.CustomerMemo?.value) {
-            const memo = inv.CustomerMemo.value;
-            const repMatch = memo.match(/Rep:\s*([A-Za-z\s/]+)/i);
-            if (repMatch) {
-              rep = repMatch[1].trim();
-            }
-          }
-          
-          return {
-            id: inv.Id,
-            docNumber: inv.DocNumber,
-            customerName: inv.CustomerRef?.name || "Unknown",
-            totalAmt: Number(inv.TotalAmt) || 0,
-            balance: Number(inv.Balance) || 0,
-            txnDate: inv.TxnDate,
-            salesRep: rep !== "Unassigned" ? rep : undefined,
-          };
-        });
-
-        console.log(`[dashboard] Unpaid invoices fetched: ${formatted.length} invoices`);
-        setUnpaidInvoices(formatted);
+        console.log(`[dashboard] Unpaid invoices fetched: ${invoices.length} invoices`);
+        setOutstandingCount(invoices.length);
+        setOutstandingTotal(totalOutstanding);
       } catch (error) {
         console.error("Error fetching unpaid invoices:", error);
-        setUnpaidInvoices([]);
-      } finally {
-        setLoadingUnpaid(false);
+        setOutstandingCount(0);
+        setOutstandingTotal(0);
       }
     };
 
@@ -334,7 +240,6 @@ export default function Dashboard() {
   // Fetch partially paid invoices for current month
   useEffect(() => {
     const fetchPartialPaidInvoices = async () => {
-      setLoadingPartialPaid(true);
       try {
         const now = new Date();
         const year = now.getFullYear();
@@ -352,29 +257,25 @@ export default function Dashboard() {
         const data = await response.json();
         const invoices = data.invoices || [];
 
-        const partials: PartialPaidInvoice[] = invoices
-          .map((inv: any) => {
-            const total = Number(inv.TotalAmt) || 0;
-            const balance = Number(inv.Balance) || 0;
-            const paid = total - balance;
-            return {
-              id: inv.Id,
-              docNumber: inv.DocNumber,
-              customerName: inv.CustomerRef?.name || "Unknown",
-              totalAmt: total,
-              balance,
-              paidAmt: paid,
-              txnDate: inv.TxnDate,
-            };
-          })
-          .filter((inv: PartialPaidInvoice) => inv.paidAmt > 0 && inv.balance > 0);
+        let count = 0;
+        let remaining = 0;
 
-        setPartialPaidInvoices(partials);
+        invoices.forEach((inv: any) => {
+          const total = Number(inv.TotalAmt) || 0;
+          const balance = Number(inv.Balance) || 0;
+          const paid = total - balance;
+          if (paid > 0 && balance > 0) {
+            count += 1;
+            remaining += balance;
+          }
+        });
+
+        setPartialPaidCount(count);
+        setPartialPaidRemaining(remaining);
       } catch (error) {
         console.error("Error fetching partial paid invoices:", error);
-        setPartialPaidInvoices([]);
-      } finally {
-        setLoadingPartialPaid(false);
+        setPartialPaidCount(0);
+        setPartialPaidRemaining(0);
       }
     };
 
@@ -411,12 +312,144 @@ export default function Dashboard() {
     };
   }, []);
 
+  // QuickBooks connectivity status check
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkQboStatus = async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await fetch(`/api/qbo/invoice/query?startDate=${today}&endDate=${today}`);
+        if (!res.ok) throw new Error("QBO status check failed");
+        if (isMounted) setQboSyncStatus("ok");
+      } catch (error) {
+        console.error("Failed QBO status check:", error);
+        if (isMounted) setQboSyncStatus("error");
+      }
+    };
+
+    checkQboStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Recent invoices (last 30 days)
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchRecentInvoices = async () => {
+      setLoadingRecentInvoices(true);
+      try {
+        const endDate = new Date().toISOString().slice(0, 10);
+        const start = new Date();
+        start.setDate(start.getDate() - 30);
+        const startDate = start.toISOString().slice(0, 10);
+        const res = await fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}`);
+        if (!res.ok) throw new Error("Failed to fetch recent invoices");
+        const data = await res.json();
+        const invoices = (data.invoices || []).slice(0, 5).map((inv: any) => {
+          const balance = Number(inv.Balance) || 0;
+          return {
+            id: inv.Id,
+            docNumber: inv.DocNumber,
+            customerName: inv.CustomerRef?.name || "Unknown",
+            totalAmt: Number(inv.TotalAmt) || 0,
+            balance,
+            txnDate: inv.TxnDate,
+            status: balance <= 0 ? "Paid" : "Open",
+          } as RecentInvoice;
+        });
+
+        if (isMounted) setRecentInvoices(invoices);
+      } catch (error) {
+        console.error("Failed to fetch recent invoices:", error);
+        if (isMounted) setRecentInvoices([]);
+      } finally {
+        if (isMounted) setLoadingRecentInvoices(false);
+      }
+    };
+
+    fetchRecentInvoices();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Recent purchases (latest purchase orders)
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchRecentPurchases = async () => {
+      setLoadingRecentPurchases(true);
+      try {
+        const res = await fetch(`/api/purchase-orders`);
+        if (!res.ok) throw new Error("Failed to fetch recent purchases");
+        const data = await res.json();
+        const purchases = (data.data || []).slice(0, 5).map((po: any) => ({
+          id: po.id,
+          poNumber: po.po_number,
+          vendorName: po.vendor_name || "Unknown",
+          totalAmount: Number(po.total_amount) || 0,
+          status: po.status || "UNKNOWN",
+          orderDate: po.order_date,
+        })) as RecentPurchase[];
+
+        if (isMounted) setRecentPurchases(purchases);
+      } catch (error) {
+        console.error("Failed to fetch recent purchases:", error);
+        if (isMounted) setRecentPurchases([]);
+      } finally {
+        if (isMounted) setLoadingRecentPurchases(false);
+      }
+    };
+
+    fetchRecentPurchases();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Monthly sales trend (last 8 months)
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchSalesTrend = async () => {
+      try {
+        const end = new Date();
+        const endDate = end.toISOString().slice(0, 10);
+        const start = new Date(end.getFullYear(), end.getMonth() - 7, 1);
+        const startDate = start.toISOString().slice(0, 10);
+        const res = await fetch(`/api/qbo/invoice/monthly?startDate=${startDate}&endDate=${endDate}`);
+        if (!res.ok) throw new Error("Failed to fetch monthly trend");
+        const data = await res.json();
+        const monthlyPaid = data.monthlyPaid || {};
+
+        const series: number[] = [];
+        for (let i = 7; i >= 0; i -= 1) {
+          const d = new Date(end.getFullYear(), end.getMonth() - i, 1);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          series.push(Number(monthlyPaid[key] || 0));
+        }
+
+        if (isMounted) setSalesTrend(series);
+      } catch (error) {
+        console.error("Failed to fetch sales trend:", error);
+        if (isMounted) setSalesTrend([]);
+      }
+    };
+
+    fetchSalesTrend();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Fetch payments made today (live tracking)
   useEffect(() => {
     let isMounted = true;
 
     const fetchPaymentsToday = async () => {
-      setLoadingPayments(true);
       try {
         const today = new Date().toLocaleDateString("en-CA");
         const res = await fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
@@ -424,7 +457,6 @@ export default function Dashboard() {
         const data = await res.json();
         const payments = data.payments || [];
 
-        const summaryMap = new Map<string, PaymentSummary>();
         let totalApplied = 0;
 
         payments.forEach((payment: any) => {
@@ -432,42 +464,17 @@ export default function Dashboard() {
           const unapplied = Number(payment.UnappliedAmt) || 0;
           const applied = Math.max(total - unapplied, 0);
           if (applied <= 0) return;
-
-          const customerName = payment.CustomerRef?.name || "Unknown Customer";
           totalApplied += applied;
-
-          const existing = summaryMap.get(customerName);
-          if (existing) {
-            existing.totalApplied += applied;
-            existing.paymentCount += 1;
-            if (payment.TxnDate && payment.TxnDate > existing.lastTxnDate) {
-              existing.lastTxnDate = payment.TxnDate;
-            }
-          } else {
-            summaryMap.set(customerName, {
-              customerName,
-              totalApplied: applied,
-              paymentCount: 1,
-              lastTxnDate: payment.TxnDate || today,
-            });
-          }
         });
 
-        const summary = Array.from(summaryMap.values()).sort((a, b) => b.totalApplied - a.totalApplied);
-
         if (isMounted) {
-          setPaymentsToday(summary);
           setPaymentsTotal(totalApplied);
-          setLastPaymentsUpdated(new Date());
         }
       } catch (error) {
         console.error("Failed to fetch payments today:", error);
         if (isMounted) {
-          setPaymentsToday([]);
           setPaymentsTotal(0);
         }
-      } finally {
-        if (isMounted) setLoadingPayments(false);
       }
     };
 
@@ -485,7 +492,6 @@ export default function Dashboard() {
     let isMounted = true;
 
     const fetchVendorPaymentsToday = async () => {
-      setLoadingVendorPayments(true);
       try {
         const today = new Date().toLocaleDateString("en-CA");
         const res = await fetch(`/api/qbo/bill-payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
@@ -493,52 +499,22 @@ export default function Dashboard() {
         const data = await res.json();
         const payments = data.payments || [];
 
-        const summaryMap = new Map<string, VendorPaymentSummary>();
         let totalPaid = 0;
 
         payments.forEach((payment: any) => {
           const paid = Number(payment.TotalAmt) || 0;
           if (paid <= 0) return;
-
-          const vendorName =
-            payment.VendorRef?.name ||
-            payment.PayeeRef?.name ||
-            "Unknown Vendor";
-
           totalPaid += paid;
-
-          const existing = summaryMap.get(vendorName);
-          if (existing) {
-            existing.totalPaid += paid;
-            existing.paymentCount += 1;
-            if (payment.TxnDate && payment.TxnDate > existing.lastTxnDate) {
-              existing.lastTxnDate = payment.TxnDate;
-            }
-          } else {
-            summaryMap.set(vendorName, {
-              vendorName,
-              totalPaid: paid,
-              paymentCount: 1,
-              lastTxnDate: payment.TxnDate || today,
-            });
-          }
         });
 
-        const summary = Array.from(summaryMap.values()).sort((a, b) => b.totalPaid - a.totalPaid);
-
         if (isMounted) {
-          setVendorPaymentsToday(summary);
           setVendorPaymentsTotal(totalPaid);
-          setLastVendorPaymentsUpdated(new Date());
         }
       } catch (error) {
         console.error("Failed to fetch vendor payments today:", error);
         if (isMounted) {
-          setVendorPaymentsToday([]);
           setVendorPaymentsTotal(0);
         }
-      } finally {
-        if (isMounted) setLoadingVendorPayments(false);
       }
     };
 
@@ -565,366 +541,172 @@ export default function Dashboard() {
                 <div className="space-y-2">
                   <h1 className="text-3xl font-semibold text-slate-900">Company Performance</h1>
                   <p className="max-w-2xl text-sm text-slate-600">
-                    Year-to-date sales, commission accrual, and live payments received today. Read-only overview; manage commissions and price list separately.
+                    Business health at a glance with monthly trends, action items, and recent activity.
                   </p>
                 </div>
               </div>
             </header>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {/* Business Health Snapshot */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Monthly Goal</div>
-                <div className="mt-2 text-2xl font-bold text-slate-900">${money(monthlyGoal)}</div>
-                <div className="mt-1 text-xs text-slate-600">Target for month</div>
-              </div>
-
-              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Sales to Date</div>
+                <div className="text-xs uppercase font-semibold text-slate-500">YTD Sales</div>
                 <div className="mt-2 text-2xl font-bold text-emerald-700">
-                  {loadingQbo ? (
-                    <span className="text-slate-400">Loading...</span>
-                  ) : (
-                    `$${money(totalSales)}`
-                  )}
-                </div>
-                <div className="mt-1 text-xs text-slate-600">
-                  {qboSales !== null ? 'Paid invoices this month' : 'YTD aggregate'}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">% of Goal</div>
-                <div className="mt-2 text-2xl font-bold text-blue-700">{percentOfGoal}%</div>
-                <div className="mt-1 text-xs text-slate-600">Pace check</div>
-              </div>
-
-              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Sales This Year So Far</div>
-                <div className="mt-2 text-2xl font-bold text-indigo-700">
                   {loadingYtd ? <span className="text-slate-400">Loading...</span> : `$${money(ytdSales ?? 0)}`}
                 </div>
-                <div className="mt-1 text-xs text-slate-600">Paid invoices for the current year</div>
+                <div className="mt-1 text-xs text-slate-600">{percentOfGoal}% of goal pace</div>
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Order Count</div>
-                <div className="mt-2 text-2xl font-bold text-slate-900">
-                  {loadingQbo ? (
-                    <span className="text-slate-400">...</span>
-                  ) : qboSales !== null ? (
-                    qboInvoiceCount
+                <div className="text-xs uppercase font-semibold text-slate-500">Outstanding Invoices</div>
+                <div className="mt-2 text-2xl font-bold text-amber-700">${money(outstandingTotal)}</div>
+                <div className="mt-1 text-xs text-slate-600">{outstandingCount} open invoices</div>
+              </div>
+
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">Commission Due</div>
+                <div className="mt-2 text-2xl font-bold text-indigo-700">${money(totalCommission)}</div>
+                <div className="mt-1 text-xs text-slate-600">Payroll pressure</div>
+              </div>
+
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">Last Sync Status</div>
+                <div className="mt-2 flex items-center gap-2 text-2xl font-bold text-slate-900">
+                  <span className={`h-2.5 w-2.5 rounded-full ${qboSyncStatus === "ok" ? "bg-emerald-500" : qboSyncStatus === "error" ? "bg-red-500" : "bg-slate-300"}`} />
+                  {qboSyncStatus === "ok" ? "QB Sync ✅" : qboSyncStatus === "error" ? "QB Sync ⚠️" : "Checking"}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">Data reliability check</div>
+              </div>
+            </div>
+
+            {/* Main Visual + Action Required */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="rounded-xl bg-white p-6 shadow-md ring-1 ring-slate-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Monthly Performance</h2>
+                    <p className="text-sm text-slate-600">Sales trend (last 8 months)</p>
+                  </div>
+                  <div className="text-right text-xs text-slate-500">
+                    {money(totalSales)} of {money(monthlyGoal)}
+                  </div>
+                </div>
+                <div className="mt-6">
+                  <svg viewBox="0 0 320 140" className="h-32 w-full">
+                    <path
+                      d={buildLinePath(salesTrend, Math.max(...salesTrend, 1), 320, 140, 12)}
+                      fill="none"
+                      stroke="#2563eb"
+                      strokeWidth="3"
+                    />
+                  </svg>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-white p-6 shadow-md ring-1 ring-slate-200">
+                <h2 className="text-lg font-semibold text-slate-900">Needs Attention</h2>
+                <p className="text-sm text-slate-600">What matters right now</p>
+                <div className="mt-4 space-y-3">
+                  {attentionItems.length === 0 ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                      All clear. No urgent items.
+                    </div>
                   ) : (
-                    mockReps.reduce((sum, r) => sum + r.orders, 0)
+                    attentionItems.map((item, idx) => (
+                      <div key={`${item}-${idx}`} className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        {item}
+                      </div>
+                    ))
                   )}
                 </div>
-                <div className="mt-1 text-xs text-slate-600">
-                  {qboSales !== null ? 'Paid invoices' : 'Total invoices'}
-                </div>
               </div>
             </div>
 
-            {/* Progress Bar */}
-            <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs uppercase font-semibold text-slate-500">Monthly Progress</div>
-                  <div className="mt-1 text-sm text-slate-600">
-                    {money(totalSales)} of {money(monthlyGoal)} | Projected: {money(projectedMonth)}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-300"
-                  style={{ width: `${Math.min(percentOfGoal, 100)}%` }}
-                />
-              </div>
-              <div className="mt-2 flex justify-between text-xs text-slate-500">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
-
-            {/* Customer Payments */}
-            <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-              <div className="border-b border-slate-200 px-6 py-4">
-                <div className="flex items-center justify-between">
+            {/* Quick Tables */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Customer Payments</h2>
-                    <p className="text-sm text-slate-600">Live tracking of customers who paid today</p>
+                    <h2 className="text-lg font-semibold text-slate-900">Recent Invoices</h2>
+                    <p className="text-sm text-slate-600">Last 30 days</p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs text-slate-500">Total Received Today</div>
-                    <div className="text-lg font-semibold text-emerald-700">${money(paymentsTotal)}</div>
-                    <div className="text-xs text-slate-500">
-                      {lastPaymentsUpdated ? `Updated ${lastPaymentsUpdated.toLocaleTimeString()}` : "Updating..."}
-                    </div>
-                  </div>
+                  <a href="/commissions" className="text-sm text-blue-600 hover:text-blue-700">View all →</a>
                 </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="border-b border-slate-200 bg-slate-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                        Customer
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Payments
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Amount Applied
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Last Payment
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {loadingPayments ? (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                          Loading payments...
-                        </td>
-                      </tr>
-                    ) : paymentsToday.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                          No payments recorded today
-                        </td>
-                      </tr>
-                    ) : (
-                      paymentsToday.map((payment) => (
-                        <tr key={payment.customerName} className="hover:bg-slate-50 transition">
-                          <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
-                          <td className="px-6 py-3 text-right text-slate-600">{payment.paymentCount}</td>
-                          <td className="px-6 py-3 text-right font-semibold text-emerald-700">
-                            ${money(payment.totalApplied)}
-                          </td>
-                          <td className="px-6 py-3 text-right text-slate-600">{payment.lastTxnDate}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Payment Made Today */}
-            <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-              <div className="border-b border-slate-200 px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Payment Made Today</h2>
-                    <p className="text-sm text-slate-600">Live tracking of payments sent to vendors</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs text-slate-500">Total Paid Today</div>
-                    <div className="text-lg font-semibold text-indigo-700">${money(vendorPaymentsTotal)}</div>
-                    <div className="text-xs text-slate-500">
-                      {lastVendorPaymentsUpdated ? `Updated ${lastVendorPaymentsUpdated.toLocaleTimeString()}` : "Updating..."}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="border-b border-slate-200 bg-slate-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                        Vendor
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Payments
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Amount Paid
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                        Last Payment
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {loadingVendorPayments ? (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                          Loading vendor payments...
-                        </td>
-                      </tr>
-                    ) : vendorPaymentsToday.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                          No vendor payments recorded today
-                        </td>
-                      </tr>
-                    ) : (
-                      vendorPaymentsToday.map((payment) => (
-                        <tr key={payment.vendorName} className="hover:bg-slate-50 transition">
-                          <td className="px-6 py-3 font-medium text-slate-900">{payment.vendorName}</td>
-                          <td className="px-6 py-3 text-right text-slate-600">{payment.paymentCount}</td>
-                          <td className="px-6 py-3 text-right font-semibold text-indigo-700">
-                            ${money(payment.totalPaid)}
-                          </td>
-                          <td className="px-6 py-3 text-right text-slate-600">{payment.lastTxnDate}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Unpaid Invoices Section */}
-            <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-              <div className="border-b border-slate-200 px-6 py-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Unpaid Invoices</h2>
-                  <p className="text-sm text-slate-600">Current month invoices awaiting payment</p>
-                </div>
-              </div>
-
-              {loadingUnpaid ? (
-                <div className="px-6 py-8 text-center text-slate-500">
-                  Loading unpaid invoices...
-                </div>
-              ) : unpaidInvoices.length === 0 ? (
-                <div className="px-6 py-8 text-center text-slate-500">
-                  No unpaid invoices this month.
-                </div>
-              ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="border-b border-slate-200 bg-slate-50">
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                          Invoice #
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                          Customer
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                          Sales Rep
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                          Date
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                          Total
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                          Balance
-                        </th>
+                        <th className="px-6 py-3 text-left font-semibold">Invoice</th>
+                        <th className="px-6 py-3 text-left font-semibold">Customer</th>
+                        <th className="px-6 py-3 text-right font-semibold">Total</th>
+                        <th className="px-6 py-3 text-right font-semibold">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {(showAllUnpaid ? unpaidInvoices : unpaidInvoices.slice(0, 15)).map((inv) => (
-                        <tr key={inv.id} className="hover:bg-slate-50 transition">
-                          <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
-                          <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
-                          <td className="px-6 py-3 text-slate-600">{inv.salesRep || "-"}</td>
-                          <td className="px-6 py-3 text-slate-600">
-                            {new Date(inv.txnDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                          </td>
-                          <td className="px-6 py-3 text-right text-slate-700">${money(inv.totalAmt)}</td>
-                          <td className="px-6 py-3 text-right font-semibold text-red-700">${money(inv.balance)}</td>
-                        </tr>
-                      ))}
+                      {loadingRecentInvoices ? (
+                        <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td></tr>
+                      ) : recentInvoices.length === 0 ? (
+                        <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">No recent invoices</td></tr>
+                      ) : (
+                        recentInvoices.map((inv) => (
+                          <tr key={inv.id} className="hover:bg-slate-50">
+                            <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
+                            <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
+                            <td className="px-6 py-3 text-right text-slate-700">${money(inv.totalAmt)}</td>
+                            <td className="px-6 py-3 text-right">
+                              <span className={`rounded-full px-2 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                                {inv.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
-                  <div className="border-t border-slate-200 px-6 py-4 bg-slate-50">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold text-slate-900">
-                        Total Unpaid: ${money(unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0))}
-                      </div>
-                      {unpaidInvoices.length > 15 && (
-                        <button
-                          onClick={() => setShowAllUnpaid(!showAllUnpaid)}
-                          className="rounded-lg px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 transition"
-                        >
-                          {showAllUnpaid ? "Show Less" : `View All (${unpaidInvoices.length})`}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Partially Paid Invoices Section */}
-            <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-              <div className="border-b border-slate-200 px-6 py-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Partially Paid Invoices</h2>
-                  <p className="text-sm text-slate-600">Customers with partial payments this month</p>
                 </div>
               </div>
 
-              {loadingPartialPaid ? (
-                <div className="px-6 py-8 text-center text-slate-500">Loading partial payments...</div>
-              ) : partialPaidInvoices.length === 0 ? (
-                <div className="px-6 py-8 text-center text-slate-500">No partially paid invoices</div>
-              ) : (
+              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Recent Purchases</h2>
+                    <p className="text-sm text-slate-600">Latest purchase orders</p>
+                  </div>
+                  <a href="/admin/purchasing" className="text-sm text-blue-600 hover:text-blue-700">View all →</a>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="border-b border-slate-200 bg-slate-50">
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                          Invoice
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                          Customer
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                          Total
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                          Paid
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                          Balance
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                          Date
-                        </th>
+                        <th className="px-6 py-3 text-left font-semibold">PO</th>
+                        <th className="px-6 py-3 text-left font-semibold">Vendor</th>
+                        <th className="px-6 py-3 text-right font-semibold">Total</th>
+                        <th className="px-6 py-3 text-right font-semibold">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {(showAllPartialPaid ? partialPaidInvoices : partialPaidInvoices.slice(0, 15)).map((inv) => (
-                        <tr key={inv.id} className="hover:bg-slate-50 transition">
-                          <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
-                          <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
-                          <td className="px-6 py-3 text-right text-slate-700">${money(inv.totalAmt)}</td>
-                          <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(inv.paidAmt)}</td>
-                          <td className="px-6 py-3 text-right font-semibold text-amber-700">${money(inv.balance)}</td>
-                          <td className="px-6 py-3 text-right text-slate-600">
-                            {new Date(inv.txnDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                          </td>
-                        </tr>
-                      ))}
+                      {loadingRecentPurchases ? (
+                        <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td></tr>
+                      ) : recentPurchases.length === 0 ? (
+                        <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">No recent purchases</td></tr>
+                      ) : (
+                        recentPurchases.map((po) => (
+                          <tr key={po.id} className="hover:bg-slate-50">
+                            <td className="px-6 py-3 font-mono text-slate-700">{po.poNumber}</td>
+                            <td className="px-6 py-3 text-slate-700">{po.vendorName}</td>
+                            <td className="px-6 py-3 text-right text-slate-700">${money(po.totalAmount)}</td>
+                            <td className="px-6 py-3 text-right">
+                              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                                {po.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
-                  <div className="border-t border-slate-200 px-6 py-4 bg-slate-50">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold text-slate-900">
-                        Total Remaining: ${money(partialPaidInvoices.reduce((sum, inv) => sum + inv.balance, 0))}
-                      </div>
-                      {partialPaidInvoices.length > 15 && (
-                        <button
-                          onClick={() => setShowAllPartialPaid(!showAllPartialPaid)}
-                          className="rounded-lg px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 transition"
-                        >
-                          {showAllPartialPaid ? "Show Less" : `View All (${partialPaidInvoices.length})`}
-                        </button>
-                      )}
-                    </div>
-                  </div>
                 </div>
-              )}
+              </div>
             </div>
 
           </div>

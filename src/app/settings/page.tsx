@@ -3,12 +3,11 @@
 export const dynamic = "force-dynamic";
 
 import { signOut } from 'next-auth/react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function SettingsPage() {
-  const router = useRouter();
   const pathname = usePathname();
   const [qboConnected, setQboConnected] = useState(false);
   const [shopifyConnected, setShopifyConnected] = useState(false);
@@ -20,6 +19,7 @@ export default function SettingsPage() {
   const [shopInput, setShopInput] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmationStep, setConfirmationStep] = useState(1);
+  const [activeTab, setActiveTab] = useState<'integrations' | 'defaults' | 'users' | 'billing'>('integrations');
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -184,6 +184,30 @@ export default function SettingsPage() {
             </Link>
           </nav>
         </div>
+
+        <div className="mb-6 rounded-lg bg-white shadow">
+          <div className="flex flex-wrap gap-3 border-b border-gray-100 px-4 py-3">
+            {[
+              { id: 'integrations', label: 'Integrations' },
+              { id: 'defaults', label: 'Defaults' },
+              { id: 'users', label: 'Users' },
+              { id: 'billing', label: 'Billing' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                  activeTab === tab.id
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-700">{error}</p>
@@ -196,133 +220,164 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Account Section */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Account</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
-              <p className="mt-1 text-gray-900">{process.env.ADMIN_EMAIL || 'admin@local'}</p>
+        {activeTab === 'integrations' && (
+          <>
+            {/* QuickBooks Section */}
+            <div className="bg-white rounded-lg shadow mb-6 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">QuickBooks Integration</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-700 font-medium">QuickBooks Online Connection</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {qboConnected ? 'Connected' : 'Not connected'}
+                    </p>
+                  </div>
+                  <div>
+                    {qboConnected ? (
+                      <button
+                        onClick={handleDisconnectQbo}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                      >
+                        Disconnect
+                      </button>
+                    ) : (
+                      <Link
+                        href="/api/qbo/connect"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                      >
+                        Connect
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Role</label>
-              <p className="mt-1 text-gray-900 capitalize">admin</p>
-            </div>
-          </div>
-        </div>
 
-        {/* QuickBooks Section */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">QuickBooks Integration</h2>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-700 font-medium">QuickBooks Online Connection</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {qboConnected ? 'Connected' : 'Not connected'}
-                </p>
-              </div>
-              <div>
-                {qboConnected ? (
-                  <button
-                    onClick={handleDisconnectQbo}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                  >
-                    Disconnect
-                  </button>
-                ) : (
-                  <Link
-                    href="/api/qbo/connect"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  >
-                    Connect
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+            {/* Shopify Section */}
+            <div className="bg-white rounded-lg shadow mb-6 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Shopify Integration</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-gray-700 font-medium">Shopify Store Connection</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {shopifyConnected ? `Connected to ${shopifyShop}` : 'Not connected'}
+                    </p>
+                  </div>
+                  <div>
+                    {shopifyConnected ? (
+                      <button
+                        onClick={handleSyncPrices}
+                        disabled={syncing}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {syncing ? 'Syncing...' : 'Sync Prices'}
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={shopInput}
+                          onChange={(e) => setShopInput(e.target.value)}
+                          placeholder="your-store.myshopify.com"
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <button
+                          onClick={handleConnectShopify}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                        >
+                          Connect
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-        {/* Shopify Section */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Shopify Integration</h2>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-gray-700 font-medium">Shopify Store Connection</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {shopifyConnected ? `Connected to ${shopifyShop}` : 'Not connected'}
-                </p>
-              </div>
-              <div>
-                {shopifyConnected ? (
-                  <button
-                    onClick={handleSyncPrices}
-                    disabled={syncing}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {syncing ? 'Syncing...' : 'Sync Prices'}
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={shopInput}
-                      onChange={(e) => setShopInput(e.target.value)}
-                      placeholder="your-store.myshopify.com"
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <button
-                      onClick={handleConnectShopify}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                    >
-                      Connect
-                    </button>
+                {shopifyConnected && (
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Note:</strong> Prices will sync from your price list to Shopify based on matching SKUs.
+                      Make sure your Shopify product variants have SKUs that match your price list item numbers.
+                    </p>
                   </div>
                 )}
               </div>
             </div>
+          </>
+        )}
 
-            {shopifyConnected && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> Prices will sync from your price list to Shopify based on matching SKUs.
-                  Make sure your Shopify product variants have SKUs that match your price list item numbers.
-                </p>
+        {activeTab === 'defaults' && (
+          <>
+            <div className="bg-white rounded-lg shadow mb-6 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Defaults</h2>
+              <p className="text-sm text-gray-500">
+                Configure default goals, commission settings, and automation rules.
+              </p>
+              <div className="mt-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                Defaults configuration is coming soon.
               </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Navigation Section */}
-        <div className="bg-white rounded-lg shadow mb-6 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">App</h2>
-          <div className="space-y-3">
-            <Link
-              href="/eula"
-              className="block text-blue-600 hover:text-blue-700 text-sm"
-            >
-              End User License Agreement
-            </Link>
-            <Link
-              href="/privacy"
-              className="block text-blue-600 hover:text-blue-700 text-sm"
-            >
-              Privacy Policy
-            </Link>
-          </div>
-        </div>
+            <div className="bg-white rounded-lg shadow mb-6 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">App</h2>
+              <div className="space-y-3">
+                <Link
+                  href="/eula"
+                  className="block text-blue-600 hover:text-blue-700 text-sm"
+                >
+                  End User License Agreement
+                </Link>
+                <Link
+                  href="/privacy"
+                  className="block text-blue-600 hover:text-blue-700 text-sm"
+                >
+                  Privacy Policy
+                </Link>
+              </div>
+            </div>
+          </>
+        )}
 
-        {/* Logout Section */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Session</h2>
-          <button
-            onClick={handleLogout}
-            className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition font-medium"
-          >
-            Sign Out
-          </button>
-        </div>
+        {activeTab === 'users' && (
+          <>
+            <div className="bg-white rounded-lg shadow mb-6 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Account</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <p className="mt-1 text-gray-900">{process.env.ADMIN_EMAIL || 'admin@local'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Role</label>
+                  <p className="mt-1 text-gray-900 capitalize">admin</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Session</h2>
+              <button
+                onClick={handleLogout}
+                className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition font-medium"
+              >
+                Sign Out
+              </button>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'billing' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Billing</h2>
+            <p className="text-sm text-gray-500">
+              Manage invoices, subscriptions, and payment methods.
+            </p>
+            <div className="mt-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              Billing settings are coming soon.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Confirmation Modal */}

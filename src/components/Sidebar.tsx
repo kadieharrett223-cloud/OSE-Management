@@ -3,13 +3,33 @@
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 
-const navItems = [
-  { label: "Dashboard", hint: "Company overview", href: "/" },
-  { label: "Commissions", hint: "QBO sync & payouts", href: "/commissions" },
-  { label: "Calendar", hint: "Sales & notifications", href: "/calendar" },
-  { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
-  { label: "Purchasing", hint: "POs and payments", href: "/admin/purchasing" },
-  { label: "Settings", hint: "QBO & Shopify config", href: "/settings" },
+const navGroups = [
+  {
+    title: "Operations",
+    items: [
+      { label: "Dashboard", hint: "Company overview", href: "/" },
+      { label: "Calendar", hint: "Sales & notifications", href: "/calendar" },
+    ],
+  },
+  {
+    title: "Finance",
+    items: [
+      { label: "Commissions", hint: "QBO sync & payouts", href: "/commissions" },
+    ],
+  },
+  {
+    title: "Inventory",
+    items: [
+      { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
+      { label: "Purchasing", hint: "POs and payments", href: "/admin/purchasing" },
+    ],
+  },
+  {
+    title: "Admin",
+    items: [
+      { label: "Settings", hint: "QBO & Shopify config", href: "/settings" },
+    ],
+  },
 ];
 
 export function Sidebar({ activePage }: { activePage: string }) {
@@ -42,24 +62,33 @@ export function Sidebar({ activePage }: { activePage: string }) {
         </button>
       </div>
 
-      <nav className="mt-6 space-y-2">
-        {navItems.map((item) => (
-          <a
-            key={item.label}
-            href={item.href}
-            className={`block w-full rounded-xl border px-3 py-3 text-left text-sm transition ${
-              item.label === activePage
-                ? "border-blue-400/50 bg-blue-900/40 text-white hover:-translate-y-[1px]"
-                : "border-slate-800/70 bg-slate-900/40 text-slate-100 hover:-translate-y-[1px] hover:border-blue-400/50 hover:bg-blue-900/40 hover:text-white"
-            }`}
-            title={item.label}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-medium">{sidebarOpen ? item.label : item.label.slice(0, 1)}</span>
-              {sidebarOpen && <span className="text-[10px] uppercase tracking-wide text-blue-200">view</span>}
-            </div>
-            {sidebarOpen && <p className="text-xs text-slate-300">{item.hint}</p>}
-          </a>
+      <nav className="mt-6 space-y-4">
+        {navGroups.map((group) => (
+          <div key={group.title} className="space-y-2">
+            {sidebarOpen && (
+              <p className="px-2 text-[10px] uppercase tracking-[0.3em] text-blue-200/80">
+                {group.title}
+              </p>
+            )}
+            {group.items.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                className={`block w-full rounded-xl border px-3 py-3 text-left text-sm transition ${
+                  item.label === activePage
+                    ? "border-blue-400/50 bg-blue-900/40 text-white hover:-translate-y-[1px]"
+                    : "border-slate-800/70 bg-slate-900/40 text-slate-100 hover:-translate-y-[1px] hover:border-blue-400/50 hover:bg-blue-900/40 hover:text-white"
+                }`}
+                title={item.label}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{sidebarOpen ? item.label : item.label.slice(0, 1)}</span>
+                  {sidebarOpen && <span className="text-[10px] uppercase tracking-wide text-blue-200">view</span>}
+                </div>
+                {sidebarOpen && <p className="text-xs text-slate-300">{item.hint}</p>}
+              </a>
+            ))}
+          </div>
         ))}
       </nav>
 
@@ -97,7 +126,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
       {sidebarOpen && (
         <div className="mt-4 rounded-xl border border-slate-800/80 bg-slate-900/60 px-4 py-3 text-xs text-slate-300">
           <p className="font-semibold text-white">Info</p>
-          <p className="text-slate-300">Dashboard shows YTD metrics and sales rep performance. Sync QBO to update in real-time.</p>
+          <p className="text-slate-300">Dashboard shows health metrics, action items, and recent activity. Sync QBO to update in real-time.</p>
         </div>
       )}
     </aside>
