@@ -172,6 +172,7 @@ export default function AdminPriceListPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [discountPercentage, setDiscountPercentage] = useState<number>(0); // Default 0% (no sale)
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -512,6 +513,83 @@ export default function AdminPriceListPage() {
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-blue-700">Admin</p>
                 <h1 className="mt-1 text-3xl font-semibold text-slate-900">Price List Management</h1>
+            {/* Guide Modal */}
+            {showGuide && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                    <h2 className="text-lg font-semibold text-slate-900">Price List Guide</h2>
+                    <button
+                      onClick={() => setShowGuide(false)}
+                      className="text-slate-400 hover:text-slate-600"
+                      type="button"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="max-h-[75vh] overflow-y-auto px-6 py-6">
+                    <div className="rounded-2xl bg-blue-50 p-6 ring-1 ring-blue-200">
+                      <h3 className="font-semibold text-blue-900">💡 Price List Notes</h3>
+                      <ul className="mt-3 space-y-2 text-sm text-blue-800">
+                        <li>
+                          <strong className="text-blue-600">Input fields (blue)</strong>: FOB Cost, Ocean Freight, Importing, Zone 5 Shipping, Multiplier
+                        </li>
+                        <li>
+                          <strong className="text-amber-700">Shipping (amber)</strong>: Critical for commission deductions
+                        </li>
+                        <li>
+                          <strong className="text-emerald-700">Sell Price</strong>: Base sell price (Cost × Multiplier)
+                        </li>
+                        <li>
+                          <strong className="text-slate-700">List Price</strong>: Sell Price × 1.2 (MSRP headroom)
+                        </li>
+                      </ul>
+
+                      <div className="mt-6 space-y-3 text-sm text-blue-900">
+                        <h4 className="font-semibold text-blue-900">Row / Column Quick Guide</h4>
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                            <p className="font-semibold text-blue-800">Item &amp; Sourcing</p>
+                            <p className="text-blue-700">Item No., Description, Supplier — identifiers only; no math impact.</p>
+                          </div>
+                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                            <p className="font-semibold text-blue-800">Base Cost Inputs</p>
+                            <p className="text-blue-700">FOB drives all downstream costs/prices. Quantity changes per-unit freight/import allocations.</p>
+                          </div>
+                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                            <p className="font-semibold text-blue-800">Tariffs &amp; Import</p>
+                            <p className="text-blue-700">Tariff 105% = FOB × 2.05. Ocean/Import spread over quantity; shifts landed cost and profit.</p>
+                          </div>
+                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                            <p className="font-semibold text-blue-800">Domestic Shipping</p>
+                            <p className="text-blue-700">Zone 5 shipping is per-unit; affects final landed cost and profit, not import math.</p>
+                          </div>
+                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                            <p className="font-semibold text-blue-800">Cost Roll-ups</p>
+                            <p className="text-blue-700">Import Landed = Tariff + Ocean + Import. Final Landed = Import Landed + Shipping.</p>
+                          </div>
+                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                            <p className="font-semibold text-blue-800">Pricing</p>
+                            <p className="text-blue-700">Multiplier changes sell price and profit only. List Price is sell price × 1.2.</p>
+                          </div>
+                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                            <p className="font-semibold text-blue-800">Profit</p>
+                            <p className="text-blue-700">Profit = Sell Price − Final Landed. Independent of list price.</p>
+                          </div>
+                          <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
+                            <p className="font-semibold text-blue-800">Change Effects</p>
+                            <p className="text-blue-700">FOB or tariff rate: everything moves. Quantity: only freight/import per-unit. Shipping: final cost/pricing only. Multiplier: price/profit only.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
                 <p className="mt-2 max-w-2xl text-sm text-slate-600">
                   Manage SKU pricing and shipping deductions. Input fields in <span className="text-blue-600 font-medium">blue</span>, computed fields auto-update.
                 </p>
@@ -554,17 +632,29 @@ export default function AdminPriceListPage() {
                 </div>
               </div>
 
-              {/* Add Product Button */}
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-md transition-colors flex items-center gap-2"
-                type="button"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Product
-              </button>
+              {/* Actions */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowGuide(true)}
+                  className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
+                  type="button"
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                    i
+                  </span>
+                  Guide
+                </button>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-md transition-colors flex items-center gap-2"
+                  type="button"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Product
+                </button>
+              </div>
             </header>
 
             {/* Status */}
@@ -826,62 +916,6 @@ export default function AdminPriceListPage() {
               </>
             )}
 
-            {/* Documentation */}
-            <section className="rounded-2xl bg-blue-50 p-6 ring-1 ring-blue-200">
-              <h3 className="font-semibold text-blue-900">💡 Price List Notes</h3>
-              <ul className="mt-3 space-y-2 text-sm text-blue-800">
-                <li>
-                  <strong className="text-blue-600">Input fields (blue)</strong>: FOB Cost, Ocean Freight, Importing, Zone 5 Shipping, Multiplier
-                </li>
-                <li>
-                  <strong className="text-amber-700">Shipping (amber)</strong>: Critical for commission deductions
-                </li>
-                <li>
-                  <strong className="text-emerald-700">Sale Price (green)</strong>: Auto-computed, used as sale price per unit for commissions
-                </li>
-                <li>
-                  All derived fields (Per Unit, Sell Price, etc.) are auto-computed by the database
-                </li>
-              </ul>
-
-              <div className="mt-6 space-y-3 text-sm text-blue-900">
-                <h4 className="font-semibold text-blue-900">Row / Column Quick Guide</h4>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                    <p className="font-semibold text-blue-800">Item &amp; Sourcing</p>
-                    <p className="text-blue-700">Item No., Description, Supplier — identifiers only; no math impact.</p>
-                  </div>
-                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                    <p className="font-semibold text-blue-800">Base Cost Inputs</p>
-                    <p className="text-blue-700">FOB drives all downstream costs/prices. Quantity changes per-unit freight/import allocations.</p>
-                  </div>
-                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                    <p className="font-semibold text-blue-800">Tariffs &amp; Import</p>
-                    <p className="text-blue-700">Tariff 105% = FOB × 2.05. Ocean/Import spread over quantity; shifts landed cost and profit.</p>
-                  </div>
-                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                    <p className="font-semibold text-blue-800">Domestic Shipping</p>
-                    <p className="text-blue-700">Zone 5 shipping is per-unit; affects final landed cost and profit, not import math.</p>
-                  </div>
-                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                    <p className="font-semibold text-blue-800">Cost Roll-ups</p>
-                    <p className="text-blue-700">Import Landed = Tariff + Ocean + Import. Final Landed = Import Landed + Shipping.</p>
-                  </div>
-                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                    <p className="font-semibold text-blue-800">Pricing</p>
-                    <p className="text-blue-700">Multiplier changes sell price and profit only. List Price is sell price × 1.2 for MSRP headroom.</p>
-                  </div>
-                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                    <p className="font-semibold text-blue-800">Profit</p>
-                    <p className="text-blue-700">Profit = Sell Price − Final Landed. Independent of list price.</p>
-                  </div>
-                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-blue-200/70">
-                    <p className="font-semibold text-blue-800">Change Effects</p>
-                    <p className="text-blue-700">FOB or tariff rate: everything moves. Quantity: only freight/import per-unit. Shipping: final cost/pricing only. Multiplier: price/profit only.</p>
-                  </div>
-                </div>
-              </div>
-            </section>
           </div>
         </main>
 
