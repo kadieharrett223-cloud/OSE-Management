@@ -49,6 +49,107 @@ const money = (v: number | null) => {
   return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+const PRICE_LIST_ORDER: string[] = [
+  "2PBP-8",
+  "2PCF-9",
+  "2PBP-10",
+  "2PBPXW-10",
+  "2PCFXL-10",
+  "2PDDA-10",
+  "2PBP-12",
+  "2PCFHD-12",
+  "2PCFHD-15",
+  "4PTA-3",
+  "4PTA-6",
+  "4PTA-4.5",
+  "8PTA",
+  "2PFC",
+  "4PML-9",
+  "HDMBL-9",
+  "4PHR-9x",
+  "HDMBL-10",
+  "4PXL-10",
+  "4PXLA-10",
+  "4PXL-10B",
+  "4PXW-10",
+  "4PHDXLA-11",
+  "4PHDXL-12",
+  "4PHDXLA-12",
+  "4PHDXLA-14",
+  "4PHDXLA-15",
+  "4032XL",
+  "4032-6",
+  "4032S",
+  "4PHDXL-22",
+  "4PHDXLA-22",
+  "4PHDXL-27",
+  "4PHDXLA-27",
+  "4PHDXL-33",
+  "4PHDXLA-33",
+  "HLCJ-6",
+  "FBCJ-6",
+  "JVCJ-6",
+  "HLCJ-14/ YZRCJ-7",
+  "HR-10",
+  "4PRJ-9",
+  "4PHDA-RJ",
+  "4PTT",
+  "4PJT",
+  "FBAR-2",
+  "YZXL-10RJT",
+  "ALT-11-15",
+  "SSALT-11-15",
+  "4PDT",
+  "ML-8APLFM",
+  "FB-9PLFM",
+  "HR-10PLFM",
+  "XW-10PLFM",
+  "4032PLFM",
+  "4PCA",
+  "MRSL-6",
+  "MRSL-75",
+  "FRSL-78",
+  "T999-E",
+  "T650",
+  "T620",
+  "MCA-1",
+  "W820",
+  "W810",
+  "W690",
+  "AS800",
+  "A9800",
+  "ACB-1",
+  "R-45",
+  "R-30",
+  "RT-1",
+  "HDML-15",
+  "MCWC-16198",
+  "HDML J",
+  "HDML-J",
+  "BNDL-POF15",
+  "BNDL-POF11",
+  "BNDL-PA14",
+  "BNDL-VA15",
+  "APU-1",
+  "UHS-5075",
+  "UHJS-750",
+  "OD-A30",
+  "OD-7170",
+  "OD-3198A",
+  "OD-3198",
+  "TJ-1102 / TJ-707",
+  "TJ-1101A / TJ2718",
+  "Hi Strength Epoxy",
+  "AW-32",
+  "HPU220-4",
+  "HPU220",
+  "HPU110",
+];
+
+const PRICE_LIST_ORDER_MAP = new Map(
+  PRICE_LIST_ORDER.map((sku, index) => [sku.toLowerCase(), index])
+);
+
 async function bufferFromFile(file: File): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -339,13 +440,40 @@ export default function AdminPriceListPage() {
   });
 
   // Group items by category and apply discount calculations
-  const itemsByCategory = categories.map((cat) => ({
-    category: cat,
-    items: filteredItems
-      .filter((item) => item.category_id === cat.id)
-      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
-      .map((item) => computeDerivedFields(item)),
-  })).filter(({ items }) => items.length > 0);
+  const sortedCategories = [...categories].sort((a, b) => {
+    const aItems = filteredItems.filter((item) => item.category_id === a.id);
+    const bItems = filteredItems.filter((item) => item.category_id === b.id);
+
+    const aMin = aItems.reduce((min, item) => {
+      const idx = PRICE_LIST_ORDER_MAP.get(item.item_no.toLowerCase());
+      return idx === undefined ? min : Math.min(min, idx);
+    }, Number.POSITIVE_INFINITY);
+
+    const bMin = bItems.reduce((min, item) => {
+      const idx = PRICE_LIST_ORDER_MAP.get(item.item_no.toLowerCase());
+      return idx === undefined ? min : Math.min(min, idx);
+    }, Number.POSITIVE_INFINITY);
+
+    if (aMin !== bMin) return aMin - bMin;
+    return (a.display_order ?? 0) - (b.display_order ?? 0);
+  });
+
+  const itemsByCategory = sortedCategories
+    .map((cat) => ({
+      category: cat,
+      items: filteredItems
+        .filter((item) => item.category_id === cat.id)
+        .sort((a, b) => {
+          const aIdx = PRICE_LIST_ORDER_MAP.get(a.item_no.toLowerCase());
+          const bIdx = PRICE_LIST_ORDER_MAP.get(b.item_no.toLowerCase());
+          if (aIdx !== undefined && bIdx !== undefined) return aIdx - bIdx;
+          if (aIdx !== undefined) return -1;
+          if (bIdx !== undefined) return 1;
+          return (a.display_order ?? 0) - (b.display_order ?? 0);
+        })
+        .map((item) => computeDerivedFields(item)),
+    }))
+    .filter(({ items }) => items.length > 0);
 
   const pathname = usePathname();
   const tabs = [
