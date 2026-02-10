@@ -125,6 +125,8 @@ export default function Dashboard() {
   const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
   const [outstandingTotal, setOutstandingTotal] = useState<number>(0);
   const [outstandingCount, setOutstandingCount] = useState<number>(0);
+  const [monthlyTotal, setMonthlyTotal] = useState<number>(0);
+  const [loadingMonthlyTotal, setLoadingMonthlyTotal] = useState(true);
   const [partialPaidCount, setPartialPaidCount] = useState<number>(0);
   const [partialPaidRemaining, setPartialPaidRemaining] = useState<number>(0);
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
@@ -255,6 +257,40 @@ export default function Dashboard() {
     };
 
     fetchUnpaidInvoices();
+  }, []);
+
+  // Fetch sales for current month
+  useEffect(() => {
+    const fetchMonthlySales = async () => {
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const startDate = `${year}-${month}-01`;
+        const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+        const endDate = `${year}-${month}-${lastDay}`;
+
+        const response = await fetch(
+          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=all`
+        );
+        
+        if (!response.ok) throw new Error("Failed to fetch monthly sales");
+        
+        const data = await response.json();
+        const invoices = data.invoices || [];
+        const totalSales = invoices.reduce((sum: number, inv: any) => sum + (Number(inv.TotalAmt) || 0), 0);
+
+        console.log(`[dashboard] Monthly sales fetched: ${invoices.length} invoices, Total: $${totalSales}`);
+        setMonthlyTotal(totalSales);
+      } catch (error) {
+        console.error("Error fetching monthly sales:", error);
+        setMonthlyTotal(0);
+      } finally {
+        setLoadingMonthlyTotal(false);
+      }
+    };
+
+    fetchMonthlySales();
   }, []);
 
   // Fetch partially paid invoices for current month
@@ -673,9 +709,11 @@ export default function Dashboard() {
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">Outstanding Invoices</div>
-                <div className="mt-2 text-2xl font-bold text-amber-700">${money(outstandingTotal)}</div>
-                <div className="mt-1 text-xs text-slate-600">{outstandingCount} open invoices</div>
+                <div className="text-xs uppercase font-semibold text-slate-500">Sales This Month</div>
+                <div className="mt-2 text-2xl font-bold text-emerald-700">
+                  {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(monthlyTotal)}`}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">{(monthlyTotal / monthlyGoal * 100).toFixed(1)}% of goal</div>
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">

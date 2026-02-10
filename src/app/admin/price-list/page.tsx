@@ -353,12 +353,11 @@ export default function AdminPriceListPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="flex min-h-screen">
-        <Sidebar activePage="Price List" />
+    <div className="flex min-h-screen">
+      <Sidebar activePage="Price List" />
 
-        {/* Main Content */}
-        <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
+      {/* Main Content */}
+      <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
           {/* Chrome-style Tabs */}
           <div className="bg-slate-800 border-b border-slate-700 px-8">
             <div className="flex gap-1">
@@ -756,7 +755,6 @@ export default function AdminPriceListPage() {
             </section>
           </div>
         </main>
-      </div>
 
       {/* Add Product Modal */}
       {showAddModal && (

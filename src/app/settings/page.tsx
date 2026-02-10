@@ -3,12 +3,13 @@
 export const dynamic = "force-dynamic";
 
 import { signOut } from 'next-auth/react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function SettingsPage() {
   const pathname = usePathname();
+  const router = useRouter();
   const [qboConnected, setQboConnected] = useState(false);
   const [shopifyConnected, setShopifyConnected] = useState(false);
   const [shopifyShop, setShopifyShop] = useState<string | null>(null);
@@ -153,8 +154,21 @@ export default function SettingsPage() {
       {/* Header */}
       <div className="bg-white shadow">
         <div className="max-w-4xl mx-auto px-6 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-500 mt-1">Manage your account and app preferences</p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="text-gray-600 hover:text-gray-900 p-1"
+              title="Go back"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+              <p className="text-gray-500 mt-1">Manage your account and app preferences</p>
+            </div>
+          </div>
         </div>
       </div>
 

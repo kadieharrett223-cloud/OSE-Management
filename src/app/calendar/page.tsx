@@ -327,10 +327,10 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen">
       <Sidebar activePage="Calendar" />
 
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-8 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
         <div className="mx-auto max-w-7xl">
           {/* Header */}
           <div className="mb-6 flex items-center justify-between">

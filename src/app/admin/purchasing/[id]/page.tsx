@@ -52,6 +52,18 @@ export default function ViewPO() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [poNotes, setPoNotes] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingPO, setDeletingPO] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPO, setEditingPO] = useState(false);
+  const [editForm, setEditForm] = useState({
+    vendor_name: "",
+    vendor_contact_name: "",
+    vendor_email: "",
+    vendor_phone: "",
+    terms: "",
+    expected_delivery: "",
+  });
 
   useEffect(() => {
     if (id) {
@@ -61,6 +73,14 @@ export default function ViewPO() {
           if (result.ok) {
             setPO(result.data);
             setPoNotes(result.data.notes || "");
+            setEditForm({
+              vendor_name: result.data.vendor_name || "",
+              vendor_contact_name: result.data.vendor_contact_name || "",
+              vendor_email: result.data.vendor_email || "",
+              vendor_phone: result.data.vendor_phone || "",
+              terms: result.data.terms || "",
+              expected_delivery: result.data.expected_delivery || "",
+            });
           }
           setLoading(false);
         })
@@ -102,6 +122,61 @@ export default function ViewPO() {
       alert("Failed to send email");
     } finally {
       setSendingEmail(false);
+    }
+  };
+
+  const handleDeletePO = async () => {
+    if (!po?.id) return;
+    
+    setDeletingPO(true);
+    try {
+      const res = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to delete PO");
+        return;
+      }
+
+      alert("Purchase order deleted successfully");
+      router.push("/admin/purchasing");
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Failed to delete purchase order");
+    } finally {
+      setDeletingPO(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const handleEditPO = async () => {
+    if (!po?.id) return;
+    
+    setEditingPO(true);
+    try {
+      const res = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to update PO");
+        return;
+      }
+
+      const result = await res.json();
+      setPO(result.data);
+      alert("Purchase order updated successfully");
+      setShowEditModal(false);
+    } catch (error) {
+      console.error("Edit error:", error);
+      alert("Failed to update purchase order");
+    } finally {
+      setEditingPO(false);
     }
   };
 
@@ -152,6 +227,18 @@ export default function ViewPO() {
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
             >
               Print
+            </button>
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+            >
+              Delete
             </button>
           </div>
         </div>
@@ -720,6 +807,119 @@ export default function ViewPO() {
                 className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
                 {sendingEmail ? "Sending..." : `Send to ${emailForm.recipient_name || emailForm.to_email || "Supplier"}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Delete Purchase Order?</h2>
+            <p className="text-slate-600 mb-6">
+              Are you sure you want to delete PO #{po?.po_number}? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deletingPO}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeletePO}
+                disabled={deletingPO}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingPO ? "Deleting..." : "Delete PO"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit PO Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md max-h-96 overflow-y-auto rounded-lg bg-white p-6 shadow-lg">
+            <h2 className="text-xl font-bold text-slate-900 mb-4">Edit Purchase Order</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Vendor Name</label>
+                <input
+                  type="text"
+                  value={editForm.vendor_name}
+                  onChange={(e) => setEditForm({ ...editForm, vendor_name: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Contact Name</label>
+                <input
+                  type="text"
+                  value={editForm.vendor_contact_name}
+                  onChange={(e) => setEditForm({ ...editForm, vendor_contact_name: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editForm.vendor_email}
+                  onChange={(e) => setEditForm({ ...editForm, vendor_email: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={editForm.vendor_phone}
+                  onChange={(e) => setEditForm({ ...editForm, vendor_phone: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Terms</label>
+                <input
+                  type="text"
+                  value={editForm.terms}
+                  onChange={(e) => setEditForm({ ...editForm, terms: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Expected Delivery</label>
+                <input
+                  type="date"
+                  value={editForm.expected_delivery}
+                  onChange={(e) => setEditForm({ ...editForm, expected_delivery: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowEditModal(false)}
+                disabled={editingPO}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleEditPO}
+                disabled={editingPO}
+                className="flex-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {editingPO ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>
