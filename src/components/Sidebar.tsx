@@ -32,8 +32,13 @@ const navGroups = [
 export function Sidebar({ activePage }: { activePage: string }) {
   return (
     <aside
-      className="flex w-72 flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-blue-950 px-4 py-6 shadow-2xl ring-1 ring-slate-900/30"
+      className="relative flex w-72 flex-col overflow-hidden bg-gradient-to-b from-slate-950 via-blue-900 to-blue-700 px-4 py-6 shadow-2xl ring-1 ring-slate-900/30"
     >
+      <div className="pointer-events-none absolute bottom-0 left-0 h-48 w-48 opacity-20">
+        <div className="absolute bottom-6 left-6 h-24 w-24 rounded-2xl border border-blue-200/40 bg-white/5" />
+        <div className="absolute bottom-12 left-16 h-16 w-16 rotate-12 rounded-xl border border-blue-200/40 bg-white/5" />
+        <div className="absolute bottom-2 left-20 h-10 w-10 rotate-45 border border-blue-200/40 bg-white/5" />
+      </div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/20 text-sm font-semibold text-blue-100 ring-1 ring-blue-300/30">
