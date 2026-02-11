@@ -6,6 +6,8 @@ export function TopBar() {
   const [qboStatus, setQboStatus] = useState<"checking" | "ok" | "error">("checking");
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [paymentsTodayCount, setPaymentsTodayCount] = useState(0);
+  const [loadingPaymentsToday, setLoadingPaymentsToday] = useState(true);
 
   const pages = [
     { label: "Dashboard", href: "/" },
@@ -52,10 +54,36 @@ export function TopBar() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPaymentsToday = async () => {
+      try {
+        setLoadingPaymentsToday(true);
+        const today = new Date().toLocaleDateString("en-CA");
+        const res = await fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
+        if (!res.ok) throw new Error("Failed to fetch payments");
+        const data = await res.json();
+        if (isMounted) setPaymentsTodayCount(data.count || 0);
+      } catch (error) {
+        if (isMounted) setPaymentsTodayCount(0);
+      } finally {
+        if (isMounted) setLoadingPaymentsToday(false);
+      }
+    };
+
+    fetchPaymentsToday();
+    const interval = setInterval(fetchPaymentsToday, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <div className="sticky top-0 z-40 w-full border-b border-slate-900/60 bg-gradient-to-r from-slate-950 via-blue-900 to-blue-700 text-slate-100 print:hidden">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-2">
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-4 text-sm">
           <span className="font-semibold text-blue-100">QBO:</span>
           {qboStatus === "ok" ? (
             <span className="inline-flex items-center gap-2 text-emerald-300">
@@ -77,6 +105,12 @@ export function TopBar() {
           ) : (
             <span className="text-blue-100/70">Checking…</span>
           )}
+          <div className="ml-2 flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-900/30 px-3 py-1 text-xs font-semibold text-blue-100">
+            Payments Today:
+            <span className="text-sm font-bold text-white">
+              {loadingPaymentsToday ? "…" : paymentsTodayCount}
+            </span>
+          </div>
         </div>
         <div className="relative flex-1 max-w-sm">
           <input
