@@ -393,19 +393,15 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Recent invoices (last 30 days)
+  // Unpaid invoices
   useEffect(() => {
     let isMounted = true;
 
-    const fetchRecentInvoices = async () => {
+    const fetchUnpaidInvoices = async () => {
       setLoadingRecentInvoices(true);
       try {
-        const endDate = new Date().toISOString().slice(0, 10);
-        const start = new Date();
-        start.setDate(start.getDate() - 30);
-        const startDate = start.toISOString().slice(0, 10);
-        const res = await fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}`);
-        if (!res.ok) throw new Error("Failed to fetch recent invoices");
+        const res = await fetch(`/api/qbo/invoice/query?status=unpaid`);
+        if (!res.ok) throw new Error("Failed to fetch unpaid invoices");
         const data = await res.json();
         const invoices = (data.invoices || []).slice(0, 5).map((inv: any) => {
           const balance = Number(inv.Balance) || 0;
@@ -422,14 +418,14 @@ export default function Dashboard() {
 
         if (isMounted) setRecentInvoices(invoices);
       } catch (error) {
-        console.error("Failed to fetch recent invoices:", error);
+        console.error("Failed to fetch unpaid invoices:", error);
         if (isMounted) setRecentInvoices([]);
       } finally {
         if (isMounted) setLoadingRecentInvoices(false);
       }
     };
 
-    fetchRecentInvoices();
+    fetchUnpaidInvoices();
     return () => {
       isMounted = false;
     };
@@ -813,8 +809,8 @@ export default function Dashboard() {
               <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
                 <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Recent Invoices</h2>
-                    <p className="text-sm text-slate-600">Last 30 days</p>
+                    <h2 className="text-lg font-semibold text-slate-900">Open Invoices</h2>
+                    <p className="text-sm text-slate-600">Unpaid invoices awaiting payment</p>
                   </div>
                   <a href="/commissions" className="text-sm text-blue-600 hover:text-blue-700">View all →</a>
                 </div>
@@ -824,7 +820,7 @@ export default function Dashboard() {
                       <tr>
                         <th className="px-6 py-3 text-left font-semibold">Invoice</th>
                         <th className="px-6 py-3 text-left font-semibold">Customer</th>
-                        <th className="px-6 py-3 text-right font-semibold">Total</th>
+                        <th className="px-6 py-3 text-right font-semibold">Amount Due</th>
                         <th className="px-6 py-3 text-right font-semibold">Status</th>
                       </tr>
                     </thead>
@@ -832,13 +828,13 @@ export default function Dashboard() {
                       {loadingRecentInvoices ? (
                         <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td></tr>
                       ) : recentInvoices.length === 0 ? (
-                        <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">No recent invoices</td></tr>
+                        <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">No open invoices</td></tr>
                       ) : (
                         recentInvoices.map((inv) => (
                           <tr key={inv.id} className="hover:bg-slate-50">
                             <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
                             <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
-                            <td className="px-6 py-3 text-right text-slate-700">${money(inv.totalAmt)}</td>
+                            <td className="px-6 py-3 text-right text-slate-700">${money(inv.balance)}</td>
                             <td className="px-6 py-3 text-right">
                               <span className={`rounded-full px-2 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                                 {inv.status}
