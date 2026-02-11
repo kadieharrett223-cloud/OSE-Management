@@ -67,7 +67,14 @@ export function TopBar() {
         const res = await fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
         if (!res.ok) throw new Error("Failed to fetch payments");
         const data = await res.json();
-        if (isMounted) setPaymentsTodayTotal(Number(data.totalApplied || 0));
+        const payments = data.payments || [];
+        const computedTotal = payments.reduce((sum: number, payment: any) => {
+          const total = Number(payment.TotalAmt) || 0;
+          const unapplied = Number(payment.UnappliedAmt) || 0;
+          const applied = Math.max(total - unapplied, 0);
+          return sum + applied;
+        }, 0);
+        if (isMounted) setPaymentsTodayTotal(Number(data.totalApplied ?? computedTotal ?? 0));
       } catch (error) {
         if (isMounted) setPaymentsTodayTotal(0);
       } finally {
@@ -109,7 +116,7 @@ export function TopBar() {
             <span className="text-blue-100/70">Checking…</span>
           )}
           <div className="ml-2 flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-900/30 px-3 py-1 text-xs font-semibold text-blue-100">
-            Payments Today:
+            Payments Today Total:
             <span className="text-sm font-bold text-white">
               {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
             </span>
