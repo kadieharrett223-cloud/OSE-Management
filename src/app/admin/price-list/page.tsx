@@ -170,7 +170,7 @@ export default function AdminPriceListPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<PriceListItem | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [discountPercentage] = useState<number>(20); // Locked at 20% off list
+  const discountPercentage = 20; // Locked at 20% off list
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -186,10 +186,6 @@ export default function AdminPriceListPage() {
     zone5_shipping: null,
     multiplier: 1,
   });
-
-  const updateDiscount = () => {
-    // Locked at 20%
-  };
 
   const categoryNameById = new Map(categories.map((cat) => [cat.id, cat.category_name]));
   const applyDiscountToAll = selectedGroups.length === 0;
@@ -613,7 +609,6 @@ export default function AdminPriceListPage() {
                       max="100"
                       step="1"
                       value={discountPercentage}
-                      onChange={updateDiscount}
                       disabled
                       className="w-16 rounded-lg border border-emerald-300 bg-white px-2 py-1.5 text-sm text-slate-900 text-right font-semibold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none"
                     />
