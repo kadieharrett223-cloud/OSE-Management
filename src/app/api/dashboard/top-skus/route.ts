@@ -1,48 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabaseClient } from "@/lib/supabase";
+import { authorizedQboFetch, QboApiError } from "@/lib/qbo";
+import { getUserId } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const supabase = getServerSupabaseClient();
-  
   try {
-    // Get last 12 months of invoice data with line items
-    // Don't filter by sku_match_status to get all SKUs
-    const { data, error } = await supabase
-      .from("invoices")
-      .select(`
-        txn_date,
-        invoice_lines(
-          sku,
-          quantity,
-          description,
-          sku_match_status
-        )
-      `)
-      .gte("txn_date", new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().split('T')[0])
-      .order("txn_date", { ascending: false });
+    const userId = await getUserId();
+    const today = new Date();
+    const startDate = new Date(today.getFullYear() - 1, today.getMonth(), 1)
+      .toISOString()
+      .split("T")[0];
 
-    if (error) throw error;
+    const query = `SELECT * FROM Invoice WHERE TxnDate >= '${startDate}' ORDERBY TxnDate DESC`;
+
+    const data = await authorizedQboFetch<any>(
+      `/query?query=${encodeURIComponent(query)}&minorversion=65`,
+      {},
+      userId || undefined
+    );
+
+    const invoices = data?.QueryResponse?.Invoice || [];
 
     // Aggregate by month and SKU
     const monthlySkuMap = new Map<string, Map<string, { quantity: number; description: string }>>();
 
-    (data || []).forEach((invoice: any) => {
-      const date = new Date(invoice.txn_date);
-      const yearMonth = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-      
+    invoices.forEach((invoice: any) => {
+      const date = new Date(invoice.TxnDate);
+      const yearMonth = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}`;
+
       if (!monthlySkuMap.has(yearMonth)) {
         monthlySkuMap.set(yearMonth, new Map());
       }
 
       const skuMap = monthlySkuMap.get(yearMonth)!;
-      
-      (invoice.invoice_lines || []).forEach((line: any) => {
-        // Include all SKUs, not just MATCHED ones
-        if (line.sku && line.sku.trim()) {
-          const existing = skuMap.get(line.sku) || { quantity: 0, description: line.description || "" };
-          existing.quantity += Number(line.quantity) || 0;
-          skuMap.set(line.sku, existing);
-        }
+
+      (invoice.Line || []).forEach((line: any) => {
+        if (line.DetailType !== "SalesItemLineDetail") return;
+
+        const detail = line.SalesItemLineDetail || {};
+        const sku = detail.ItemRef?.name || detail.ItemRef?.value || line.ItemRef?.name || line.ItemRef?.value || line.Description;
+        const quantity = Number(detail.Qty ?? line.Qty ?? 0);
+        if (!sku || !quantity) return;
+
+        const existing = skuMap.get(sku) || { quantity: 0, description: line.Description || "" };
+        existing.quantity += quantity;
+        skuMap.set(sku, existing);
       });
     });
 
@@ -67,6 +68,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ ok: true, data: result });
   } catch (error: any) {
+    if (error instanceof QboApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error("Top SKUs error:", error);
     return NextResponse.json(
       { error: error.message || "Failed to fetch top SKUs" },

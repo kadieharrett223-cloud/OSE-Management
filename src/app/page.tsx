@@ -138,6 +138,7 @@ export default function Dashboard() {
   const [loadingVendorPayments, setLoadingVendorPayments] = useState(true);
   const [recentInvoices, setRecentInvoices] = useState<RecentInvoice[]>([]);
   const [loadingRecentInvoices, setLoadingRecentInvoices] = useState(true);
+  const [showOpenInvoicesModal, setShowOpenInvoicesModal] = useState(false);
   const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
   const [loadingRecentPurchases, setLoadingRecentPurchases] = useState(true);
   const [qboSyncStatus, setQboSyncStatus] = useState<"idle" | "ok" | "error">("idle");
@@ -403,7 +404,7 @@ export default function Dashboard() {
         const res = await fetch(`/api/qbo/invoice/query?status=unpaid`);
         if (!res.ok) throw new Error("Failed to fetch unpaid invoices");
         const data = await res.json();
-        const invoices = (data.invoices || []).slice(0, 5).map((inv: any) => {
+        const invoices = (data.invoices || []).map((inv: any) => {
           const balance = Number(inv.Balance) || 0;
           return {
             id: inv.Id,
@@ -812,7 +813,13 @@ export default function Dashboard() {
                     <h2 className="text-lg font-semibold text-slate-900">Open Invoices</h2>
                     <p className="text-sm text-slate-600">Unpaid invoices awaiting payment</p>
                   </div>
-                  <a href="/commissions" className="text-sm text-blue-600 hover:text-blue-700">View all →</a>
+                  <button
+                    type="button"
+                    onClick={() => setShowOpenInvoicesModal(true)}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    View all →
+                  </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -830,7 +837,7 @@ export default function Dashboard() {
                       ) : recentInvoices.length === 0 ? (
                         <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">No open invoices</td></tr>
                       ) : (
-                        recentInvoices.map((inv) => (
+                        recentInvoices.slice(0, 5).map((inv) => (
                           <tr key={inv.id} className="hover:bg-slate-50">
                             <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
                             <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
@@ -848,6 +855,46 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
+                  <p className="text-sm text-slate-600">Payments received from customers today</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b border-slate-200 bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Applied</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {loadingCustomerPayments ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td>
+                        </tr>
+                      ) : customerPaymentsToday.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
+                        </tr>
+                      ) : (
+                        customerPaymentsToday.map((payment) => (
+                          <tr key={payment.id} className="hover:bg-slate-50">
+                            <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
+                            <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
+                            <td className="px-6 py-3 text-right text-slate-600">${money(payment.totalAmount)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Purchases + Top SKUs */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
                 <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
                   <div>
@@ -882,49 +929,6 @@ export default function Dashboard() {
                                 {po.status}
                               </span>
                             </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* Top SKUs Chart */}
-            <TopSkuChart />
-
-            {/* Customer Payments + Top SKUs Side by Side */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
-                  <p className="text-sm text-slate-600">Payments received from customers today</p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="border-b border-slate-200 bg-slate-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Applied</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {loadingCustomerPayments ? (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td>
-                        </tr>
-                      ) : customerPaymentsToday.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
-                        </tr>
-                      ) : (
-                        customerPaymentsToday.map((payment) => (
-                          <tr key={payment.id} className="hover:bg-slate-50">
-                            <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
-                            <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
-                            <td className="px-6 py-3 text-right text-slate-600">${money(payment.totalAmount)}</td>
                           </tr>
                         ))
                       )}
@@ -985,6 +989,60 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {showOpenInvoicesModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+                <div className="w-full max-w-4xl rounded-xl bg-white shadow-xl ring-1 ring-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">All Open Invoices</h2>
+                      <p className="text-sm text-slate-600">Full list of unpaid invoices</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowOpenInvoicesModal(false)}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="max-h-[70vh] overflow-y-auto">
+                    <table className="w-full">
+                      <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                        <tr>
+                          <th className="px-6 py-3 text-left font-semibold">Invoice</th>
+                          <th className="px-6 py-3 text-left font-semibold">Customer</th>
+                          <th className="px-6 py-3 text-right font-semibold">Amount Due</th>
+                          <th className="px-6 py-3 text-right font-semibold">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {recentInvoices.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-6 text-center text-slate-500">
+                              No open invoices
+                            </td>
+                          </tr>
+                        ) : (
+                          recentInvoices.map((inv) => (
+                            <tr key={inv.id} className="hover:bg-slate-50">
+                              <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
+                              <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
+                              <td className="px-6 py-3 text-right text-slate-700">${money(inv.balance)}</td>
+                              <td className="px-6 py-3 text-right">
+                                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                                  {inv.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
 
           </div>
         </main>
