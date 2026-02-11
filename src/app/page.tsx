@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { TopSkuChart } from "@/components/TopSkuChart";
 import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
 const money = (value: number | undefined) => {
@@ -893,6 +894,9 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Top SKUs Chart */}
+            <TopSkuChart />
 
             {/* Bottom Listed Cards */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
