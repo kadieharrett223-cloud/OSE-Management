@@ -838,7 +838,7 @@ export default function Dashboard() {
                       ) : recentInvoices.length === 0 ? (
                         <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">No open invoices</td></tr>
                       ) : (
-                        recentInvoices.slice(0, 7).map((inv) => (
+                        recentInvoices.slice(0, 5).map((inv) => (
                           <tr key={inv.id} className="hover:bg-slate-50">
                             <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
                             <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
@@ -892,7 +892,7 @@ export default function Dashboard() {
                           <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
                         </tr>
                       ) : (
-                        customerPaymentsToday.map((payment) => (
+                        customerPaymentsToday.slice(0, 5).map((payment) => (
                           <tr key={payment.id} className="hover:bg-slate-50">
                             <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
                             <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
