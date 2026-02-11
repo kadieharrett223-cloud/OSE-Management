@@ -170,7 +170,7 @@ export default function AdminPriceListPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<PriceListItem | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const discountPercentage = 20; // Locked at 20% off list
+  const [discountPercentage, setDiscountPercentage] = useState<number>(20); // Default 20% off list
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -187,6 +187,12 @@ export default function AdminPriceListPage() {
     multiplier: 1,
   });
 
+  // Save discount to localStorage when changed
+  const updateDiscount = (value: number) => {
+    setDiscountPercentage(value);
+    localStorage.setItem("priceListDiscount", value.toString());
+  };
+
   const categoryNameById = new Map(categories.map((cat) => [cat.id, cat.category_name]));
   const applyDiscountToAll = selectedGroups.length === 0;
 
@@ -199,7 +205,15 @@ export default function AdminPriceListPage() {
 
   useEffect(() => {
     loadData();
-    // Discount is locked at 20%
+    // Load discount from localStorage on mount (default to 20)
+    const saved = localStorage.getItem("priceListDiscount");
+    const parsed = saved !== null ? Number(saved) : NaN;
+    if (saved === null || Number.isNaN(parsed) || parsed === 0) {
+      setDiscountPercentage(20);
+      localStorage.setItem("priceListDiscount", "20");
+    } else {
+      setDiscountPercentage(parsed);
+    }
   }, []);
 
   const loadData = async () => {
@@ -609,7 +623,7 @@ export default function AdminPriceListPage() {
                       max="100"
                       step="1"
                       value={discountPercentage}
-                      disabled
+                      onChange={(e) => updateDiscount(Number(e.target.value))}
                       className="w-16 rounded-lg border border-emerald-300 bg-white px-2 py-1.5 text-sm text-slate-900 text-right font-semibold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none"
                     />
                     <span className="text-sm font-semibold text-emerald-700">% off</span>
