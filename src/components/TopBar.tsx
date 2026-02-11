@@ -92,18 +92,18 @@ export function TopBar() {
 
   return (
     <div className="sticky top-0 z-40 w-full border-b border-slate-900/60 bg-gradient-to-r from-slate-950 via-blue-900 to-blue-700 text-slate-100 print:hidden">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-2">
-        <div className="flex items-center gap-4 text-sm">
+      <div className="mx-auto flex w-full flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+        <div className="flex flex-wrap items-center gap-2 text-xs sm:gap-4 sm:text-sm">
           <span className="font-semibold text-blue-100">QBO:</span>
           {qboStatus === "ok" ? (
-            <span className="inline-flex items-center gap-2 text-emerald-300">
+            <span className="inline-flex items-center gap-1 text-emerald-300 sm:gap-2">
               Synced ✅
               {lastChecked && (
-                <span className="text-xs text-blue-100/70">Checked {lastChecked.toLocaleTimeString()}</span>
+                <span className="hidden text-xs text-blue-100/70 sm:inline">Checked {lastChecked.toLocaleTimeString()}</span>
               )}
             </span>
           ) : qboStatus === "error" ? (
-            <span className="inline-flex items-center gap-2 text-red-300">
+            <span className="inline-flex items-center gap-1 text-red-300 sm:gap-2">
               Not connected
               <a
                 href="/api/qbo/connect"
@@ -115,14 +115,15 @@ export function TopBar() {
           ) : (
             <span className="text-blue-100/70">Checking…</span>
           )}
-          <div className="ml-2 flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-900/30 px-3 py-1 text-xs font-semibold text-blue-100">
-            Payments Today Total:
-            <span className="text-sm font-bold text-white">
+          <div className="flex items-center gap-1 rounded-full border border-blue-400/30 bg-blue-900/30 px-2 py-1 text-xs font-semibold text-blue-100 sm:ml-2 sm:gap-2 sm:px-3">
+            <span className="hidden sm:inline">Payments Today Total:</span>
+            <span className="sm:hidden">Today:</span>
+            <span className="text-xs font-bold text-white sm:text-sm">
               {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
             </span>
           </div>
         </div>
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative w-full sm:flex-1 sm:max-w-sm">
           <input
             type="search"
             placeholder="Search..."
