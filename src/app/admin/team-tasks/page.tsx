@@ -53,7 +53,7 @@ export default function TeamTasksPage() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as TeamTask[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           setTasks(parsed);
         }
       } catch {
