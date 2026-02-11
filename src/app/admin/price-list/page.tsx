@@ -304,7 +304,7 @@ export default function AdminPriceListPage() {
     }
   };
 
-  // Client-side calculation: Tariff = FOB×2, Per Unit = Tariff+Ocean+Import, Cost w/Shipping = Per Unit+Zone5, Sell = Cost×Mult, List = Sell×1.2, Profit = Sell−Cost
+  // Client-side calculation: Tariff = FOB×2, Per Unit = Tariff+Ocean+Import, Cost w/Shipping = Per Unit+Zone5, Base Sell = Cost×Mult, List = Base Sell×1.2, Discount off List, Profit = Sell−Cost
   const computeDerivedFields = (item: PriceListItem, discountOverride?: number): PriceListItem => {
     const fob_cost = item.fob_cost || 0;
     const ocean_per_unit = item.ocean_frt || 0;  // Already per-unit in DB
@@ -329,14 +329,15 @@ export default function AdminPriceListPage() {
 
     const appliedDiscount = discountOverride ?? discountPercentage;
 
-    // 6) Sell price: Base sell price with discount applied (discount is off sell price, not list)
-    const sell_price = base_sell_price * (1 - (appliedDiscount || 0) / 100);
+    // 6) Sell price: Always 20% below list, plus any additional discount off list
+    const totalDiscount = 0.2 + (appliedDiscount || 0) / 100;
+    const sell_price = list_price * Math.max(0, 1 - totalDiscount);
 
     // 7) Profit: Sell price - Cost with shipping
     const profit = sell_price - cost_with_shipping;
 
     // Preserve legacy fields for compatibility.
-    const rounded_normal_price = sell_price;
+    const rounded_normal_price = list_price * 0.8;
     const black_friday_price = list_price * 0.75;
     const discounted_sale_price = list_price * (1 - (appliedDiscount || 0) / 100);
     const rounded_sale_price = Math.floor(discounted_sale_price / 100) * 100 - 1;
@@ -522,7 +523,7 @@ export default function AdminPriceListPage() {
               </div>
             </div>
 
-            <div className="mx-auto px-8 py-10 space-y-6">
+            <div className="mx-auto max-w-7xl px-8 py-10 space-y-6">
             {/* Header */}
             <header className="flex items-start justify-between">
               <div>
@@ -576,7 +577,7 @@ export default function AdminPriceListPage() {
                         </div>
                       </div>
                       <div className="mt-3 text-xs text-blue-700">
-                        Discount applies to <span className="font-semibold">Sell Price</span> only (List stays at Sell × 1.2).
+                        Sell is always <span className="font-semibold">20% off list</span>, plus any extra discount off list.
                       </div>
                     </div>
                   </div>
