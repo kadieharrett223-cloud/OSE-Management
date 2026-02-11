@@ -239,6 +239,23 @@ export default function PurchasingPage() {
     }
   }
 
+  async function handleDeleteAllPos() {
+    const confirmed = window.confirm("This will permanently delete ALL purchase orders and payments. Continue?");
+    if (!confirmed) return;
+    try {
+      const res = await fetch("/api/admin/purchase-orders/reset", { method: "POST" });
+      const payload = await res.json();
+      if (!res.ok) {
+        alert(payload.error || "Failed to delete purchase orders");
+        return;
+      }
+      await fetchPOs();
+    } catch (error) {
+      console.error("Delete all POs error:", error);
+      alert("Failed to delete purchase orders");
+    }
+  }
+
   async function updatePoStatus(poId: string, status: string) {
     try {
       const res = await fetch(`/api/purchase-orders/${poId}`, {
@@ -465,6 +482,12 @@ export default function PurchasingPage() {
                     Create PO
                   </button>
                 )}
+                <button
+                  onClick={handleDeleteAllPos}
+                  className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
+                >
+                  Delete All POs
+                </button>
               </div>
             </header>
 
@@ -964,6 +987,12 @@ export default function PurchasingPage() {
                                 className="text-sm font-semibold text-slate-600 hover:text-slate-900"
                               >
                                 View
+                              </button>
+                              <button
+                                onClick={() => setSelectedPO(po)}
+                                className="text-sm font-semibold text-slate-600 hover:text-slate-900"
+                              >
+                                Add Payment
                               </button>
                               {po.status !== "SHIPPED" && po.status !== "RECEIVED" && po.status !== "PAID" && (
                                 <button
