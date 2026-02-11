@@ -22,6 +22,11 @@ export const metadata: Metadata = {
   description: "Tariff, landed cost, and pricing calculator for OSE Management.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
