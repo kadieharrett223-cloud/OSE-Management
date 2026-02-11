@@ -6,6 +6,7 @@ const navGroups = [
     items: [
       { label: "Dashboard", hint: "Company overview", href: "/" },
       { label: "Calendar", hint: "Sales & notifications", href: "/calendar" },
+      { label: "Team Tasks", hint: "Project management", href: "/admin/team-tasks" },
     ],
   },
   {
