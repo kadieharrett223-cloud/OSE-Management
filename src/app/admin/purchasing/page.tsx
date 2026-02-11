@@ -462,12 +462,6 @@ export default function PurchasingPage() {
                 <p className="text-sm text-slate-600">Manage purchasing with clear status tracking.</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <div className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payments Today Total</span>
-                  <div className="text-lg font-semibold text-slate-900">
-                    {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
-                  </div>
-                </div>
                 <input
                   type="search"
                   value={searchQuery}
