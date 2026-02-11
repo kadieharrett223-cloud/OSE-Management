@@ -164,11 +164,14 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Fetch QuickBooks invoice data for current month
+  // Fetch QuickBooks invoice data for current month (calendar month)
   useEffect(() => {
     let isMounted = true;
-    const currentMonth = getCurrentCommissionMonth();
-    const { startDate, endDate } = getCommissionDateRange(currentMonth);
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = (today.getMonth() + 1).toString().padStart(2, "0");
+    const startDate = `${year}-${month}-01`;
+    const endDate = today.toISOString().slice(0, 10);
     
     // Fetch total sales
     fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`)
@@ -259,7 +262,7 @@ export default function Dashboard() {
     fetchUnpaidInvoices();
   }, []);
 
-  // Fetch sales for current month
+  // Fetch sales for current month (paid, through today)
   useEffect(() => {
     const fetchMonthlySales = async () => {
       try {
@@ -267,11 +270,10 @@ export default function Dashboard() {
         const year = now.getFullYear();
         const month = (now.getMonth() + 1).toString().padStart(2, '0');
         const startDate = `${year}-${month}-01`;
-        const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
-        const endDate = `${year}-${month}-${lastDay}`;
+        const endDate = now.toISOString().slice(0, 10);
 
         const response = await fetch(
-          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}`
+          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`
         );
         
         if (!response.ok) throw new Error("Failed to fetch monthly sales");

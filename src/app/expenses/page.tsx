@@ -146,127 +146,129 @@ export default function ExpensesPage() {
               </div>
             </header>
 
-            <section className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-              <div className="border-b border-slate-200 px-5 py-4">
-                <h2 className="text-lg font-semibold text-slate-900">Unpaid / To Be Paid Log</h2>
-                <p className="text-xs text-slate-500">Bills due in {selectedMonth}</p>
-              </div>
-              <div className="grid grid-cols-1 gap-4 border-b border-slate-200 px-5 py-4 md:grid-cols-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Total balance</p>
-                  <p className="text-2xl font-semibold text-slate-900">${money(totals.totalBalance)}</p>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <section className="flex h-full flex-col rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-5 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Unpaid / To Be Paid Log</h2>
+                  <p className="text-xs text-slate-500">Bills due in {selectedMonth}</p>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Total bill amount</p>
-                  <p className="text-2xl font-semibold text-slate-900">${money(totals.totalAmount)}</p>
+                <div className="grid grid-cols-1 gap-4 border-b border-slate-200 px-5 py-4 md:grid-cols-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Total balance</p>
+                    <p className="text-2xl font-semibold text-slate-900">${money(totals.totalBalance)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Total bill amount</p>
+                    <p className="text-2xl font-semibold text-slate-900">${money(totals.totalAmount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Open bills</p>
+                    <p className="text-2xl font-semibold text-slate-900">{unpaidBillsForMonth.length}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Open bills</p>
-                  <p className="text-2xl font-semibold text-slate-900">{unpaidBillsForMonth.length}</p>
+                <div className="divide-y divide-slate-100 overflow-y-auto px-5 py-2 max-h-[520px]">
+                  {loading && (
+                    <div className="px-0 py-4 text-sm text-slate-500">Loading bills from QBO…</div>
+                  )}
+                  {!loading && error && (
+                    <div className="px-0 py-4 text-sm text-red-600">{error}</div>
+                  )}
+                  {!loading && !error && unpaidBillsForMonth.length === 0 && (
+                    <div className="px-0 py-4 text-sm text-slate-500">No unpaid bills found for this month.</div>
+                  )}
+                  {!loading && !error &&
+                    unpaidBillsForMonth.map((bill) => (
+                      <div key={bill.Id} className="grid grid-cols-1 gap-3 py-4 md:grid-cols-6">
+                        <div className="md:col-span-2">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Vendor</p>
+                          <p className="text-sm font-medium text-slate-900">
+                            {bill.VendorRef?.name || "Unknown vendor"}
+                          </p>
+                          <p className="text-xs text-slate-500">Bill #{bill.DocNumber || bill.Id}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Bill date</p>
+                          <p className="text-sm text-slate-600">{formatDate(bill.TxnDate)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Due date</p>
+                          <p className="text-sm text-slate-600">{formatDueDate(bill.DueDate)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Balance</p>
+                          <p className="text-sm font-semibold text-slate-900">${money(Number(bill.Balance) || 0)}</p>
+                          <p className="text-xs text-slate-500">Total ${money(Number(bill.TotalAmt) || 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Account</p>
+                          <p className="text-sm text-slate-600">{bill.APAccountRef?.name || "—"}</p>
+                          {bill.PrivateNote && (
+                            <p className="text-xs text-slate-500 line-clamp-2">{bill.PrivateNote}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                 </div>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {loading && (
-                  <div className="px-5 py-6 text-sm text-slate-500">Loading bills from QBO…</div>
-                )}
-                {!loading && error && (
-                  <div className="px-5 py-6 text-sm text-red-600">{error}</div>
-                )}
-                {!loading && !error && unpaidBillsForMonth.length === 0 && (
-                  <div className="px-5 py-6 text-sm text-slate-500">No unpaid bills found for this month.</div>
-                )}
-                {!loading && !error &&
-                  unpaidBillsForMonth.map((bill) => (
-                    <div key={bill.Id} className="grid grid-cols-1 gap-3 px-5 py-4 md:grid-cols-6">
-                      <div className="md:col-span-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Vendor</p>
-                        <p className="text-sm font-medium text-slate-900">
-                          {bill.VendorRef?.name || "Unknown vendor"}
-                        </p>
-                        <p className="text-xs text-slate-500">Bill #{bill.DocNumber || bill.Id}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Bill date</p>
-                        <p className="text-sm text-slate-600">{formatDate(bill.TxnDate)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Due date</p>
-                        <p className="text-sm text-slate-600">{formatDueDate(bill.DueDate)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Balance</p>
-                        <p className="text-sm font-semibold text-slate-900">${money(Number(bill.Balance) || 0)}</p>
-                        <p className="text-xs text-slate-500">Total ${money(Number(bill.TotalAmt) || 0)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Account</p>
-                        <p className="text-sm text-slate-600">{bill.APAccountRef?.name || "—"}</p>
-                        {bill.PrivateNote && (
-                          <p className="text-xs text-slate-500 line-clamp-2">{bill.PrivateNote}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </section>
+              </section>
 
-            <section className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-              <div className="border-b border-slate-200 px-5 py-4">
-                <h2 className="text-lg font-semibold text-slate-900">Paid Log</h2>
-                <p className="text-xs text-slate-500">Bill payments for {selectedMonth}</p>
-              </div>
-              <div className="grid grid-cols-1 gap-4 border-b border-slate-200 px-5 py-4 md:grid-cols-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Total paid</p>
-                  <p className="text-2xl font-semibold text-slate-900">${money(paidTotals.totalPaid)}</p>
+              <section className="flex h-full flex-col rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-5 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Paid Log</h2>
+                  <p className="text-xs text-slate-500">Bill payments for {selectedMonth}</p>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Payments</p>
-                  <p className="text-2xl font-semibold text-slate-900">{paidBills.length}</p>
+                <div className="grid grid-cols-1 gap-4 border-b border-slate-200 px-5 py-4 md:grid-cols-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Total paid</p>
+                    <p className="text-2xl font-semibold text-slate-900">${money(paidTotals.totalPaid)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Payments</p>
+                    <p className="text-2xl font-semibold text-slate-900">{paidBills.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Period</p>
+                    <p className="text-sm text-slate-600">
+                      {formatDate(startDate)} - {formatDate(endDate)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Period</p>
-                  <p className="text-sm text-slate-600">
-                    {formatDate(startDate)} - {formatDate(endDate)}
-                  </p>
+                <div className="divide-y divide-slate-100 overflow-y-auto px-5 py-2 max-h-[520px]">
+                  {loading && (
+                    <div className="px-0 py-4 text-sm text-slate-500">Loading paid log from QBO…</div>
+                  )}
+                  {!loading && error && (
+                    <div className="px-0 py-4 text-sm text-red-600">{error}</div>
+                  )}
+                  {!loading && !error && paidBills.length === 0 && (
+                    <div className="px-0 py-4 text-sm text-slate-500">No bill payments found for this month.</div>
+                  )}
+                  {!loading && !error &&
+                    paidBills.map((payment) => (
+                      <div key={payment.Id} className="grid grid-cols-1 gap-3 py-4 md:grid-cols-5">
+                        <div className="md:col-span-2">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Vendor</p>
+                          <p className="text-sm font-medium text-slate-900">
+                            {payment.VendorRef?.name || "Vendor"}
+                          </p>
+                          <p className="text-xs text-slate-500">Payment #{payment.DocNumber || payment.Id}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Paid date</p>
+                          <p className="text-sm text-slate-600">{formatDate(payment.TxnDate)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Amount</p>
+                          <p className="text-sm font-semibold text-slate-900">${money(Number(payment.TotalAmt) || 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Notes</p>
+                          <p className="text-sm text-slate-600">{payment.PrivateNote || "—"}</p>
+                        </div>
+                      </div>
+                    ))}
                 </div>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {loading && (
-                  <div className="px-5 py-6 text-sm text-slate-500">Loading paid log from QBO…</div>
-                )}
-                {!loading && error && (
-                  <div className="px-5 py-6 text-sm text-red-600">{error}</div>
-                )}
-                {!loading && !error && paidBills.length === 0 && (
-                  <div className="px-5 py-6 text-sm text-slate-500">No bill payments found for this month.</div>
-                )}
-                {!loading && !error &&
-                  paidBills.map((payment) => (
-                    <div key={payment.Id} className="grid grid-cols-1 gap-3 px-5 py-4 md:grid-cols-5">
-                      <div className="md:col-span-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Vendor</p>
-                        <p className="text-sm font-medium text-slate-900">
-                          {payment.VendorRef?.name || "Vendor"}
-                        </p>
-                        <p className="text-xs text-slate-500">Payment #{payment.DocNumber || payment.Id}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Paid date</p>
-                        <p className="text-sm text-slate-600">{formatDate(payment.TxnDate)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Amount</p>
-                        <p className="text-sm font-semibold text-slate-900">${money(Number(payment.TotalAmt) || 0)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Notes</p>
-                        <p className="text-sm text-slate-600">{payment.PrivateNote || "—"}</p>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </section>
+              </section>
+            </div>
 
             <div className="rounded-xl bg-white p-5 shadow-md ring-1 ring-slate-200">
               <h2 className="text-lg font-semibold text-slate-900">Next Steps</h2>
