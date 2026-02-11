@@ -170,7 +170,7 @@ export default function AdminPriceListPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<PriceListItem | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [discountPercentage, setDiscountPercentage] = useState<number>(0); // Default 0% (no sale)
+  const [discountPercentage, setDiscountPercentage] = useState<number>(20); // Default 20% off list
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -209,6 +209,9 @@ export default function AdminPriceListPage() {
     const saved = localStorage.getItem("priceListDiscount");
     if (saved) {
       setDiscountPercentage(Number(saved));
+    } else {
+      setDiscountPercentage(20);
+      localStorage.setItem("priceListDiscount", "20");
     }
   }, []);
 
