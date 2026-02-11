@@ -332,9 +332,8 @@ export default function AdminPriceListPage() {
 
     const appliedDiscount = discountOverride ?? discountPercentage;
 
-    // 6) Sell price: Always 20% below list, plus any additional discount off list
-    const totalDiscount = 0.2 + (appliedDiscount || 0) / 100;
-    const sell_price = list_price * Math.max(0, 1 - totalDiscount);
+    // 6) Sell price: Discount % off list price
+    const sell_price = list_price * (1 - (appliedDiscount || 0) / 100);
 
     // 7) Profit: Sell price - Cost with shipping
     const profit = sell_price - cost_with_shipping;
@@ -526,7 +525,7 @@ export default function AdminPriceListPage() {
               </div>
             </div>
 
-            <div className="mx-auto max-w-7xl px-8 py-10 space-y-6">
+            <div className="mx-auto px-8 py-10 space-y-6">
             {/* Header */}
             <header className="flex items-start justify-between">
               <div>
@@ -580,7 +579,7 @@ export default function AdminPriceListPage() {
                         </div>
                       </div>
                       <div className="mt-3 text-xs text-blue-700">
-                        Sell is always <span className="font-semibold">20% off list</span>, plus any extra discount off list.
+                        Discount field sets the <span className="font-semibold">% off list price</span>. Default: 20%.
                       </div>
                     </div>
                   </div>
