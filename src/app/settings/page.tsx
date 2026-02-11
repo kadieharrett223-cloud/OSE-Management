@@ -58,14 +58,29 @@ export default function SettingsPage() {
   }, []);
 
   const handleDisconnectQbo = async () => {
+    if (!confirm('Disconnect QuickBooks? You\'ll need to reconnect to access QB data.')) return;
     try {
       setError(null);
-      // Clear QBO tokens (you may need to add an endpoint for this)
-      // For now, just clear and ask user to sign in again
-      alert('QuickBooks connection cleared. You will need to reconnect when ready.');
-      setQboConnected(false);
-    } catch (err) {
-      setError('Failed to disconnect QuickBooks');
+      const res = await fetch('/api/qbo/disconnect', { method: 'POST' });
+      if (res.ok) {
+        setQboConnected(false);
+        setSuccess('QuickBooks disconnected successfully');
+      } else {
+        throw new Error('Failed to disconnect');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to disconnect QuickBooks');
+    }
+  };
+
+  const handleConnectQbo = async () => {
+    try {
+      setError(null);
+      const res = await fetch('/api/qbo/connect');
+      if (!res.ok) throw new Error('Failed to connect QB');
+      // Redirect will happen from the API
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect QuickBooks');
     }
   };
 

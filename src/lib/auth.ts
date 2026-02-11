@@ -84,3 +84,9 @@ export const authOptions: NextAuthOptions = {
 export async function getSession() {
   return getServerSession(authOptions as any);
 }
+
+// Extract user ID from session, useful for multi-tenant API routes
+export async function getUserId(): Promise<string | null> {
+  const session: any = await getSession();
+  return session?.user?.id || null;
+}

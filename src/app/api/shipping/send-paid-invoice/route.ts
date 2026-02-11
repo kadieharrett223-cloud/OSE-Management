@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch, authorizedQboFetchRaw, QboApiError } from "@/lib/qbo";
+import { getUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -8,6 +9,7 @@ export const fetchCache = "force-no-store";
 
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getUserId();
     const { paymentId, customerName } = await req.json();
     const shippingEmail = process.env.SHIPPING_EMAIL || process.env.SMTP_FROM || process.env.SMTP_USER;
     const smtpHost = process.env.SMTP_HOST;
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: 502 });
     }
 
-    const paymentData = await authorizedQboFetch<any>(`/payment/${paymentId}`);
+    const paymentData = await authorizedQboFetch<any>(`/payment/${paymentId}`, {}, userId || undefined);
     const payment = paymentData?.Payment;
 
     const linkedInvoices = (payment?.Line || [])
@@ -86,7 +88,7 @@ export async function POST(req: NextRequest) {
         headers: {
           Accept: "application/pdf",
         },
-      });
+      }, userId || undefined);
 
       const buffer = Buffer.from(await pdfRes.arrayBuffer());
       attachments.push({

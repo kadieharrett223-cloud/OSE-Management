@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch, QboApiError } from "@/lib/qbo";
+import { getUserId } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
+    const userId = await getUserId();
     const searchParams = req.nextUrl.searchParams;
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -25,7 +27,9 @@ export async function GET(req: NextRequest) {
     query += " ORDERBY TxnDate DESC";
 
     const data = await authorizedQboFetch<any>(
-      `/query?query=${encodeURIComponent(query)}&minorversion=65`
+      `/query?query=${encodeURIComponent(query)}&minorversion=65`,
+      {},
+      userId || undefined
     );
 
     const payments = data?.QueryResponse?.Payment || [];

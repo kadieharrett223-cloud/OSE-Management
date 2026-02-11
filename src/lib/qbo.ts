@@ -59,6 +59,7 @@ export type QboTokenResponse = {
 
 export type QboTokenRow = {
   id: string;
+  user_id: string | null;
   access_token: string | null;
   refresh_token: string | null;
   realm_id: string | null;
@@ -151,14 +152,20 @@ async function writeTokenFile(row: QboTokenRow): Promise<void> {
   await fs.promises.writeFile(TOKEN_FILE, JSON.stringify(row, null, 2));
 }
 
-export async function getTokenRow(): Promise<QboTokenRow | null> {
+export async function getTokenRow(userId?: string): Promise<QboTokenRow | null> {
   try {
     const supabase = getServerSupabaseClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from("qbo_tokens")
-      .select("*")
-      .eq("id", "primary")
-      .maybeSingle();
+      .select("*");
+    
+    if (userId) {
+      query = query.eq("user_id", userId);
+    } else {
+      query = query.eq("id", "primary");
+    }
+    
+    const { data, error } = await query.maybeSingle();
     if (error) throw error;
     return data as QboTokenRow | null;
   } catch (err) {
@@ -167,11 +174,12 @@ export async function getTokenRow(): Promise<QboTokenRow | null> {
   }
 }
 
-export async function saveTokenRow(token: QboTokenResponse, state?: string) {
+export async function saveTokenRow(token: QboTokenResponse, state?: string, userId?: string) {
   const expiresAt = new Date(Date.now() + token.expires_in * 1000).toISOString();
   const refreshExpiresAt = new Date(Date.now() + token.x_refresh_token_expires_in * 1000).toISOString();
   const payload: QboTokenRow = {
-    id: "primary",
+    id: userId || "primary",
+    user_id: userId || null,
     access_token: token.access_token,
     refresh_token: token.refresh_token,
     realm_id: token.realmId || null,
@@ -197,8 +205,8 @@ function isExpiring(expiresAt: string | null, skewMs = 120_000) {
   return Date.parse(expiresAt) < Date.now() + skewMs;
 }
 
-export async function ensureAccessToken(): Promise<{ accessToken: string; realmId: string }> {
-  const row = await getTokenRow();
+export async function ensureAccessToken(userId?: string): Promise<{ accessToken: string; realmId: string }> {
+  const row = await getTokenRow(userId);
   if (!row || !row.access_token || !row.refresh_token || !row.realm_id) {
     throw new Error("No stored QuickBooks tokens or realmId. Connect QuickBooks first.");
   }
@@ -290,8 +298,8 @@ export async function qboApiFetch<T>(realmId: string, path: string, init: Reques
   return (await res.json()) as T;
 }
 
-export async function authorizedQboFetch<T>(path: string, init: RequestInit = {}) {
-  const { accessToken, realmId } = await ensureAccessToken();
+export async function authorizedQboFetch<T>(path: string, init: RequestInit = {}, userId?: string) {
+  const { accessToken, realmId } = await ensureAccessToken(userId);
   const headers = new Headers(init.headers || {});
   headers.set("Authorization", `Bearer ${accessToken}`);
   headers.set("Accept", "application/json");
@@ -304,8 +312,8 @@ export async function authorizedQboFetch<T>(path: string, init: RequestInit = {}
   });
 }
 
-export async function authorizedQboFetchRaw(path: string, init: RequestInit = {}) {
-  const { accessToken, realmId } = await ensureAccessToken();
+export async function authorizedQboFetchRaw(path: string, init: RequestInit = {}, userId?: string) {
+  const { accessToken, realmId } = await ensureAccessToken(userId);
   const headers = new Headers(init.headers || {});
   headers.set("Authorization", `Bearer ${accessToken}`);
   if (!headers.has("Accept")) {

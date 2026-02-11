@@ -4,6 +4,7 @@ export const fetchCache = "force-no-store";
 
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCodeForToken, saveTokenRow } from "@/lib/qbo";
+import { getSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
@@ -15,6 +16,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Get current user from session for multi-tenant token storage
+    const session: any = await getSession();
+    const userId = session?.user?.id;
+
     // Exchange code for tokens
     const tokenResponse = await exchangeCodeForToken(code, realmId);
 
@@ -28,12 +33,16 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Persist tokens (Supabase if available, else local file fallback)
+    // Persist tokens with user_id for multi-tenant isolation
     // Ensure realmId is included in the saved payload
     if (!tokenResponse.realmId && realmId) {
       tokenResponse.realmId = realmId;
     }
-    const { expiresAt, refreshExpiresAt } = await saveTokenRow(tokenResponse, state || undefined);
+    const { expiresAt, refreshExpiresAt } = await saveTokenRow(
+      tokenResponse,
+      state || undefined,
+      userId
+    );
 
     return NextResponse.json({
       ok: true,
