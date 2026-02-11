@@ -56,14 +56,14 @@ export function Sidebar({ activePage }: { activePage: string }) {
       {/* Backdrop for mobile */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-gradient-to-b from-blue-950 via-blue-700 to-blue-500 px-4 py-6 shadow-2xl ring-1 ring-blue-950/30 transition-transform duration-300 lg:static lg:h-full lg:w-72 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-30 flex h-screen w-64 flex-col bg-gradient-to-b from-blue-950 via-blue-700 to-blue-500 px-4 py-6 shadow-2xl ring-1 ring-blue-950/30 transition-transform duration-300 lg:static lg:h-full lg:w-72 lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

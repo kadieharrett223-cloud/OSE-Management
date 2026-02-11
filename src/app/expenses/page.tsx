@@ -270,12 +270,6 @@ export default function ExpensesPage() {
               </section>
             </div>
 
-            <div className="rounded-xl bg-white p-5 shadow-md ring-1 ring-slate-200">
-              <h2 className="text-lg font-semibold text-slate-900">Next Steps</h2>
-              <p className="mt-2 text-sm text-slate-600">
-                Connect bill pay, payroll imports, or vendor schedules here when you’re ready.
-              </p>
-            </div>
           </div>
         </main>
       </div>
