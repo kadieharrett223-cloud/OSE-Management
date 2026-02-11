@@ -85,8 +85,10 @@ export default function PurchasingPage() {
   const [rangeEnd, setRangeEnd] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
-  const [paymentsTodayCount, setPaymentsTodayCount] = useState(0);
+  const [paymentsTodayTotal, setPaymentsTodayTotal] = useState(0);
   const [loadingPaymentsToday, setLoadingPaymentsToday] = useState(true);
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
   const [formData, setFormData] = useState({
     po_number: "",
     vendor_name: "",
@@ -143,24 +145,31 @@ export default function PurchasingPage() {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchPaymentsTodayCount = async () => {
+    const fetchPaymentsTodayTotal = async () => {
       try {
         setLoadingPaymentsToday(true);
         const today = new Date().toLocaleDateString("en-CA");
         const res = await fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
         if (!res.ok) throw new Error("Failed to fetch payments");
         const data = await res.json();
-        if (isMounted) setPaymentsTodayCount(data.count || 0);
+        const payments = data.payments || [];
+        const computedTotal = payments.reduce((sum: number, payment: any) => {
+          const total = Number(payment.TotalAmt) || 0;
+          const unapplied = Number(payment.UnappliedAmt) || 0;
+          const applied = Math.max(total - unapplied, 0);
+          return sum + applied;
+        }, 0);
+        if (isMounted) setPaymentsTodayTotal(Number(data.totalApplied ?? computedTotal ?? 0));
       } catch (error) {
         console.error("Failed to fetch payments today:", error);
-        if (isMounted) setPaymentsTodayCount(0);
+        if (isMounted) setPaymentsTodayTotal(0);
       } finally {
         if (isMounted) setLoadingPaymentsToday(false);
       }
     };
 
-    fetchPaymentsTodayCount();
-    const interval = setInterval(fetchPaymentsTodayCount, 30000);
+    fetchPaymentsTodayTotal();
+    const interval = setInterval(fetchPaymentsTodayTotal, 30000);
 
     return () => {
       isMounted = false;
@@ -454,9 +463,9 @@ export default function PurchasingPage() {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payments Today</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payments Today Total</span>
                   <div className="text-lg font-semibold text-slate-900">
-                    {loadingPaymentsToday ? "…" : paymentsTodayCount}
+                    {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
                   </div>
                 </div>
                 <input
