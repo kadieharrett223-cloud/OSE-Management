@@ -438,6 +438,7 @@ export default function PurchasingPage() {
                   <option value="all">All Status</option>
                   <option value="draft">Draft</option>
                   <option value="submitted">Sent</option>
+                  <option value="shipped">Shipped</option>
                   <option value="received">Received</option>
                   <option value="paid">Paid</option>
                 </select>
@@ -942,12 +943,14 @@ export default function PurchasingPage() {
                           <td className="px-6 py-3 text-center">
                             <span
                               className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
-                                po.status === "RECEIVED"
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : po.status === "PAID"
+                                po.status === "PAID"
                                   ? "bg-indigo-100 text-indigo-800"
-                                  : po.status === "SUBMITTED"
+                                  : po.status === "RECEIVED"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : po.status === "SHIPPED"
                                   ? "bg-blue-100 text-blue-800"
+                                  : po.status === "SUBMITTED"
+                                  ? "bg-amber-100 text-amber-800"
                                   : "bg-slate-100 text-slate-800"
                               }`}
                             >
@@ -962,7 +965,15 @@ export default function PurchasingPage() {
                               >
                                 View
                               </button>
-                              {po.status !== "RECEIVED" && (
+                              {po.status !== "SHIPPED" && po.status !== "RECEIVED" && po.status !== "PAID" && (
+                                <button
+                                  onClick={() => updatePoStatus(po.id, "SHIPPED")}
+                                  className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+                                >
+                                  Mark Shipped
+                                </button>
+                              )}
+                              {po.status !== "RECEIVED" && po.status !== "PAID" && (
                                 <button
                                   onClick={() => updatePoStatus(po.id, "RECEIVED")}
                                   className="text-sm font-semibold text-emerald-600 hover:text-emerald-700"
