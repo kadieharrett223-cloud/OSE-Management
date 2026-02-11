@@ -6,17 +6,18 @@ export async function GET(req: NextRequest) {
   
   try {
     // Get last 12 months of invoice data with line items
+    // Don't filter by sku_match_status to get all SKUs
     const { data, error } = await supabase
       .from("invoices")
       .select(`
         txn_date,
-        invoice_lines!inner(
+        invoice_lines(
           sku,
           quantity,
-          description
+          description,
+          sku_match_status
         )
       `)
-      .eq("invoice_lines.sku_match_status", "MATCHED")
       .gte("txn_date", new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().split('T')[0])
       .order("txn_date", { ascending: false });
 
@@ -36,8 +37,9 @@ export async function GET(req: NextRequest) {
       const skuMap = monthlySkuMap.get(yearMonth)!;
       
       (invoice.invoice_lines || []).forEach((line: any) => {
-        if (line.sku) {
-          const existing = skuMap.get(line.sku) || { quantity: 0, description: line.description };
+        // Include all SKUs, not just MATCHED ones
+        if (line.sku && line.sku.trim()) {
+          const existing = skuMap.get(line.sku) || { quantity: 0, description: line.description || "" };
           existing.quantity += Number(line.quantity) || 0;
           skuMap.set(line.sku, existing);
         }

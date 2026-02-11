@@ -14,13 +14,17 @@ interface TopSkuData {
 export function TopSkuChart() {
   const [data, setData] = useState<TopSkuData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState<string>("");
 
   useEffect(() => {
     const fetchTopSkus = async () => {
       try {
         const response = await fetch("/api/dashboard/top-skus");
-        if (!response.ok) throw new Error("Failed to fetch");
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to fetch");
+        }
         const result = await response.json();
         if (result.ok && result.data) {
           setData(result.data);
@@ -28,8 +32,9 @@ export function TopSkuChart() {
             setSelectedMonth(result.data[0].month);
           }
         }
-      } catch (error) {
-        console.error("Error fetching top SKUs:", error);
+      } catch (err: any) {
+        console.error("Error fetching top SKUs:", err);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -38,9 +43,29 @@ export function TopSkuChart() {
     fetchTopSkus();
   }, []);
 
+  if (loading) {
+    return (
+      <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200 p-6">
+        <p className="text-slate-500">Loading top SKUs...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200 p-6">
+        <p className="text-red-600">Failed to load top SKUs: {error}</p>
+      </div>
+    );
+  }
+
   const currentMonthData = data.find((d) => d.month === selectedMonth);
   if (!currentMonthData || currentMonthData.topSkus.length === 0) {
-    return null;
+    return (
+      <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200 p-6">
+        <p className="text-slate-500">No SKU data available</p>
+      </div>
+    );
   }
 
   const maxQuantity = Math.max(...currentMonthData.topSkus.map((s) => s.quantity));
