@@ -85,6 +85,8 @@ export default function PurchasingPage() {
   const [rangeEnd, setRangeEnd] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+  const [paymentsTodayCount, setPaymentsTodayCount] = useState(0);
+  const [loadingPaymentsToday, setLoadingPaymentsToday] = useState(true);
   const [formData, setFormData] = useState({
     po_number: "",
     vendor_name: "",
@@ -136,6 +138,34 @@ export default function PurchasingPage() {
     fetchPOs();
     fetchPriceList();
     fetchSuppliers();
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPaymentsTodayCount = async () => {
+      try {
+        setLoadingPaymentsToday(true);
+        const today = new Date().toLocaleDateString("en-CA");
+        const res = await fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
+        if (!res.ok) throw new Error("Failed to fetch payments");
+        const data = await res.json();
+        if (isMounted) setPaymentsTodayCount(data.count || 0);
+      } catch (error) {
+        console.error("Failed to fetch payments today:", error);
+        if (isMounted) setPaymentsTodayCount(0);
+      } finally {
+        if (isMounted) setLoadingPaymentsToday(false);
+      }
+    };
+
+    fetchPaymentsTodayCount();
+    const interval = setInterval(fetchPaymentsTodayCount, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -423,6 +453,12 @@ export default function PurchasingPage() {
                 <p className="text-sm text-slate-600">Manage purchasing with clear status tracking.</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
+                <div className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payments Today</span>
+                  <div className="text-lg font-semibold text-slate-900">
+                    {loadingPaymentsToday ? "…" : paymentsTodayCount}
+                  </div>
+                </div>
                 <input
                   type="search"
                   value={searchQuery}
