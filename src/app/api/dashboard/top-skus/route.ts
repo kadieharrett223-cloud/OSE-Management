@@ -37,9 +37,12 @@ export async function GET(req: NextRequest) {
         if (line.DetailType !== "SalesItemLineDetail") return;
 
         const detail = line.SalesItemLineDetail || {};
-        const sku = detail.ItemRef?.name || detail.ItemRef?.value || line.ItemRef?.name || line.ItemRef?.value || line.Description;
-        const quantity = Number(detail.Qty ?? line.Qty ?? 0);
+        const sku = detail.ItemRef?.name || detail.ItemRef?.value || "";
+        const quantity = Number(detail.Qty ?? 0);
         if (!sku || !quantity) return;
+
+        const normalizedSku = sku.toLowerCase();
+        if (normalizedSku.includes("note") || normalizedSku.includes("misc")) return;
 
         const existing = skuMap.get(sku) || { quantity: 0, description: line.Description || "" };
         existing.quantity += quantity;

@@ -75,26 +75,21 @@ export function TopSkuChart({ compact = false }: TopSkuChartProps) {
   const maxQuantity = Math.max(...currentMonthData.topSkus.map((s) => s.quantity));
   const months = data.map((d) => d.month);
 
-  // Compact mode - just the list without header/footer
+  // Compact mode - mini bar chart (top 5)
   if (compact) {
     return (
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {currentMonthData.topSkus.slice(0, 5).map((sku, index) => {
           const percentage = (sku.quantity / maxQuantity) * 100;
           return (
             <div key={sku.sku} className="space-y-1">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-slate-900 text-sm">{index + 1}. {sku.sku}</p>
-                  <p className="text-xs text-slate-500 truncate">{sku.description}</p>
-                </div>
-                <div className="flex-shrink-0 ml-2 text-right">
-                  <p className="font-semibold text-slate-900 text-sm">{sku.quantity.toLocaleString()}</p>
-                </div>
+              <div className="flex items-center justify-between text-xs text-slate-600">
+                <span className="font-semibold text-slate-900">{index + 1}. {sku.sku}</span>
+                <span className="font-semibold text-slate-900">{sku.quantity.toLocaleString()}</span>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+              <div className="relative h-3 rounded-full bg-slate-200 overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all"
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
                   style={{ width: `${percentage}%` }}
                 />
               </div>
@@ -131,26 +126,20 @@ export function TopSkuChart({ compact = false }: TopSkuChartProps) {
         </select>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {currentMonthData.topSkus.map((sku, index) => {
           const percentage = (sku.quantity / maxQuantity) * 100;
           return (
-            <div key={sku.sku} className="space-y-1">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-slate-900 text-sm">{index + 1}. {sku.sku}</p>
-                  <p className="text-xs text-slate-500 truncate">{sku.description}</p>
-                </div>
-                <div className="flex-shrink-0 ml-4 text-right">
-                  <p className="font-semibold text-slate-900">{sku.quantity.toLocaleString()}</p>
-                  <p className="text-xs text-slate-500">units</p>
-                </div>
-              </div>
-              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+            <div key={sku.sku} className="grid grid-cols-[1fr,6fr,1fr] items-center gap-3">
+              <div className="text-sm font-semibold text-slate-900 truncate">{index + 1}. {sku.sku}</div>
+              <div className="relative h-4 rounded-full bg-slate-200 overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all"
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
                   style={{ width: `${percentage}%` }}
                 />
+              </div>
+              <div className="text-right text-sm font-semibold text-slate-900">
+                {sku.quantity.toLocaleString()}
               </div>
             </div>
           );
