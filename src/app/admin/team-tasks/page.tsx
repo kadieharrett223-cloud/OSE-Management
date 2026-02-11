@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
 interface TeamTask {
@@ -11,6 +11,7 @@ interface TeamTask {
   status: "todo" | "in-progress" | "done";
   dueDate?: string;
   priority: "low" | "medium" | "high";
+  updatedAt: string;
 }
 
 export default function TeamTasksPage() {
@@ -23,6 +24,7 @@ export default function TeamTasksPage() {
       status: "in-progress",
       dueDate: "2026-02-15",
       priority: "high",
+      updatedAt: "2026-02-10T15:45:00.000Z",
     },
     {
       id: "2",
@@ -32,6 +34,7 @@ export default function TeamTasksPage() {
       status: "todo",
       dueDate: "2026-02-28",
       priority: "medium",
+      updatedAt: "2026-02-09T18:20:00.000Z",
     },
     {
       id: "3",
@@ -41,31 +44,72 @@ export default function TeamTasksPage() {
       status: "todo",
       dueDate: "2026-02-20",
       priority: "high",
+      updatedAt: "2026-02-08T13:10:00.000Z",
     },
   ]);
 
-  const [newTask, setNewTask] = useState("");
+  useEffect(() => {
+    const saved = localStorage.getItem("teamTasks");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as TeamTask[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setTasks(parsed);
+        }
+      } catch {
+        // Ignore malformed cache
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("teamTasks", JSON.stringify(tasks));
+  }, [tasks]);
+
+  const [newTask, setNewTask] = useState({
+    title: "",
+    description: "",
+    assignee: "",
+    status: "todo" as TeamTask["status"],
+    priority: "medium" as TeamTask["priority"],
+    dueDate: "",
+  });
   const [showAddModal, setShowAddModal] = useState(false);
 
   const handleAddTask = () => {
-    if (!newTask.trim()) return;
+    if (!newTask.title.trim()) return;
     const task: TeamTask = {
       id: Date.now().toString(),
-      title: newTask,
+      title: newTask.title.trim(),
+      description: newTask.description.trim() || undefined,
+      assignee: newTask.assignee.trim() || undefined,
+      status: newTask.status,
+      priority: newTask.priority,
+      dueDate: newTask.dueDate || undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    setTasks((prev) => [...prev, task]);
+    setNewTask({
+      title: "",
+      description: "",
+      assignee: "",
       status: "todo",
       priority: "medium",
-    };
-    setTasks([...tasks, task]);
-    setNewTask("");
+      dueDate: "",
+    });
     setShowAddModal(false);
   };
 
   const handleStatusChange = (id: string, newStatus: TeamTask["status"]) => {
-    setTasks(tasks.map((t) => (t.id === id ? { ...t, status: newStatus } : t)));
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, status: newStatus, updatedAt: new Date().toISOString() } : t
+      )
+    );
   };
 
   const handleDelete = (id: string) => {
-    setTasks(tasks.filter((t) => t.id !== id));
+    setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
   const todoTasks = tasks.filter((t) => t.status === "todo");
@@ -93,6 +137,14 @@ export default function TeamTasksPage() {
         return "text-red-600";
     }
   };
+
+  const formatUpdatedAt = (value: string) =>
+    new Date(value).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -130,12 +182,16 @@ export default function TeamTasksPage() {
                             <span className={`text-xs font-semibold ${getPriorityColor(task.priority)} capitalize`}>
                               {task.priority}
                             </span>
+                            {task.assignee && (
+                              <span className="text-xs text-slate-600">Assigned to {task.assignee}</span>
+                            )}
                             {task.dueDate && (
                               <span className="text-xs text-slate-500">
                                 Due {new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                               </span>
                             )}
                           </div>
+                          <p className="mt-2 text-xs text-slate-500">Updated {formatUpdatedAt(task.updatedAt)}</p>
                         </div>
                         <select
                           value={task.status}
@@ -173,7 +229,13 @@ export default function TeamTasksPage() {
                               {task.priority}
                             </span>
                             {task.assignee && <span className="text-xs text-slate-600">Assigned to {task.assignee}</span>}
+                            {task.dueDate && (
+                              <span className="text-xs text-slate-500">
+                                Due {new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                              </span>
+                            )}
                           </div>
+                          <p className="mt-2 text-xs text-slate-500">Updated {formatUpdatedAt(task.updatedAt)}</p>
                         </div>
                         <select
                           value={task.status}
@@ -206,6 +268,18 @@ export default function TeamTasksPage() {
                         <div className="flex-1">
                           <h3 className="font-medium text-slate-900 line-through">{task.title}</h3>
                           {task.description && <p className="mt-1 text-xs text-slate-600">{task.description}</p>}
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className={`text-xs font-semibold ${getPriorityColor(task.priority)} capitalize`}>
+                              {task.priority}
+                            </span>
+                            {task.assignee && <span className="text-xs text-slate-600">Assigned to {task.assignee}</span>}
+                            {task.dueDate && (
+                              <span className="text-xs text-slate-500">
+                                Due {new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">Updated {formatUpdatedAt(task.updatedAt)}</p>
                         </div>
                         <select
                           value={task.status}
@@ -241,11 +315,60 @@ export default function TeamTasksPage() {
               <input
                 type="text"
                 placeholder="Task title"
-                value={newTask}
-                onChange={(e) => setNewTask(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                value={newTask.title}
+                onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400"
                 onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
               />
+              <textarea
+                placeholder="Task description"
+                value={newTask.description}
+                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400"
+                rows={3}
+              />
+              <input
+                type="text"
+                placeholder="Assign to"
+                value={newTask.assignee}
+                onChange={(e) => setNewTask({ ...newTask, assignee: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-600">Status</label>
+                  <select
+                    value={newTask.status}
+                    onChange={(e) => setNewTask({ ...newTask, status: e.target.value as TeamTask["status"] })}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    <option value="todo">To Do</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="done">Done</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-600">Priority</label>
+                  <select
+                    value={newTask.priority}
+                    onChange={(e) => setNewTask({ ...newTask, priority: e.target.value as TeamTask["priority"] })}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-600">Due date</label>
+                <input
+                  type="date"
+                  value={newTask.dueDate}
+                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                />
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowAddModal(false)}
