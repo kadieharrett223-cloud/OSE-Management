@@ -133,6 +133,7 @@ export default function Dashboard() {
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
   const [customerPaymentsToday, setCustomerPaymentsToday] = useState<CustomerPayment[]>([]);
   const [loadingCustomerPayments, setLoadingCustomerPayments] = useState(true);
+  const [showCustomerPaymentsModal, setShowCustomerPaymentsModal] = useState(false);
   const [vendorPaymentsTotal, setVendorPaymentsTotal] = useState<number>(0);
   const [vendorPaymentsToday, setVendorPaymentsToday] = useState<VendorPaymentSummary[]>([]);
   const [loadingVendorPayments, setLoadingVendorPayments] = useState(true);
@@ -856,9 +857,21 @@ export default function Dashboard() {
               </div>
 
               <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
-                  <p className="text-sm text-slate-600">Payments received from customers today</p>
+                <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
+                    <p className="text-sm text-slate-600">Payments received from customers today</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Total received: <span className="font-semibold text-slate-900">${money(paymentsTotal)}</span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomerPaymentsModal(true)}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    View all →
+                  </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -1034,6 +1047,52 @@ export default function Dashboard() {
                                   {inv.status}
                                 </span>
                               </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showCustomerPaymentsModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+                <div className="w-full max-w-4xl rounded-xl bg-white shadow-xl ring-1 ring-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">All Customer Payments Today</h2>
+                      <p className="text-sm text-slate-600">Total received: ${money(paymentsTotal)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomerPaymentsModal(false)}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="max-h-[70vh] overflow-y-auto">
+                    <table className="w-full">
+                      <thead className="border-b border-slate-200 bg-slate-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
+                          <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Applied</th>
+                          <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {customerPaymentsToday.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
+                          </tr>
+                        ) : (
+                          customerPaymentsToday.map((payment) => (
+                            <tr key={payment.id} className="hover:bg-slate-50">
+                              <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
+                              <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
+                              <td className="px-6 py-3 text-right text-slate-600">${money(payment.totalAmount)}</td>
                             </tr>
                           ))
                         )}
