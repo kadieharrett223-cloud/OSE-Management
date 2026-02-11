@@ -22,20 +22,16 @@ type PurchaseOrder = {
 };
 
 const statusOptions = [
-  { value: "draft", label: "Draft" },
-  { value: "submitted", label: "Sent" },
+  { value: "to_be_paid", label: "To Be Paid" },
   { value: "shipped", label: "Shipped" },
   { value: "received", label: "Received" },
-  { value: "paid", label: "Paid" },
 ];
 
 const getStatusColor = (status: string) => {
-  const s = status?.toLowerCase() || "draft";
-  if (s === "paid") return "bg-indigo-100 text-indigo-800";
+  const s = status?.toLowerCase() || "to_be_paid";
   if (s === "received") return "bg-emerald-100 text-emerald-800";
   if (s === "shipped") return "bg-blue-100 text-blue-800";
-  if (s === "submitted") return "bg-amber-100 text-amber-800";
-  return "bg-slate-100 text-slate-800";
+  return "bg-amber-100 text-amber-800";
 };
 
 export default function ShipmentTrackingPage() {
@@ -204,7 +200,7 @@ export default function ShipmentTrackingPage() {
                           <div className="flex items-center gap-3">
                             <label className="text-xs font-semibold text-slate-600">Update Status:</label>
                             <select
-                              value={po.status?.toLowerCase() || "draft"}
+                              value={po.status?.toLowerCase() || "to_be_paid"}
                               onChange={(e) => handleStatusChange(po.id, e.target.value)}
                               disabled={updatingId === po.id}
                               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
