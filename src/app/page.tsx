@@ -265,7 +265,7 @@ export default function Dashboard() {
     fetchUnpaidInvoices();
   }, []);
 
-  // Fetch sales for current month (paid, through today)
+  // Fetch sales for current month (payments applied, through today)
   useEffect(() => {
     const fetchMonthlySales = async () => {
       try {
@@ -276,16 +276,21 @@ export default function Dashboard() {
         const endDate = now.toISOString().slice(0, 10);
 
         const response = await fetch(
-          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`
+          `/api/qbo/payment/query?startDate=${startDate}&endDate=${endDate}`
         );
         
         if (!response.ok) throw new Error("Failed to fetch monthly sales");
         
         const data = await response.json();
-        const invoices = data.invoices || [];
-        const totalSales = invoices.reduce((sum: number, inv: any) => sum + (Number(inv.TotalAmt) || 0), 0);
+        const payments = data.payments || [];
+        const totalSales = payments.reduce((sum: number, payment: any) => {
+          const total = Number(payment.TotalAmt) || 0;
+          const unapplied = Number(payment.UnappliedAmt) || 0;
+          const applied = Math.max(total - unapplied, 0);
+          return sum + applied;
+        }, 0);
 
-        console.log(`[dashboard] Monthly sales fetched: ${invoices.length} invoices, Total: $${totalSales}`);
+        console.log(`[dashboard] Monthly sales fetched: ${payments.length} payments, Total: $${totalSales}`);
         setMonthlyTotal(totalSales);
       } catch (error) {
         console.error("Error fetching monthly sales:", error);
@@ -471,14 +476,16 @@ export default function Dashboard() {
   useEffect(() => {
     let isMounted = true;
 
-    const buildCumulativeSeries = (invoices: any[], days: number, startDate: Date) => {
+    const buildCumulativeSeries = (payments: any[], days: number, startDate: Date) => {
       const dailyTotals = Array.from({ length: days }, () => 0);
 
-      invoices.forEach((inv: any) => {
-        const date = new Date(inv.TxnDate);
+      payments.forEach((payment: any) => {
+        const date = new Date(payment.TxnDate);
         const dayIndex = Math.max(0, Math.min(days - 1, date.getDate() - 1));
-        const total = Number(inv.TotalAmt) || 0;
-        dailyTotals[dayIndex] += total;
+        const total = Number(payment.TotalAmt) || 0;
+        const unapplied = Number(payment.UnappliedAmt) || 0;
+        const applied = Math.max(total - unapplied, 0);
+        dailyTotals[dayIndex] += applied;
       });
 
       const cumulative: number[] = [];
@@ -511,8 +518,8 @@ export default function Dashboard() {
           .slice(0, 10);
 
         const [currentRes, lastRes] = await Promise.all([
-          fetch(`/api/qbo/invoice/query?startDate=${currentStart}&endDate=${currentEnd}&status=paid&_=${Date.now()}`),
-          fetch(`/api/qbo/invoice/query?startDate=${lastStart}&endDate=${lastEnd}&status=paid&_=${Date.now()}`),
+          fetch(`/api/qbo/payment/query?startDate=${currentStart}&endDate=${currentEnd}&_=${Date.now()}`),
+          fetch(`/api/qbo/payment/query?startDate=${lastStart}&endDate=${lastEnd}&_=${Date.now()}`),
         ]);
 
         if (!currentRes.ok || !lastRes.ok) {
@@ -523,13 +530,13 @@ export default function Dashboard() {
         const currentData = await currentRes.json();
         const lastData = await lastRes.json();
 
-        const currentInvoices = currentData.invoices || [];
-        const lastInvoices = lastData.invoices || [];
+        const currentPayments = currentData.payments || [];
+        const lastPayments = lastData.payments || [];
 
-        console.log(`[dashboard] Monthly data - current: ${currentInvoices.length} invoices, last month: ${lastInvoices.length} invoices`);
+        console.log(`[dashboard] Monthly data - current: ${currentPayments.length} payments, last month: ${lastPayments.length} payments`);
 
-        const currentSeries = buildCumulativeSeries(currentInvoices, daysSoFar, currentMonthStart);
-        const lastSeries = buildCumulativeSeries(lastInvoices, compareDays, lastMonthStart);
+        const currentSeries = buildCumulativeSeries(currentPayments, daysSoFar, currentMonthStart);
+        const lastSeries = buildCumulativeSeries(lastPayments, compareDays, lastMonthStart);
 
         if (isMounted) {
           setCurrentMonthTrend(currentSeries);

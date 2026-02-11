@@ -6,8 +6,11 @@ export function TopBar() {
   const [qboStatus, setQboStatus] = useState<"checking" | "ok" | "error">("checking");
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [paymentsTodayCount, setPaymentsTodayCount] = useState(0);
+  const [paymentsTodayTotal, setPaymentsTodayTotal] = useState(0);
   const [loadingPaymentsToday, setLoadingPaymentsToday] = useState(true);
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
 
   const pages = [
     { label: "Dashboard", href: "/" },
@@ -64,9 +67,9 @@ export function TopBar() {
         const res = await fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
         if (!res.ok) throw new Error("Failed to fetch payments");
         const data = await res.json();
-        if (isMounted) setPaymentsTodayCount(data.count || 0);
+        if (isMounted) setPaymentsTodayTotal(Number(data.totalApplied || 0));
       } catch (error) {
-        if (isMounted) setPaymentsTodayCount(0);
+        if (isMounted) setPaymentsTodayTotal(0);
       } finally {
         if (isMounted) setLoadingPaymentsToday(false);
       }
@@ -108,7 +111,7 @@ export function TopBar() {
           <div className="ml-2 flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-900/30 px-3 py-1 text-xs font-semibold text-blue-100">
             Payments Today:
             <span className="text-sm font-bold text-white">
-              {loadingPaymentsToday ? "…" : paymentsTodayCount}
+              {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
             </span>
           </div>
         </div>
