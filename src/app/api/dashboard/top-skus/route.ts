@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch, QboApiError } from "@/lib/qbo";
 import { getUserId } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const userId = await getUserId();
