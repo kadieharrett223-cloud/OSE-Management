@@ -894,7 +894,7 @@ export default function Dashboard() {
             {/* Top SKUs Chart */}
             <TopSkuChart />
 
-            {/* Bottom Listed Cards */}
+            {/* Customer Payments + Top SKUs Side by Side */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
                 <div className="border-b border-slate-200 px-6 py-4">
@@ -932,6 +932,20 @@ export default function Dashboard() {
                   </table>
                 </div>
               </div>
+
+              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Top SKUs This Month</h2>
+                  <p className="text-sm text-slate-600">Most popular units sold</p>
+                </div>
+                <div className="px-6 py-4 space-y-3 max-h-96 overflow-y-auto">
+                  <TopSkuChart compact={true} />
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Listed Cards */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
                 <div className="border-b border-slate-200 px-6 py-4">
                   <h2 className="text-lg font-semibold text-slate-900">Vendors Paid Today</h2>

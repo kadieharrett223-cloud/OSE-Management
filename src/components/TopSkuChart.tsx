@@ -11,7 +11,11 @@ interface TopSkuData {
   }>;
 }
 
-export function TopSkuChart() {
+interface TopSkuChartProps {
+  compact?: boolean;
+}
+
+export function TopSkuChart({ compact = false }: TopSkuChartProps) {
   const [data, setData] = useState<TopSkuData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
@@ -45,7 +49,7 @@ export function TopSkuChart() {
 
   if (loading) {
     return (
-      <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200 p-6">
+      <div className={compact ? "" : "rounded-xl bg-white shadow-md ring-1 ring-slate-200 p-6"}>
         <p className="text-slate-500">Loading top SKUs...</p>
       </div>
     );
@@ -53,7 +57,7 @@ export function TopSkuChart() {
 
   if (error) {
     return (
-      <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200 p-6">
+      <div className={compact ? "" : "rounded-xl bg-white shadow-md ring-1 ring-slate-200 p-6"}>
         <p className="text-red-600">Failed to load top SKUs: {error}</p>
       </div>
     );
@@ -62,7 +66,7 @@ export function TopSkuChart() {
   const currentMonthData = data.find((d) => d.month === selectedMonth);
   if (!currentMonthData || currentMonthData.topSkus.length === 0) {
     return (
-      <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200 p-6">
+      <div className={compact ? "" : "rounded-xl bg-white shadow-md ring-1 ring-slate-200 p-6"}>
         <p className="text-slate-500">No SKU data available</p>
       </div>
     );
@@ -71,6 +75,37 @@ export function TopSkuChart() {
   const maxQuantity = Math.max(...currentMonthData.topSkus.map((s) => s.quantity));
   const months = data.map((d) => d.month);
 
+  // Compact mode - just the list without header/footer
+  if (compact) {
+    return (
+      <div className="space-y-2.5">
+        {currentMonthData.topSkus.slice(0, 5).map((sku, index) => {
+          const percentage = (sku.quantity / maxQuantity) * 100;
+          return (
+            <div key={sku.sku} className="space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-slate-900 text-sm">{index + 1}. {sku.sku}</p>
+                  <p className="text-xs text-slate-500 truncate">{sku.description}</p>
+                </div>
+                <div className="flex-shrink-0 ml-2 text-right">
+                  <p className="font-semibold text-slate-900 text-sm">{sku.quantity.toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all"
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Full mode - with header, footer, and month selector
   return (
     <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200 p-6">
       <div className="flex items-center justify-between mb-6">
