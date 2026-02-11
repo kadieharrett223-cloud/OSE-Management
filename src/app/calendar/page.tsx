@@ -488,59 +488,6 @@ export default function CalendarPage() {
               })}
             </div>
           </div>
-
-          {/* Upcoming Notifications */}
-          <div className="mt-6 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">All Notifications</h2>
-            {notifications.length === 0 ? (
-              <p className="text-sm text-slate-500">No notifications yet. Click "Add Notification" to create one.</p>
-            ) : (
-              <div className="space-y-2">
-                {notifications.map((notif) => (
-                  <div
-                    key={notif.id}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-slate-900">{notif.title}</span>
-                        {notif.recurring !== "none" && (
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-                            {notif.recurring}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 text-sm text-slate-600">
-                        {new Date(notif.date).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </div>
-                      {notif.notes && <p className="mt-1 text-xs text-slate-500">{notif.notes}</p>}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setEditingNotification(notif);
-                          setShowAddModal(true);
-                        }}
-                        className="rounded px-3 py-1 text-sm text-blue-600 hover:bg-blue-50"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteNotification(notif.id)}
-                        className="rounded px-3 py-1 text-sm text-red-600 hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </main>
     </div>

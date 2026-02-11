@@ -93,7 +93,7 @@ export function TopBar() {
   return (
     <div className="sticky top-0 z-40 w-full border-b border-slate-900/60 bg-gradient-to-r from-slate-950 via-blue-900 to-blue-700 text-slate-100 print:hidden">
       <div className="mx-auto flex w-full flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
-        <div className="flex flex-wrap items-center gap-2 text-xs sm:gap-4 sm:text-sm">
+        <div className="flex flex-nowrap items-center gap-2 text-xs sm:gap-4 sm:text-sm overflow-x-auto">
           <span className="font-semibold text-blue-100">QBO:</span>
           {qboStatus === "ok" ? (
             <span className="inline-flex items-center gap-1 text-emerald-300 sm:gap-2">
