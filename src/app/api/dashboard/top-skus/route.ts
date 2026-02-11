@@ -42,7 +42,12 @@ export async function GET(req: NextRequest) {
         if (!sku || !quantity) return;
 
         const normalizedSku = sku.toLowerCase();
-        if (normalizedSku.includes("note") || normalizedSku.includes("misc")) return;
+        if (
+          normalizedSku.includes("note") ||
+          normalizedSku.includes("misc") ||
+          normalizedSku.includes("discount") ||
+          normalizedSku.includes("shipping")
+        ) return;
 
         const existing = skuMap.get(sku) || { quantity: 0, description: line.Description || "" };
         existing.quantity += quantity;
