@@ -189,9 +189,8 @@ export default function AdminPriceListPage() {
 
   // Save discount to localStorage when changed
   const updateDiscount = (value: number) => {
-    const normalized = value && value > 0 ? value : 20;
-    setDiscountPercentage(normalized);
-    localStorage.setItem("priceListDiscount", normalized.toString());
+    setDiscountPercentage(value);
+    localStorage.setItem("priceListDiscount", value.toString());
   };
 
   const categoryNameById = new Map(categories.map((cat) => [cat.id, cat.category_name]));
@@ -206,14 +205,13 @@ export default function AdminPriceListPage() {
 
   useEffect(() => {
     loadData();
-    // Load discount from localStorage on mount (default to 20)
+    // Load discount from localStorage on mount
     const saved = localStorage.getItem("priceListDiscount");
-    const parsed = saved !== null ? Number(saved) : NaN;
-    if (saved === null || Number.isNaN(parsed) || parsed <= 0) {
+    if (saved) {
+      setDiscountPercentage(Number(saved));
+    } else {
       setDiscountPercentage(20);
       localStorage.setItem("priceListDiscount", "20");
-    } else {
-      setDiscountPercentage(parsed);
     }
   }, []);
 
