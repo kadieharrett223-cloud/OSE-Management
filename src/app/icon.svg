@@ -1,29 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="App icon">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#000000" />
-      <stop offset="100%" stop-color="#b00020" />
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="96" fill="url(#bg)" />
-  <path
-    d="M256 84
-       C214 136 224 182 196 226
-       C172 262 140 292 140 340
-       C140 406 190 448 256 448
-       C322 448 372 406 372 340
-       C372 292 340 262 316 226
-       C288 182 298 136 256 84Z"
-    fill="#000000"
-  />
-  <path
-    d="M256 164
-       C236 198 244 222 228 246
-       C214 268 196 288 196 316
-       C196 356 224 384 256 384
-       C288 384 316 356 316 316
-       C316 288 298 268 284 246
-       C268 222 276 198 256 164Z"
-    fill="#0a0a0a"
-  />
+  <rect width="512" height="512" rx="96" fill="#000000" />
+  <text
+    x="256"
+    y="300"
+    text-anchor="middle"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="200"
+    font-weight="700"
+    fill="#ffffff"
+  >
+    OSE
+  </text>
 </svg>
