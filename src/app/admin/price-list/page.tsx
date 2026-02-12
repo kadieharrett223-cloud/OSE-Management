@@ -327,22 +327,25 @@ export default function AdminPriceListPage() {
     // 3) Final cost with shipping: Per unit + Zone 5
     const cost_with_shipping = per_unit + zone5_shipping;
 
-    // 4) Sell price: (Cost × Multiplier) + Shipping
-    const sell_price = (per_unit * multiplier) + zone5_shipping;
+    // 4) Base sell price: (Cost × Multiplier) + Shipping
+    const base_sell_price = (per_unit * multiplier) + zone5_shipping;
 
-    // 5) List price: Use manual value if present, else 20% above sell price
-    const list_price = item.list_price ?? (sell_price * 1.2);
+    // 5) List price: Use manual value if present, else 20% above base sell price
+    const list_price = item.list_price ?? (base_sell_price * 1.2);
 
     const appliedDiscount = discountOverride ?? discountPercentage;
 
-    // 6) Profit: Sell price - Final cost with shipping
+    // 6) Apply discount to list price to get final sell price
+    const sell_price = list_price * (1 - (appliedDiscount || 0) / 100);
+
+    // 7) Profit: Discounted sell price - Final cost with shipping
     const profit = sell_price - cost_with_shipping;
 
     // Preserve legacy fields for compatibility.
     const rounded_normal_price = list_price * 0.8;
     const black_friday_price = list_price * 0.75;
-    const discounted_sale_price = list_price * (1 - (appliedDiscount || 0) / 100);
-    const rounded_sale_price = Math.floor(discounted_sale_price / 100) * 100 - 1;
+    const discounted_sale_price = sell_price;
+    const rounded_sale_price = Math.floor(sell_price / 100) * 100 - 1;
 
     return {
       ...item,
