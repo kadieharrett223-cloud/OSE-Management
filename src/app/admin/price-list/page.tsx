@@ -330,8 +330,8 @@ export default function AdminPriceListPage() {
     // 4) Base sell price: (Cost × Multiplier) + Shipping
     const base_sell_price = (per_unit * multiplier) + zone5_shipping;
 
-    // 5) List price: Use manual value if present, else 20% above base sell price
-    const list_price = item.list_price ?? (base_sell_price * 1.2);
+    // 5) List price: Always calculated as 20% above base sell price (ignore stored values)
+    const list_price = base_sell_price * 1.2;
 
     const appliedDiscount = discountOverride ?? discountPercentage;
 
