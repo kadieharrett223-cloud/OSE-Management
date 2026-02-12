@@ -460,7 +460,7 @@ export default function AdminPriceListPage() {
     );
   });
 
-  // Group items by category, apply calculations, preserve category order
+  // Group items by category, apply calculations, sort items by sell price within each group
   const itemsByCategory = [...categories]
     .filter((cat) => applyDiscountToAll || selectedGroups.includes(cat.category_name))
     .map((cat) => {
@@ -468,12 +468,10 @@ export default function AdminPriceListPage() {
         .filter((item) => item.category_id === cat.id)
         .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
         .sort((a, b) => {
-          const aIdx = PRICE_LIST_ORDER_MAP.get(a.item_no.toLowerCase());
-          const bIdx = PRICE_LIST_ORDER_MAP.get(b.item_no.toLowerCase());
-          if (aIdx !== undefined && bIdx !== undefined) return aIdx - bIdx;
-          if (aIdx !== undefined) return -1;
-          if (bIdx !== undefined) return 1;
-          return (a.display_order ?? 0) - (b.display_order ?? 0);
+          // Sort by sell price within each category (lowest to highest)
+          const priceA = Number(a.sell_price || 0);
+          const priceB = Number(b.sell_price || 0);
+          return priceA - priceB;
         });
 
       return {
