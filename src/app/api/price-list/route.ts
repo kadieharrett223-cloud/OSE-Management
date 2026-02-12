@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabase
       .from("price_list_items")
-      .select("id, item_no, description, list_price, shipping_included_per_unit, weight_lbs, fob_cost, shopify_variant_id");
+      .select("id, item_no, description, list_price, shipping_included_per_unit, weight_lbs, fob_cost, shopify_variant_id")
       .eq("is_active", true);
 
     if (error) throw error;
