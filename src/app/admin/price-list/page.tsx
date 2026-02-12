@@ -460,7 +460,7 @@ export default function AdminPriceListPage() {
     );
   });
 
-  // Group items by category, apply calculations, then sort groups by lowest price
+  // Group items by category, apply calculations, preserve category order
   const itemsByCategory = [...categories]
     .filter((cat) => applyDiscountToAll || selectedGroups.includes(cat.category_name))
     .map((cat) => {
@@ -476,23 +476,13 @@ export default function AdminPriceListPage() {
           return (a.display_order ?? 0) - (b.display_order ?? 0);
         });
 
-      const minSellPrice = derivedItems.reduce((min, item) => {
-        const price = Number(item.sell_price || 0);
-        if (!Number.isFinite(price) || price <= 0) return min;
-        return Math.min(min, price);
-      }, Number.POSITIVE_INFINITY);
-
       return {
         category: cat,
         items: derivedItems,
-        minSellPrice,
       };
     })
     .filter(({ items }) => items.length > 0)
-    .sort((a, b) => {
-      if (a.minSellPrice !== b.minSellPrice) return a.minSellPrice - b.minSellPrice;
-      return (a.category.display_order ?? 0) - (b.category.display_order ?? 0);
-    })
+    .sort((a, b) => (a.category.display_order ?? 0) - (b.category.display_order ?? 0))
     .map(({ category, items }) => ({ category, items }));
 
   const pathname = usePathname();
@@ -769,7 +759,7 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* Description (INPUT) */}
-                              <td className="px-2 py-1.5 text-left whitespace-nowrap">
+                              <td className="px-2 py-1.5 text-left">
                                 {isEditing ? (
                                   <input
                                     type="text"
@@ -778,7 +768,11 @@ export default function AdminPriceListPage() {
                                     className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-xs font-medium text-slate-700 bg-white"
                                   />
                                 ) : (
-                                  <span className="text-slate-700 text-xs">{item.description || "—"}</span>
+                                  <span className="text-slate-700 text-xs">
+                                    {item.description && item.description.length > 20
+                                      ? item.description.slice(0, 20) + "..."
+                                      : item.description || "—"}
+                                  </span>
                                 )}
                               </td>
 
