@@ -55,6 +55,13 @@ export function CommandBar() {
           action: () => router.push("/commissions"),
         },
         {
+          id: "jump-payroll",
+          label: "Payroll",
+          hint: "Open payroll overview",
+          keywords: ["payroll", "wages", "team"],
+          action: () => router.push("/payroll"),
+        },
+        {
           id: "jump-customers",
           label: "Customer",
           hint: "Open customers",
