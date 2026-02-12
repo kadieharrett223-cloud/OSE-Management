@@ -308,11 +308,12 @@ export default function AdminPriceListPage() {
     }
   };
 
-  // Client-side calculation: Tariff = FOB×2, Per Unit = Tariff+Ocean+Import, Cost w/Shipping = Per Unit+Zone5, Base Sell = Cost×Mult, List = Base Sell×1.2, Discount off List, Profit = Sell−Cost
+  // Client-side calculation: Tariff = FOB×2, Ocean/Import per unit from container constants, Cost = Tariff+Ocean+Import, Final = Cost+Shipping, Sell = (Cost×Multiplier)+Shipping
   const computeDerivedFields = (item: PriceListItem, discountOverride?: number): PriceListItem => {
     const fob_cost = item.fob_cost || 0;
-    const ocean_per_unit = item.ocean_frt || 0;  // Already per-unit in DB
-    const importing_per_unit = item.importing || 0;  // Already per-unit in DB
+    const quantity = item.quantity || 0;
+    const ocean_per_unit = quantity > 0 ? 3000 / quantity : (item.ocean_frt || 0);
+    const importing_per_unit = quantity > 0 ? 2100 / quantity : (item.importing || 0);
     const zone5_shipping = item.zone5_shipping || 0;
     const multiplier = item.multiplier || 1;
 
@@ -322,21 +323,18 @@ export default function AdminPriceListPage() {
     // 2) Per unit: Tariff + Ocean per-unit + Importing per-unit
     const per_unit = tariff_105 + ocean_per_unit + importing_per_unit;
 
-    // 3) Cost with shipping: Per unit + Zone 5
+    // 3) Final cost with shipping: Per unit + Zone 5
     const cost_with_shipping = per_unit + zone5_shipping;
 
-    // 4) Base sell price (before discount): Cost with shipping × Multiplier
-    const base_sell_price = cost_with_shipping * multiplier;
+    // 4) Sell price: (Cost × Multiplier) + Shipping
+    const sell_price = (per_unit * multiplier) + zone5_shipping;
 
-    // 5) List price: Base sell price × 1.2 (fixed, never changes with discount)
-    const list_price = base_sell_price * 1.2;
+    // 5) List price: Use manual value if present, else 20% above sell price
+    const list_price = item.list_price ?? (sell_price * 1.2);
 
     const appliedDiscount = discountOverride ?? discountPercentage;
 
-    // 6) Sell price: Discount % off list price
-    const sell_price = list_price * (1 - (appliedDiscount || 0) / 100);
-
-    // 7) Profit: Sell price - Cost with shipping
+    // 6) Profit: Sell price - Final cost with shipping
     const profit = sell_price - cost_with_shipping;
 
     // Preserve legacy fields for compatibility.
@@ -348,6 +346,8 @@ export default function AdminPriceListPage() {
     return {
       ...item,
       tariff_105,
+      ocean_frt: ocean_per_unit,
+      importing: importing_per_unit,
       ocean_per_unit,
       importing_per_unit,
       per_unit,
