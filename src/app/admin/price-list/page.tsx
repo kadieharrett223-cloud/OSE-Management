@@ -460,31 +460,13 @@ export default function AdminPriceListPage() {
     );
   });
 
-  // Group items by category and apply discount calculations
-  const sortedCategories = [...categories].sort((a, b) => {
-    const aItems = filteredItems.filter((item) => item.category_id === a.id);
-    const bItems = filteredItems.filter((item) => item.category_id === b.id);
-
-    const aMin = aItems.reduce((min, item) => {
-      const idx = PRICE_LIST_ORDER_MAP.get(item.item_no.toLowerCase());
-      return idx === undefined ? min : Math.min(min, idx);
-    }, Number.POSITIVE_INFINITY);
-
-    const bMin = bItems.reduce((min, item) => {
-      const idx = PRICE_LIST_ORDER_MAP.get(item.item_no.toLowerCase());
-      return idx === undefined ? min : Math.min(min, idx);
-    }, Number.POSITIVE_INFINITY);
-
-    if (aMin !== bMin) return aMin - bMin;
-    return (a.display_order ?? 0) - (b.display_order ?? 0);
-  });
-
-  const itemsByCategory = sortedCategories
+  // Group items by category, apply calculations, then sort groups by lowest price
+  const itemsByCategory = [...categories]
     .filter((cat) => applyDiscountToAll || selectedGroups.includes(cat.category_name))
-    .map((cat) => ({
-      category: cat,
-      items: filteredItems
+    .map((cat) => {
+      const derivedItems = filteredItems
         .filter((item) => item.category_id === cat.id)
+        .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
         .sort((a, b) => {
           const aIdx = PRICE_LIST_ORDER_MAP.get(a.item_no.toLowerCase());
           const bIdx = PRICE_LIST_ORDER_MAP.get(b.item_no.toLowerCase());
@@ -492,10 +474,26 @@ export default function AdminPriceListPage() {
           if (aIdx !== undefined) return -1;
           if (bIdx !== undefined) return 1;
           return (a.display_order ?? 0) - (b.display_order ?? 0);
-        })
-        .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id))),
-    }))
-    .filter(({ items }) => items.length > 0);
+        });
+
+      const minSellPrice = derivedItems.reduce((min, item) => {
+        const price = Number(item.sell_price || 0);
+        if (!Number.isFinite(price) || price <= 0) return min;
+        return Math.min(min, price);
+      }, Number.POSITIVE_INFINITY);
+
+      return {
+        category: cat,
+        items: derivedItems,
+        minSellPrice,
+      };
+    })
+    .filter(({ items }) => items.length > 0)
+    .sort((a, b) => {
+      if (a.minSellPrice !== b.minSellPrice) return a.minSellPrice - b.minSellPrice;
+      return (a.category.display_order ?? 0) - (b.category.display_order ?? 0);
+    })
+    .map(({ category, items }) => ({ category, items }));
 
   const pathname = usePathname();
   const tabs = [
