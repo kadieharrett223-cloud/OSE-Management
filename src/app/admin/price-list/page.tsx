@@ -552,37 +552,20 @@ export default function AdminPriceListPage() {
                   </div>
                   <div className="max-h-[75vh] overflow-y-auto px-6 py-6">
                     <div className="rounded-2xl bg-blue-50 p-6 ring-1 ring-blue-200">
-                      <h3 className="font-semibold text-blue-900">💡 Price List Guide</h3>
-                      <p className="mt-2 text-sm text-blue-800">
-                        Example flow (single item):
-                      </p>
-                      <div className="mt-4 rounded-xl bg-white/80 p-4 ring-1 ring-blue-200/70">
-                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-blue-900">
-                          <span className="rounded-full bg-blue-100 px-2 py-1">FOB × 2.05</span>
-                          <span className="text-blue-400">→</span>
-                          <span className="rounded-full bg-blue-100 px-2 py-1">Tariff 105%</span>
-                          <span className="text-blue-400">→</span>
-                          <span className="rounded-full bg-blue-100 px-2 py-1">+ Ocean</span>
-                          <span className="text-blue-400">→</span>
-                          <span className="rounded-full bg-blue-100 px-2 py-1">+ Import</span>
-                          <span className="text-blue-400">→</span>
-                          <span className="rounded-full bg-amber-100 px-2 py-1">+ Zone 5</span>
-                          <span className="text-blue-400">→</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-1">Cost w/Shipping</span>
-                          <span className="text-blue-400">→</span>
-                          <span className="rounded-full bg-blue-100 px-2 py-1">× Multiplier</span>
-                          <span className="text-blue-400">→</span>
-                          <span className="rounded-full bg-emerald-100 px-2 py-1">Sell Price</span>
-                          <span className="text-blue-400">→</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-1">× 1.2</span>
-                          <span className="text-blue-400">→</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-1">List Price</span>
-                          <span className="text-blue-400">→</span>
-                          <span className="rounded-full bg-emerald-100 px-2 py-1">Sell − Cost = Profit</span>
+                      <h3 className="font-semibold text-blue-900">Price List Guide</h3>
+                      <div className="mt-3 text-sm text-blue-800 space-y-2">
+                        <p><span className="font-semibold">Manual inputs:</span> FOB cost, quantity (container capacity), shipping, multiplier, optional list price.</p>
+                        <p><span className="font-semibold">Constants:</span> Tariff rate = 100%, Ocean freight = 3000 per container, Importing = 2100 per container.</p>
+                        <div className="rounded-xl bg-white/80 p-4 ring-1 ring-blue-200/70 text-xs text-blue-900 space-y-1">
+                          <div>Tariff = FOB × 2</div>
+                          <div>Ocean per unit = 3000 ÷ Quantity</div>
+                          <div>Importing per unit = 2100 ÷ Quantity</div>
+                          <div>Cost (no shipping) = Tariff + Ocean + Importing</div>
+                          <div>Final cost = Cost + Shipping</div>
+                          <div>Sell price = (Cost × Multiplier) + Shipping</div>
+                          <div>Profit = Sell price − Final cost</div>
                         </div>
-                      </div>
-                      <div className="mt-3 text-xs text-blue-700">
-                        Discount field sets the <span className="font-semibold">% off list price</span>. Default: 20%.
+                        <p className="text-xs text-blue-700">Discount field sets the % off list price (default 20%).</p>
                       </div>
                     </div>
                   </div>
