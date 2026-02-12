@@ -78,6 +78,22 @@ export default function ViewPO() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [priceList, setPriceList] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
+  const [creatingProduct, setCreatingProduct] = useState(false);
+  const [newProductForm, setNewProductForm] = useState({
+    item_no: "",
+    description: "",
+    category_id: "",
+    supplier: "",
+    fob_cost: 0,
+    quantity: 0,
+    ocean_frt: 0,
+    importing: 0,
+    zone5_shipping: 0,
+    multiplier: 1,
+    weight_lbs: 0,
+  });
 
   useEffect(() => {
     if (id) {
@@ -113,6 +129,16 @@ export default function ViewPO() {
         setPriceList(items);
       })
       .catch((err) => console.error("Failed to load price list:", err));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/price-list/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        const items = Array.isArray(data?.items) ? data.items : [];
+        setCategories(items);
+      })
+      .catch((err) => console.error("Failed to load categories:", err));
   }, []);
 
   const handleSendEmail = async () => {
@@ -398,6 +424,75 @@ export default function ViewPO() {
   const remainingWeightLbs = Math.max(containerMaxLbs - totalWeightLbs, 0);
 
   const money = (num: number) => num.toFixed(2);
+
+  const skuExists = Boolean(
+    lineItemForm.sku && priceList.some((item) => (item.sku || item.item_no)?.toLowerCase() === lineItemForm.sku.toLowerCase())
+  );
+
+  const openCreateProductModal = () => {
+    setNewProductForm((prev) => ({
+      ...prev,
+      item_no: lineItemForm.sku || prev.item_no,
+      description: lineItemForm.description || prev.description,
+      fob_cost: lineItemForm.unit_price || prev.fob_cost,
+      weight_lbs: lineItemForm.weight_lbs || prev.weight_lbs,
+    }));
+    setShowCreateProductModal(true);
+  };
+
+  const handleCreateProduct = async () => {
+    const itemNo = newProductForm.item_no.trim();
+    const description = newProductForm.description.trim();
+
+    if (!itemNo || !description) {
+      alert("SKU and description are required.");
+      return;
+    }
+
+    if (priceList.some((item) => (item.sku || item.item_no)?.toLowerCase() === itemNo.toLowerCase())) {
+      alert("That SKU already exists in the price list.");
+      return;
+    }
+
+    setCreatingProduct(true);
+    try {
+      const res = await fetch("/api/price-list/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newProductForm,
+          item_no: itemNo,
+          description,
+          category_id: newProductForm.category_id || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Failed to create product");
+        return;
+      }
+
+      const data = await res.json();
+      const newItem = data.item;
+      if (newItem) {
+        setPriceList((prev) => [newItem, ...prev]);
+        setLineItemForm((prev) => ({
+          ...prev,
+          sku: newItem.sku || itemNo,
+          description: newItem.description || description,
+          unit_price: Number(newItem.fob_cost ?? prev.unit_price),
+        }));
+      }
+
+      setShowCreateProductModal(false);
+    } catch (error) {
+      console.error("Create product error:", error);
+      alert("Failed to create product");
+    } finally {
+      setCreatingProduct(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -1226,6 +1321,15 @@ export default function ViewPO() {
                       <option key={item.id} value={item.sku || item.item_no || ""}>{item.description}</option>
                     ))}
                   </datalist>
+                  {!skuExists && lineItemForm.sku && (
+                    <button
+                      type="button"
+                      onClick={openCreateProductModal}
+                      className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-800"
+                    >
+                      + Create new product
+                    </button>
+                  )}
                 </div>
                 <div className="col-span-4 border-r border-slate-200 p-2">
                   <input
@@ -1280,6 +1384,135 @@ export default function ViewPO() {
                 className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
               >
                 {savingLineItem ? "Saving..." : "Save Item"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateProductModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-lg">
+            <h2 className="text-xl font-bold text-slate-900 mb-4">Create New Product</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-1">
+                <label className="block text-sm font-semibold text-slate-700 mb-1">SKU *</label>
+                <input
+                  type="text"
+                  value={newProductForm.item_no}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, item_no: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Category</label>
+                <select
+                  value={newProductForm.category_id}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, category_id: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="">Uncategorized</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>{category.category_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Description *</label>
+                <input
+                  type="text"
+                  value={newProductForm.description}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, description: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">FOB Cost</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newProductForm.fob_cost}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, fob_cost: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Quantity (container qty)</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={newProductForm.quantity}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, quantity: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Weight (lbs)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newProductForm.weight_lbs}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, weight_lbs: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Ocean Freight</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newProductForm.ocean_frt}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, ocean_frt: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Importing</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newProductForm.importing}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, importing: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Zone 5 Shipping</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newProductForm.zone5_shipping}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, zone5_shipping: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Multiplier</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newProductForm.multiplier}
+                  onChange={(e) => setNewProductForm({ ...newProductForm, multiplier: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowCreateProductModal(false)}
+                disabled={creatingProduct}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateProduct}
+                disabled={creatingProduct}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {creatingProduct ? "Creating..." : "Create Product"}
               </button>
             </div>
           </div>
