@@ -285,6 +285,7 @@ export default function AdminPriceListPage() {
       const { error } = await supabase
         .from("price_list_items")
         .update({
+          item_no: editingItem.item_no,
           description: editingItem.description,
           fob_cost: editingItem.fob_cost,
           quantity: editingItem.quantity,
@@ -751,9 +752,18 @@ export default function AdminPriceListPage() {
                             return (
                             <React.Fragment key={item.id}>
                             <tr className={isEditing ? "bg-blue-50/70 border-l-4 border-l-blue-500" : "hover:bg-slate-50"}>
-                              {/* Item No */}
+                              {/* Item No (INPUT) */}
                               <td className="pl-3 pr-0.5 py-1.5 sticky left-0 bg-inherit z-10">
-                                <span className="font-mono text-xs font-medium text-slate-900 whitespace-nowrap">{item.item_no}</span>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    value={displayItem.item_no || ""}
+                                    onChange={(e) => setEditingItem((prev) => prev ? ({ ...prev, item_no: e.target.value }) : prev)}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-xs font-mono font-medium text-slate-900 bg-white"
+                                  />
+                                ) : (
+                                  <span className="font-mono text-xs font-medium text-slate-900 whitespace-nowrap">{item.item_no}</span>
+                                )}
                               </td>
 
                               {/* Description (INPUT) */}
