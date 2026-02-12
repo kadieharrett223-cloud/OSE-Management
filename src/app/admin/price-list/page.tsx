@@ -719,6 +719,7 @@ export default function AdminPriceListPage() {
                       <table className="w-full divide-y divide-slate-100 text-xs border-collapse table-fixed">
                         <colgroup>
                           <col style={{ width: "75px" }} />
+                          <col style={{ width: "200px" }} />
                           <col style={{ width: "60px" }} />
                           <col style={{ width: "60px" }} />
                           <col style={{ width: "65px" }} />
@@ -737,6 +738,7 @@ export default function AdminPriceListPage() {
                         <thead className="bg-slate-50">
                           <tr>
                             <th className="pl-3 pr-0.5 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
+                            <th className="px-2 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">Description</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
                             <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
                             <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Quantity</th>
@@ -764,6 +766,20 @@ export default function AdminPriceListPage() {
                               {/* Item No */}
                               <td className="pl-3 pr-0.5 py-1.5 sticky left-0 bg-inherit z-10">
                                 <span className="font-mono text-xs font-medium text-slate-900 whitespace-nowrap">{item.item_no}</span>
+                              </td>
+
+                              {/* Description (INPUT) */}
+                              <td className="px-2 py-1.5 text-left whitespace-nowrap">
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    value={displayItem.description || ""}
+                                    onChange={(e) => setEditingItem((prev) => prev ? ({ ...prev, description: e.target.value }) : prev)}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-xs font-medium text-slate-700 bg-white"
+                                  />
+                                ) : (
+                                  <span className="text-slate-700 text-xs">{item.description || "—"}</span>
+                                )}
                               </td>
 
                               {/* Supplier */}
