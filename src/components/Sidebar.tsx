@@ -16,7 +16,6 @@ const navGroups = [
     items: [
       { label: "Expenses", hint: "Bills & payroll", href: "/expenses" },
       { label: "Payroll", hint: "Payroll costs & team", href: "/payroll" },
-      { label: "Commissions", hint: "QBO sync & payouts", href: "/commissions" },
     ],
   },
   {
