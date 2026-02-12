@@ -396,8 +396,8 @@ export default function AdminPriceListPage() {
           category_id: newProduct.category_id,
           fob_cost: newProduct.fob_cost,
           quantity: newProduct.quantity,
-          ocean_frt: newProduct.ocean_frt,
-          importing: newProduct.importing,
+          ocean_frt: newProduct.quantity ? null : newProduct.ocean_frt,
+          importing: newProduct.quantity ? null : newProduct.importing,
           zone5_shipping: newProduct.zone5_shipping,
           multiplier: newProduct.multiplier || 1,
           is_active: true
@@ -1048,30 +1048,10 @@ export default function AdminPriceListPage() {
                   />
                 </div>
 
-                {/* Ocean Freight */}
-                <div>
-                  <label className="block text-sm font-semibold text-blue-700 mb-1">Ocean Freight</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={newProduct.ocean_frt ?? ""}
-                    onChange={(e) => setNewProduct({ ...newProduct, ocean_frt: e.target.value ? Number(e.target.value) : null })}
-                    placeholder="0.00"
-                    className="w-full rounded-lg border border-blue-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
-                  />
-                </div>
-
-                {/* Importing */}
-                <div>
-                  <label className="block text-sm font-semibold text-blue-700 mb-1">Importing</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={newProduct.importing ?? ""}
-                    onChange={(e) => setNewProduct({ ...newProduct, importing: e.target.value ? Number(e.target.value) : null })}
-                    placeholder="0.00"
-                    className="w-full rounded-lg border border-blue-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
-                  />
+                <div className="col-span-2">
+                  <p className="text-xs text-slate-500">
+                    Ocean freight and importing are auto-calculated from quantity (3000 and 2100 per container).
+                  </p>
                 </div>
 
                 {/* Zone 5 Shipping */}
