@@ -176,14 +176,15 @@ export default function WholesalersPage() {
                     key={tab.href}
                     href={tab.href}
                     className={`px-4 md:px-6 py-3 text-sm font-medium transition relative whitespace-nowrap ${
-                    pathname === tab.href
-                      ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
-                      : "text-slate-300 hover:text-white hover:bg-slate-700/50"
-                  }`}
-                >
-                  {tab.label}
-                </a>
-              ))}
+                      pathname === tab.href
+                        ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
+                        : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                    }`}
+                  >
+                    {tab.label}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
 
