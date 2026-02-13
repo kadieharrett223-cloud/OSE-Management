@@ -102,6 +102,9 @@ const buildTimeMap = (activities: QboTimeActivity[]) => {
   return map;
 };
 
+const averageRate = (rates: number[]) =>
+  rates.length ? rates.reduce((sum, rate) => sum + rate, 0) / rates.length : 0;
+
 export async function GET(req: NextRequest) {
   try {
     const userId = await getUserId();
@@ -161,9 +164,7 @@ export async function GET(req: NextRequest) {
       const previousTimeInfo = previousTimeByEmployee.get(employeeKey)
         || previousTimeByEmployee.get(employee.DisplayName || "")
         || { hours: 0, rates: [] };
-      const inferredRate = timeInfo.rates.length
-        ? timeInfo.rates.reduce((sum, rate) => sum + rate, 0) / timeInfo.rates.length
-        : 0;
+      const inferredRate = averageRate(timeInfo.rates) || averageRate(previousTimeInfo.rates);
       const baseRate = toNumber(employee.BillRate) || inferredRate;
 
       const perPayrollCost = type === "Salary"
