@@ -124,6 +124,9 @@ export function TopBar() {
             </span>
           </div>
         </div>
+        <div className="hidden lg:block text-center">
+          <span className="text-lg font-bold text-white tracking-wide">Olympic Shop Equipment</span>
+        </div>
         <div className="relative w-full sm:flex-1 sm:max-w-sm">
           <input
             type="search"
