@@ -64,9 +64,9 @@ export default function TerminatedPayrollPage() {
         <Sidebar activePage="Payroll" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
-            <div className="bg-slate-800 border-b border-slate-700 rounded-2xl">
-              <div className="flex gap-1 px-4">
+          <div className="bg-slate-800 border-b border-slate-700">
+            <div className="mx-auto max-w-6xl px-6">
+              <div className="flex gap-1">
                 {tabs.map((tab) => (
                   <a
                     key={tab.href}
@@ -82,6 +82,8 @@ export default function TerminatedPayrollPage() {
                 ))}
               </div>
             </div>
+          </div>
+          <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
 
             <header>
               <h1 className="text-2xl font-semibold text-slate-900">Terminated Team</h1>
