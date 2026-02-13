@@ -124,8 +124,9 @@ export function TopBar() {
             </span>
           </div>
         </div>
-        <div className="hidden lg:block text-center">
+        <div className="hidden lg:flex lg:flex-col lg:items-center lg:gap-0.5">
           <span className="text-lg font-bold text-white tracking-wide">Olympic Shop Equipment</span>
+          <span className="text-[10px] text-blue-200/60">brought to you by kadie ☺</span>
         </div>
         <div className="relative w-full sm:flex-1 sm:max-w-sm">
           <input

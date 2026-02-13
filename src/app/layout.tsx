@@ -40,9 +40,6 @@ export default function RootLayout({
         <Providers>
           <TopBar />
           {children}
-          <footer className="fixed bottom-0 left-0 right-0 py-2 text-center text-xs text-slate-400 bg-transparent pointer-events-none print:hidden">
-            brought to you by kadie ☺
-          </footer>
         </Providers>
         <SpeedInsights />
       </body>
