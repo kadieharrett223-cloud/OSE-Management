@@ -979,9 +979,9 @@ export default function AdminPriceListPage() {
                         const displayItem = isEditing && editingItem ? editingItem : item;
                         
                         return (
-                          <div key={item.id} className={`p-4 ${isEditing ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}>
-                            {/* Item No & Description */}
-                            <div className="mb-3">
+                          <div key={item.id} className={`p-3 ${isEditing ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}>
+                            {/* Item No only (no description on mobile) */}
+                            <div className="mb-2">
                               {isEditing ? (
                                 <input
                                   type="text"
@@ -990,33 +990,32 @@ export default function AdminPriceListPage() {
                                   className="w-full mb-2 rounded border border-blue-400 px-2 py-1 text-sm font-mono font-semibold"
                                 />
                               ) : (
-                                <div className="font-mono text-sm font-bold text-slate-900">{item.item_no}</div>
+                                <div className="font-mono text-xs font-bold text-slate-900">{item.item_no}</div>
                               )}
-                              <div className="text-xs text-slate-600 mt-1">{item.description || "—"}</div>
                             </div>
 
                             {/* Key mobile fields only */}
-                            <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div className="grid grid-cols-2 gap-2 text-xs">
                               <div>
-                                <div className="text-slate-500 mb-0.5">Cost w/ Shipping</div>
-                                <div className="font-semibold text-slate-900">${money(displayItem.cost_with_shipping)}</div>
+                                <div className="text-slate-500 mb-0.5 text-[10px] uppercase">Cost+Ship</div>
+                                <div className="font-semibold text-slate-900 text-xs">${money(displayItem.cost_with_shipping)}</div>
                               </div>
                               <div>
-                                <div className="text-slate-500 mb-0.5">Sell Price</div>
-                                <div className="font-semibold text-blue-700">${money(displayItem.sell_price)}</div>
+                                <div className="text-slate-500 mb-0.5 text-[10px] uppercase">Sell</div>
+                                <div className="font-semibold text-blue-700 text-xs">${money(displayItem.sell_price)}</div>
                               </div>
                               <div>
-                                <div className="text-slate-500 mb-0.5">List Price</div>
-                                <div className="font-semibold text-slate-700">${money(displayItem.list_price)}</div>
+                                <div className="text-slate-500 mb-0.5 text-[10px] uppercase">List</div>
+                                <div className="font-semibold text-slate-700 text-xs">${money(displayItem.list_price)}</div>
                               </div>
                               <div>
-                                <div className="text-slate-500 mb-0.5">Profit</div>
-                                <div className="font-bold text-emerald-700">${money(displayItem.profit)}</div>
+                                <div className="text-slate-500 mb-0.5 text-[10px] uppercase">Profit</div>
+                                <div className="font-bold text-emerald-700 text-xs">${money(displayItem.profit)}</div>
                               </div>
                             </div>
 
                             {/* Actions */}
-                            <div className="mt-3 flex gap-2 pt-3 border-t border-slate-200">
+                            <div className="mt-2 flex gap-2 pt-2 border-t border-slate-200">
                               {isEditing ? (
                                 <>
                                   <button
