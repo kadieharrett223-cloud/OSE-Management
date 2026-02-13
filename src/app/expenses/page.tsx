@@ -126,12 +126,12 @@ export default function ExpensesPage() {
         <Sidebar activePage="Expenses" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
-          <div className="mx-auto max-w-7xl px-8 py-6 space-y-6">
+          <div className="mx-auto max-w-7xl px-4 md:px-8 py-4 md:py-6 space-y-4 md:space-y-6">
             <header className="space-y-2">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-blue-700">Finance</p>
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-3xl font-semibold text-slate-900">Expenses</h1>
+                  <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">Expenses</h1>
                   <p className="text-sm text-slate-600">Live bills and expenses pulled from QBO.</p>
                 </div>
                 <div>

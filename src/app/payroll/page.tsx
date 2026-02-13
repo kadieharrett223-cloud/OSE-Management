@@ -143,14 +143,14 @@ export default function PayrollPage() {
         <Sidebar activePage="Payroll" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          <div className="bg-slate-800 border-b border-slate-700">
-            <div className="mx-auto max-w-7xl px-8">
-              <div className="flex gap-1">
+          <div className="bg-slate-800 border-b border-slate-700 overflow-x-auto">
+            <div className="mx-auto max-w-7xl px-4 md:px-8">
+              <div className="flex gap-1 min-w-max">
                 {tabs.map((tab) => (
                   <a
                     key={tab.href}
                     href={tab.href}
-                    className={`px-6 py-3 text-sm font-medium transition relative ${
+                    className={`px-4 md:px-6 py-3 text-sm font-medium transition relative whitespace-nowrap ${
                       pathname === tab.href
                         ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
                         : "text-slate-300 hover:text-white hover:bg-slate-700/50"
@@ -162,11 +162,11 @@ export default function PayrollPage() {
               </div>
             </div>
           </div>
-          <div className="mx-auto max-w-7xl px-8 py-8 space-y-10">
+          <div className="mx-auto max-w-7xl px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-10">
             <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-blue-700">Payroll Overview</p>
-                <h1 className="mt-2 text-3xl font-semibold text-slate-900">Payroll Costs & Team Members</h1>
+                <p className="text-xs uppercase tracking-[0.2em] md:tracking-[0.3em] text-blue-700">Payroll Overview</p>
+                <h1 className="mt-2 text-2xl md:text-3xl font-semibold text-slate-900">Payroll Costs & Team Members</h1>
                 <p className="mt-1 text-sm text-slate-600">
                   Live payroll view from QBO for the selected pay period.
                 </p>

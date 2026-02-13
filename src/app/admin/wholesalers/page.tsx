@@ -168,13 +168,14 @@ export default function WholesalersPage() {
         <Sidebar activePage="Commissions" />
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
           {/* Chrome-style Tabs */}
-          <div className="bg-slate-800 border-b border-slate-700 px-8">
-            <div className="flex gap-1">
-              {tabs.map((tab) => (
-                <a
-                  key={tab.href}
-                  href={tab.href}
-                  className={`px-6 py-3 text-sm font-medium transition relative ${
+          <div className="bg-slate-800 border-b border-slate-700">
+            <div className="mx-auto max-w-7xl px-4 md:px-8">
+              <div className="flex gap-1 overflow-x-auto min-w-max">
+                {tabs.map((tab) => (
+                  <a
+                    key={tab.href}
+                    href={tab.href}
+                    className={`px-4 md:px-6 py-3 text-sm font-medium transition relative whitespace-nowrap ${
                     pathname === tab.href
                       ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
                       : "text-slate-300 hover:text-white hover:bg-slate-700/50"
@@ -186,12 +187,12 @@ export default function WholesalersPage() {
             </div>
           </div>
 
-          <div className="p-8">
-            <div className="mx-auto max-w-7xl space-y-6">
+          <div className="p-4 md:p-8">
+            <div className="mx-auto max-w-7xl space-y-4 md:space-y-6">
               {/* Header */}
-              <header className="flex items-center justify-between">
+              <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <h1 className="text-3xl font-semibold text-slate-900">Wholesalers</h1>
+                    <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">Wholesalers</h1>
                     <p className="mt-2 text-sm text-slate-600">Manage client relationships, terms, and contact information</p>
                 </div>
                   <div className="flex items-center gap-3">

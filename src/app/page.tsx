@@ -731,13 +731,13 @@ export default function Dashboard() {
         <Sidebar activePage="Dashboard" />
         {/* Main Content */}
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
-          <div className="mx-auto max-w-7xl px-4 py-4 space-y-8 sm:px-6 lg:px-8 print-hidden">
+          <div className="mx-auto max-w-7xl px-3 md:px-4 py-3 md:py-4 space-y-4 md:space-y-8 sm:px-6 lg:px-8 print-hidden">
             {/* Header */}
-            <header className="flex flex-col gap-3">
+            <header className="flex flex-col gap-2 md:gap-3">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-blue-700">Dashboard</p>
-              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <div className="space-y-2">
-                  <h1 className="text-3xl font-semibold text-slate-900">Company Performance</h1>
+              <div className="flex flex-col justify-between gap-3 md:gap-4 lg:flex-row lg:items-center">
+                <div className="space-y-1 md:space-y-2">
+                  <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">Company Performance</h1>
                   <p className="max-w-2xl text-sm text-slate-600">
                     Business health at a glance with monthly trends, action items, and recent activity.
                   </p>

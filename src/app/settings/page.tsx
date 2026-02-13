@@ -168,19 +168,19 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow">
-        <div className="max-w-4xl mx-auto px-6 py-6">
-          <div className="flex items-center gap-4">
+        <div className="max-w-4xl mx-auto px-4 md:px-6 py-4 md:py-6">
+          <div className="flex items-center gap-3 md:gap-4">
             <button
               onClick={() => router.back()}
               className="text-gray-600 hover:text-gray-900 p-1"
               title="Go back"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Settings</h1>
               <p className="text-gray-500 mt-1">Manage your account and app preferences</p>
             </div>
           </div>
@@ -188,12 +188,12 @@ export default function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto px-6 py-4">
-        <div className="mb-6 border-b border-gray-200">
-          <nav className="flex gap-4">
+      <div className="max-w-4xl mx-auto px-4 md:px-6 py-3 md:py-4">
+        <div className="mb-4 md:mb-6 border-b border-gray-200">
+          <nav className="flex gap-3 md:gap-4 overflow-x-auto">
             <Link
               href="/settings"
-              className={`pb-3 px-1 border-b-2 text-sm font-medium transition ${
+              className={`pb-3 px-1 border-b-2 text-sm font-medium transition whitespace-nowrap ${
                 pathname === "/settings"
                   ? "border-blue-600 text-blue-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
@@ -214,8 +214,8 @@ export default function SettingsPage() {
           </nav>
         </div>
 
-        <div className="mb-6 rounded-lg bg-white shadow">
-          <div className="flex flex-wrap gap-3 border-b border-gray-100 px-4 py-3">
+        <div className="mb-4 md:mb-6 rounded-lg bg-white shadow">
+          <div className="flex flex-wrap gap-2 md:gap-3 border-b border-gray-100 px-3 md:px-4 py-2 md:py-3">
             {[
               { id: 'integrations', label: 'Integrations' },
               { id: 'defaults', label: 'Defaults' },
@@ -226,7 +226,7 @@ export default function SettingsPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                className={`rounded-full px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-medium transition ${
                   activeTab === tab.id
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'

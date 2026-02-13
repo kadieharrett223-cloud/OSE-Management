@@ -99,13 +99,14 @@ export default function SuppliersPage() {
         <Sidebar activePage="Purchasing" />
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
           {/* Chrome-style Tabs */}
-          <div className="bg-slate-800 border-b border-slate-700 px-8">
-            <div className="flex gap-1">
-              {tabs.map((tab) => (
-                <a
-                  key={tab.href}
-                  href={tab.href}
-                  className={`px-6 py-3 text-sm font-medium transition relative ${
+          <div className="bg-slate-800 border-b border-slate-700">
+            <div className="mx-auto max-w-5xl px-4 md:px-6">
+              <div className="flex gap-1 overflow-x-auto min-w-max">
+                {tabs.map((tab) => (
+                  <a
+                    key={tab.href}
+                    href={tab.href}
+                    className={`px-4 md:px-6 py-3 text-sm font-medium transition relative whitespace-nowrap ${
                     pathname === tab.href
                       ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
                       : "text-slate-300 hover:text-white hover:bg-slate-700/50"
@@ -117,10 +118,10 @@ export default function SuppliersPage() {
             </div>
           </div>
 
-          <div className="mx-auto max-w-5xl px-6 py-4 space-y-8">
+          <div className="mx-auto max-w-5xl px-4 md:px-6 py-4 md:py-6 space-y-4 md:space-y-8">
             <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-2xl font-semibold">Suppliers</h1>
+                <h1 className="text-xl md:text-2xl font-semibold">Suppliers</h1>
                 <p className="text-sm text-slate-600">Track supplier details and recent activity.</p>
               </div>
               <button

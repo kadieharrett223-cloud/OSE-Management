@@ -202,13 +202,13 @@ export default function CommissionsPage() {
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
           <div className="bg-slate-800 border-b border-slate-700">
-            <div className="mx-auto max-w-7xl px-8">
+            <div className="mx-auto max-w-7xl px-4 md:px-8">
               <div className="flex gap-1">
                 {tabs.map((tab) => (
                   <a
                     key={tab.href}
                     href={tab.href}
-                    className={`px-6 py-3 text-sm font-medium transition relative ${
+                    className={`px-4 md:px-6 py-3 text-sm font-medium transition relative whitespace-nowrap ${
                       pathname === tab.href
                         ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
                         : "text-slate-300 hover:text-white hover:bg-slate-700/50"
@@ -220,12 +220,12 @@ export default function CommissionsPage() {
               </div>
             </div>
           </div>
-          <div className="mx-auto max-w-7xl px-8 py-8 space-y-6">
+          <div className="mx-auto max-w-7xl px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
 
             <header>
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-semibold text-slate-900">Commission Tracker</h1>
+                  <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">Commission Tracker</h1>
                   <p className="mt-1 text-sm text-slate-600">Track sales by rep for {monthYearDisplay}</p>
                 </div>
                 <div className="flex items-center gap-3">
