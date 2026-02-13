@@ -268,7 +268,7 @@ export default function Dashboard() {
     fetchUnpaidInvoices();
   }, []);
 
-  // Fetch sales for current month (payments applied, through today)
+  // Fetch sales for current month (payments applied + invoices marked paid)
   useEffect(() => {
     const fetchMonthlySales = async () => {
       try {
@@ -278,22 +278,30 @@ export default function Dashboard() {
         const startDate = `${year}-${month}-01`;
         const endDate = now.toISOString().slice(0, 10);
 
-        const response = await fetch(
-          `/api/qbo/payment/query?startDate=${startDate}&endDate=${endDate}`
-        );
-        
-        if (!response.ok) throw new Error("Failed to fetch monthly sales");
-        
-        const data = await response.json();
-        const payments = data.payments || [];
-        const totalSales = payments.reduce((sum: number, payment: any) => {
+        const [paymentsResponse, paidInvoicesResponse] = await Promise.all([
+          fetch(`/api/qbo/payment/query?startDate=${startDate}&endDate=${endDate}`),
+          fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`),
+        ]);
+
+        if (!paymentsResponse.ok || !paidInvoicesResponse.ok) {
+          throw new Error("Failed to fetch monthly sales");
+        }
+
+        const paymentsData = await paymentsResponse.json();
+        const paidInvoicesData = await paidInvoicesResponse.json();
+
+        const payments = paymentsData.payments || [];
+        const paymentsTotal = payments.reduce((sum: number, payment: any) => {
           const total = Number(payment.TotalAmt) || 0;
           const unapplied = Number(payment.UnappliedAmt) || 0;
           const applied = Math.max(total - unapplied, 0);
           return sum + applied;
         }, 0);
 
-        console.log(`[dashboard] Monthly sales fetched: ${payments.length} payments, Total: $${totalSales}`);
+        const paidInvoicesTotal = Number(paidInvoicesData.totalPaid || 0);
+        const totalSales = paymentsTotal + paidInvoicesTotal;
+
+        console.log(`[dashboard] Monthly sales fetched: ${payments.length} payments + paid invoices, Total: $${totalSales}`);
         setMonthlyTotal(totalSales);
       } catch (error) {
         console.error("Error fetching monthly sales:", error);
@@ -752,7 +760,9 @@ export default function Dashboard() {
                 <div className="mt-2 text-2xl font-bold text-emerald-700">
                   {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(monthlyTotal)}`}
                 </div>
-                <div className="mt-1 text-xs text-slate-600">{(monthlyTotal / monthlyGoal * 100).toFixed(1)}% of goal</div>
+                <div className="mt-1 text-xs text-slate-600">
+                  {(monthlyTotal / monthlyGoal * 100).toFixed(1)}% of goal • payments + paid invoices
+                </div>
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
