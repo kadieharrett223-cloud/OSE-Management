@@ -437,13 +437,13 @@ export default function PurchasingPage() {
         <Sidebar activePage="Purchasing" />
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
           {/* Chrome-style Tabs */}
-          <div className="bg-slate-800 border-b border-slate-700 px-8">
-            <div className="flex gap-1">
+          <div className="bg-slate-800 border-b border-slate-700 px-4 md:px-8 overflow-x-auto">
+            <div className="flex gap-1 min-w-max">
               {tabs.map((tab) => (
                 <a
                   key={tab.href}
                   href={tab.href}
-                  className={`px-6 py-3 text-sm font-medium transition relative ${
+                  className={`px-4 md:px-6 py-3 text-sm font-medium transition relative whitespace-nowrap ${
                     pathname === tab.href
                       ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
                       : "text-slate-300 hover:text-white hover:bg-slate-700/50"
@@ -455,24 +455,24 @@ export default function PurchasingPage() {
             </div>
           </div>
 
-          <div className="mx-auto max-w-7xl px-8 py-4 space-y-8">
+          <div className="mx-auto max-w-7xl px-4 md:px-8 py-4 space-y-8">
             <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h1 className="text-3xl font-semibold text-slate-900">Purchase Orders</h1>
+                <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">Purchase Orders</h1>
                 <p className="text-sm text-slate-600">Manage purchasing with clear status tracking.</p>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <input
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search PO or supplier"
-                  className="w-52 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full sm:w-52 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full sm:w-auto rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="all">All Status</option>
                   <option value="to_be_paid">To Be Paid</option>
@@ -484,20 +484,20 @@ export default function PurchasingPage() {
                     type="date"
                     value={rangeStart}
                     onChange={(e) => setRangeStart(e.target.value)}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="flex-1 sm:flex-initial rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   <span className="text-xs text-slate-500">to</span>
                   <input
                     type="date"
                     value={rangeEnd}
                     onChange={(e) => setRangeEnd(e.target.value)}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="flex-1 sm:flex-initial rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
                 {!showForm && (
                   <button
                     onClick={() => setShowForm(true)}
-                    className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-blue-700"
+                    className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-blue-700"
                   >
                     Create PO
                   </button>
@@ -928,7 +928,8 @@ export default function PurchasingPage() {
             )}
 
             <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-              <div className="overflow-x-auto">
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="border-b border-slate-200 bg-slate-50">
                     <tr>
@@ -1025,16 +1026,99 @@ export default function PurchasingPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Mobile Card View */}
+              <div className="block md:hidden divide-y divide-slate-100">
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, idx) => (
+                    <div key={`skeleton-${idx}`} className="p-4 animate-pulse space-y-2">
+                      <div className="h-4 w-24 rounded bg-slate-200" />
+                      <div className="h-3 w-40 rounded bg-slate-200" />
+                      <div className="h-3 w-32 rounded bg-slate-200" />
+                    </div>
+                  ))
+                ) : filteredPos.length === 0 ? (
+                  <div className="p-8 text-center text-slate-600">
+                    <div className="text-lg font-semibold text-slate-900">No purchase orders yet</div>
+                    <div className="mt-2 text-sm text-slate-600">Create your first PO to start tracking purchasing.</div>
+                    <div className="mt-4">
+                      <button
+                        onClick={() => setShowForm(true)}
+                        className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-blue-700"
+                      >
+                        Create your first PO
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  pagedPos.map((po) => (
+                    <div key={po.id} className="p-4 hover:bg-slate-50">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <div className="font-mono text-sm font-semibold text-slate-900">{po.po_number}</div>
+                          <div className="text-xs text-slate-600 mt-0.5">{po.vendor_name}</div>
+                        </div>
+                        <span
+                          className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
+                            po.status === "RECEIVED"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : po.status === "SHIPPED"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {statusLabel(po.status)}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                        <div>
+                          <span className="text-slate-500">Created:</span>{" "}
+                          <span className="text-slate-700">{formatDate(po.order_date)}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-slate-500">Total:</span>{" "}
+                          <span className="font-semibold text-slate-900">${money(po.total_amount)}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-2 border-t border-slate-200">
+                        <button
+                          onClick={() => window.location.href = `/admin/purchasing/${po.id}`}
+                          className="flex-1 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
+                        >
+                          View
+                        </button>
+                        {po.status === "TO_BE_PAID" && (
+                          <button
+                            onClick={() => updatePoStatus(po.id, "SHIPPED")}
+                            className="px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
+                          >
+                            Mark Shipped
+                          </button>
+                        )}
+                        {po.status === "SHIPPED" && (
+                          <button
+                            onClick={() => updatePoStatus(po.id, "RECEIVED")}
+                            className="px-3 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 rounded hover:bg-emerald-100"
+                          >
+                            Mark Received
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
               {!loading && filteredPos.length > 0 && (
-                <div className="flex items-center justify-between border-t border-slate-200 px-6 py-3 text-sm text-slate-600">
-                  <div>
+                <div className="flex items-center justify-between border-t border-slate-200 px-4 md:px-6 py-3 text-sm text-slate-600">
+                  <div className="text-xs md:text-sm">
                     Showing {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filteredPos.length)} of {filteredPos.length}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                       disabled={safePage === 1}
-                      className="rounded border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-600 disabled:opacity-40"
+                      className="rounded border border-slate-300 px-2 md:px-3 py-1 text-xs md:text-sm font-semibold text-slate-600 disabled:opacity-40"
                     >
                       Prev
                     </button>
@@ -1042,7 +1126,7 @@ export default function PurchasingPage() {
                     <button
                       onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
                       disabled={safePage === totalPages}
-                      className="rounded border border-slate-300 px-3 py-1 text-sm font-semibold text-slate-600 disabled:opacity-40"
+                      className="rounded border border-slate-300 px-2 md:px-3 py-1 text-xs md:text-sm font-semibold text-slate-600 disabled:opacity-40"
                     >
                       Next
                     </button>

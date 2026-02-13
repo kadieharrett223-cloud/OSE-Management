@@ -34,7 +34,7 @@ export default function SignUp() {
         throw new Error(data.error || "Sign-up failed");
       }
 
-      router.push("/auth/signin?message=Account+created.+Please+sign+in.");
+      router.push("/auth/signin?message=Account+created!+An+admin+will+approve+your+access+shortly.");
     } catch (err: any) {
       setError(err?.message || "An error occurred");
     } finally {
@@ -48,7 +48,8 @@ export default function SignUp() {
         <div className="rounded-xl bg-white shadow-lg ring-1 ring-slate-200 px-8 py-10 space-y-6">
           <div className="space-y-2 text-center">
             <h1 className="text-2xl font-bold text-slate-900">Create Account</h1>
-            <p className="text-sm text-slate-600">Sign up to get started</p>
+            <p className="text-sm text-slate-600">Sign up to request access</p>
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200">Your account will need approval before you can log in</p>
           </div>
 
           {error && (

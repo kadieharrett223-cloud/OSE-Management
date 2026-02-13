@@ -13,6 +13,7 @@ function SignInContent() {
   const [isLoading, setIsLoading] = useState(false);
 
   const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const message = searchParams.get("message");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -46,6 +47,12 @@ function SignInContent() {
             <h1 className="text-2xl font-bold text-slate-900">Sign In</h1>
             <p className="text-sm text-slate-600">Enter your credentials to continue</p>
           </div>
+
+          {message && (
+            <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
+              {message}
+            </div>
+          )}
 
           {error && (
             <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -92,6 +99,15 @@ function SignInContent() {
               {isLoading ? "Signing in..." : "Sign In"}
             </button>
           </form>
+
+          <div className="pt-4 border-t border-slate-200 text-center">
+            <p className="text-sm text-slate-600">
+              Don't have an account?{" "}
+              <a href="/auth/signup" className="font-semibold text-blue-600 hover:text-blue-700">
+                Sign up
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </div>

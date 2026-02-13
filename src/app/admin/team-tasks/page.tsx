@@ -15,45 +15,14 @@ interface TeamTask {
 }
 
 export default function TeamTasksPage() {
-  const [tasks, setTasks] = useState<TeamTask[]>([
-    {
-      id: "1",
-      title: "Review February invoices",
-      description: "Check all paid invoices for accuracy",
-      assignee: "Kadie",
-      status: "in-progress",
-      dueDate: "2026-02-15",
-      priority: "high",
-      updatedAt: "2026-02-10T15:45:00.000Z",
-    },
-    {
-      id: "2",
-      title: "Reconcile vendor payments",
-      description: "Verify all vendor payments match QBO records",
-      assignee: "Admin",
-      status: "todo",
-      dueDate: "2026-02-28",
-      priority: "medium",
-      updatedAt: "2026-02-09T18:20:00.000Z",
-    },
-    {
-      id: "3",
-      title: "Follow up on outstanding invoices",
-      description: "Contact customers with unpaid invoices",
-      assignee: "Sales Team",
-      status: "todo",
-      dueDate: "2026-02-20",
-      priority: "high",
-      updatedAt: "2026-02-08T13:10:00.000Z",
-    },
-  ]);
+  const [tasks, setTasks] = useState<TeamTask[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem("teamTasks");
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as TeamTask[];
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           setTasks(parsed);
         }
       } catch {

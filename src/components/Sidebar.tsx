@@ -28,6 +28,7 @@ const navGroups = [
   {
     title: "Admin",
     items: [
+      { label: "Users", hint: "Approve & manage users", href: "/admin/users" },
       { label: "Settings", hint: "QBO & Shopify config", href: "/settings" },
     ],
   },

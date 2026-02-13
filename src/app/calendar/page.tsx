@@ -371,10 +371,10 @@ export default function CalendarPage() {
       <div className="flex min-h-screen">
         <Sidebar activePage="Calendar" />
 
-        <main className="flex-1 p-8 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
+        <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 p-4 md:p-8">
           <div className="mx-auto max-w-7xl">
             {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-slate-900">Sales Calendar</h1>
                 <p className="text-slate-600">
@@ -387,46 +387,46 @@ export default function CalendarPage() {
                   </div>
                 )}
               </div>
-              <div className="flex gap-3">
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-              <button
-                onClick={() => {
-                  setEditingNotification({
-                    id: "",
-                    title: "",
-                    date: new Date().toISOString().split("T")[0],
-                    recurring: "none",
-                  });
-                  setShowAddModal(true);
-                }}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                + Add Notification
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto"
+                />
+                <button
+                  onClick={() => {
+                    setEditingNotification({
+                      id: "",
+                      title: "",
+                      date: new Date().toISOString().split("T")[0],
+                      recurring: "none",
+                    });
+                    setShowAddModal(true);
+                  }}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  + Add Notification
+                </button>
+              </div>
             </div>
-          </div>
 
           {/* Calendar Grid */}
-          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <div className="rounded-xl bg-white p-4 md:p-6 shadow-sm ring-1 ring-slate-200">
             {/* Day headers */}
-            <div className="mb-4 grid grid-cols-7 gap-2">
+            <div className="mb-3 grid grid-cols-7 gap-1 md:mb-4 md:gap-2">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                <div key={day} className="text-center text-xs font-semibold uppercase text-slate-500">
+                <div key={day} className="text-center text-[10px] font-semibold uppercase text-slate-500 md:text-xs">
                   {day}
                 </div>
               ))}
             </div>
 
             {/* Calendar days */}
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 md:gap-2">
               {calendarDays.map((date, idx) => {
                 if (!date) {
-                  return <div key={`empty-${idx}`} className="h-32" />;
+                  return <div key={`empty-${idx}`} className="h-20 md:h-32" />;
                 }
 
                 const dayNotifications = getNotificationsForDate(date);
@@ -436,7 +436,7 @@ export default function CalendarPage() {
                 return (
                   <div
                     key={date.toISOString()}
-                    className={`h-32 overflow-hidden rounded-lg border p-2 ${
+                    className={`h-20 overflow-hidden rounded-lg border p-1 md:h-32 md:p-2 ${
                       today
                         ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500"
                         : "border-slate-200 bg-white hover:bg-slate-50"

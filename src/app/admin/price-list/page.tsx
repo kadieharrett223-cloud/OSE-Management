@@ -696,6 +696,11 @@ export default function AdminPriceListPage() {
               </div>
             ) : (
               <>
+                {/* Mobile Notice */}
+                <div className="block md:hidden mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-xs text-amber-800">
+                  <span className="font-semibold">Mobile view:</span> Some columns are hidden for better visibility. Use desktop for full details.
+                </div>
+
                 {/* Price List by Category */}
                 {itemsByCategory.map(({ category, items: categoryItems }) => (
                   <section key={category.id} className="rounded-2xl bg-white shadow-md ring-1 ring-slate-200">
@@ -706,8 +711,8 @@ export default function AdminPriceListPage() {
                       </h2>
                     </div>
 
-                    {/* Items Table */}
-                    <div className="overflow-x-auto">
+                    {/* Items Table - Desktop View */}
+                    <div className="hidden md:block overflow-x-auto">
                       <table className="w-full divide-y divide-slate-100 text-xs border-collapse table-fixed">
                         <colgroup>
                           <col style={{ width: "75px" }} />
@@ -958,13 +963,106 @@ export default function AdminPriceListPage() {
                           );})}
                           {categoryItems.length === 0 && (
                             <tr>
-                              <td colSpan={10} className="px-6 py-4 text-center text-xs text-slate-600">
+                              <td colSpan={16} className="px-6 py-4 text-center text-xs text-slate-600">
                                 No items in this category
                               </td>
                             </tr>
                           )}
                         </tbody>
                       </table>
+                    </div>
+
+                    {/* Mobile Card View */}
+                    <div className="block md:hidden divide-y divide-slate-100">
+                      {categoryItems.map((item) => {
+                        const isEditing = editingId === item.id;
+                        const displayItem = isEditing && editingItem ? editingItem : item;
+                        
+                        return (
+                          <div key={item.id} className={`p-4 ${isEditing ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}>
+                            {/* Item No & Description */}
+                            <div className="mb-3">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={displayItem.item_no || ""}
+                                  onChange={(e) => setEditingItem((prev) => prev ? ({ ...prev, item_no: e.target.value }) : prev)}
+                                  className="w-full mb-2 rounded border border-blue-400 px-2 py-1 text-sm font-mono font-semibold"
+                                />
+                              ) : (
+                                <div className="font-mono text-sm font-bold text-slate-900">{item.item_no}</div>
+                              )}
+                              <div className="text-xs text-slate-600 mt-1">{item.description || "—"}</div>
+                            </div>
+
+                            {/* Key mobile fields only */}
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <div className="text-slate-500 mb-0.5">Cost w/ Shipping</div>
+                                <div className="font-semibold text-slate-900">${money(displayItem.cost_with_shipping)}</div>
+                              </div>
+                              <div>
+                                <div className="text-slate-500 mb-0.5">Sell Price</div>
+                                <div className="font-semibold text-blue-700">${money(displayItem.sell_price)}</div>
+                              </div>
+                              <div>
+                                <div className="text-slate-500 mb-0.5">List Price</div>
+                                <div className="font-semibold text-slate-700">${money(displayItem.list_price)}</div>
+                              </div>
+                              <div>
+                                <div className="text-slate-500 mb-0.5">Profit</div>
+                                <div className="font-bold text-emerald-700">${money(displayItem.profit)}</div>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="mt-3 flex gap-2 pt-3 border-t border-slate-200">
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    onClick={handleSave}
+                                    disabled={isLoading}
+                                    className="flex-1 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded hover:bg-emerald-700"
+                                    type="button"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEditing}
+                                    className="flex-1 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50"
+                                    type="button"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => startEditing(item)}
+                                    className="flex-1 px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
+                                    type="button"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteProduct(item.id)}
+                                    disabled={isLoading}
+                                    className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 rounded hover:bg-red-100"
+                                    type="button"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {categoryItems.length === 0 && (
+                        <div className="p-4 text-center text-xs text-slate-600">
+                          No items in this category
+                        </div>
+                      )}
                     </div>
                   </section>
                 ))}

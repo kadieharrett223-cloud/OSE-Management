@@ -1,31 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hash } from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password } = body;
+    const { email, password, role } = body;
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 });
     }
 
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     // Check if user exists
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const { data: existing } = await supabase
+      .from("auth_users")
+      .select("id")
+      .ilike("email", email)
+      .single();
+
     if (existing) {
       return NextResponse.json({ error: "User already exists" }, { status: 409 });
     }
 
-    // Hash password and create user
-    const passwordHash = await hash(password, 10);
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        role: "REP",
-      },
-    });
+    // Create user in auth_users table (inactive by default - requires admin approval)
+    // Note: Passwords are stored in plain text as per current schema
+    const { data: user, error } = await supabase
+      .from("auth_users")
+      .insert([{
+        email: email.toLowerCase(),
+        password,
+        role: role || "rep",
+        active: false,
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase insert error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true, userId: user.id }, { status: 201 });
   } catch (error: any) {
