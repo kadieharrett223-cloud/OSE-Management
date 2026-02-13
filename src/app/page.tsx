@@ -140,6 +140,8 @@ export default function Dashboard() {
   const [recentInvoices, setRecentInvoices] = useState<RecentInvoice[]>([]);
   const [loadingRecentInvoices, setLoadingRecentInvoices] = useState(true);
   const [showOpenInvoicesModal, setShowOpenInvoicesModal] = useState(false);
+  const [printingOpenInvoices, setPrintingOpenInvoices] = useState(false);
+  const [printOpenInvoicesError, setPrintOpenInvoicesError] = useState<string | null>(null);
   const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
   const [loadingRecentPurchases, setLoadingRecentPurchases] = useState(true);
   const [qboSyncStatus, setQboSyncStatus] = useState<"idle" | "ok" | "error">("idle");
@@ -438,6 +440,20 @@ export default function Dashboard() {
     };
   }, []);
 
+  const handlePrintOpenInvoices = () => {
+    if (loadingRecentInvoices) return;
+    if (recentInvoices.length === 0) {
+      setPrintOpenInvoicesError("No open invoices to print.");
+      return;
+    }
+    setPrintOpenInvoicesError(null);
+    setPrintingOpenInvoices(true);
+    setTimeout(() => {
+      window.print();
+      setPrintingOpenInvoices(false);
+    }, 150);
+  };
+
   // Recent purchases (latest purchase orders)
   useEffect(() => {
     let isMounted = true;
@@ -689,11 +705,24 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      <style jsx global>{`
+        @media print {
+          aside {
+            display: none !important;
+          }
+          .print-hidden {
+            display: none !important;
+          }
+          .print-only {
+            display: block !important;
+          }
+        }
+      `}</style>
       <div className="flex min-h-screen">
         <Sidebar activePage="Dashboard" />
         {/* Main Content */}
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
-          <div className="mx-auto max-w-7xl px-8 py-4 space-y-8">
+          <div className="mx-auto max-w-7xl px-4 py-4 space-y-8 sm:px-6 lg:px-8 print-hidden">
             {/* Header */}
             <header className="flex flex-col gap-3">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-blue-700">Dashboard</p>
@@ -821,16 +850,28 @@ export default function Dashboard() {
                     <h2 className="text-lg font-semibold text-slate-900">Open Invoices</h2>
                     <p className="text-sm text-slate-600">Unpaid invoices awaiting payment</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowOpenInvoicesModal(true)}
-                    className="text-sm text-blue-600 hover:text-blue-700"
-                  >
-                    View all →
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handlePrintOpenInvoices}
+                      className="text-sm text-slate-600 hover:text-slate-800"
+                    >
+                      {printingOpenInvoices ? "Preparing print…" : "Print"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowOpenInvoicesModal(true)}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      View all →
+                    </button>
+                  </div>
                 </div>
+                {printOpenInvoicesError && (
+                  <div className="px-6 pt-4 text-sm text-red-600">{printOpenInvoicesError}</div>
+                )}
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full hidden sm:table">
                     <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                       <tr>
                         <th className="px-6 py-3 text-left font-semibold">Invoice</th>
@@ -860,6 +901,26 @@ export default function Dashboard() {
                       )}
                     </tbody>
                   </table>
+                  <div className="sm:hidden px-4 py-4 space-y-3">
+                    {loadingRecentInvoices ? (
+                      <div className="text-sm text-slate-500">Loading...</div>
+                    ) : recentInvoices.length === 0 ? (
+                      <div className="text-sm text-slate-500">No open invoices</div>
+                    ) : (
+                      recentInvoices.slice(0, 5).map((inv) => (
+                        <div key={inv.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-slate-900">{inv.docNumber}</span>
+                            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                              {inv.status}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-600">{inv.customerName}</p>
+                          <p className="text-sm font-semibold text-slate-900">${money(inv.balance)}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -881,7 +942,7 @@ export default function Dashboard() {
                   </button>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full hidden sm:table">
                     <thead className="border-b border-slate-200 bg-slate-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
@@ -909,6 +970,23 @@ export default function Dashboard() {
                       )}
                     </tbody>
                   </table>
+                  <div className="sm:hidden px-4 py-4 space-y-3">
+                    {loadingCustomerPayments ? (
+                      <div className="text-sm text-slate-500">Loading...</div>
+                    ) : customerPaymentsToday.length === 0 ? (
+                      <div className="text-sm text-slate-500">No customer payments received today</div>
+                    ) : (
+                      customerPaymentsToday.slice(0, 5).map((payment) => (
+                        <div key={payment.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                          <p className="text-sm font-semibold text-slate-900">{payment.customerName}</p>
+                          <div className="mt-1 flex items-center justify-between text-sm">
+                            <span className="text-emerald-700 font-semibold">${money(payment.appliedAmount)}</span>
+                            <span className="text-slate-500">${money(payment.totalAmount)}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1110,6 +1188,38 @@ export default function Dashboard() {
               </div>
             )}
 
+          </div>
+          <div className="print-only hidden bg-white px-8 py-6 text-slate-900">
+            <div className="mb-6">
+              <h1 className="text-2xl font-semibold">Open Invoices</h1>
+              <p className="text-sm text-slate-600">Full list of unpaid invoices</p>
+            </div>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="py-2">Invoice</th>
+                  <th className="py-2">Customer</th>
+                  <th className="py-2">Date</th>
+                  <th className="py-2 text-right">Amount Due</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {recentInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-6 text-sm text-slate-500">No open invoices</td>
+                  </tr>
+                ) : (
+                  recentInvoices.map((inv) => (
+                    <tr key={inv.id} className="text-sm">
+                      <td className="py-2 font-semibold text-slate-900">{inv.docNumber}</td>
+                      <td className="py-2 text-slate-700">{inv.customerName}</td>
+                      <td className="py-2 text-slate-700">{inv.txnDate}</td>
+                      <td className="py-2 text-right text-slate-900">${money(inv.balance)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </main>
       </div>

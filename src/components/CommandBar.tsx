@@ -52,7 +52,7 @@ export function CommandBar() {
           label: "Invoice",
           hint: "Open invoice view",
           keywords: ["invoice", "invoices", "billing"],
-          action: () => router.push("/payroll#commissions"),
+          action: () => router.push("/commissions"),
         },
         {
           id: "jump-payroll",
@@ -73,7 +73,7 @@ export function CommandBar() {
           label: "Rep",
           hint: "Open reps/commissions",
           keywords: ["rep", "reps", "commissions"],
-          action: () => router.push("/payroll#commissions"),
+          action: () => router.push("/commissions"),
         },
         {
           id: "jump-vendors",
@@ -92,7 +92,7 @@ export function CommandBar() {
           label: "Create invoice",
           hint: "Open invoice workflow",
           keywords: ["create", "invoice", "new"],
-          action: () => router.push("/payroll#commissions"),
+          action: () => router.push("/commissions?create=1"),
         },
         {
           id: "sync-qb",

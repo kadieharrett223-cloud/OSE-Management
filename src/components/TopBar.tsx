@@ -16,6 +16,7 @@ export function TopBar() {
     { label: "Dashboard", href: "/" },
     { label: "Expenses", href: "/expenses" },
     { label: "Payroll", href: "/payroll" },
+    { label: "Commissions", href: "/commissions" },
     { label: "Calendar", href: "/calendar" },
     { label: "Price List", href: "/admin/price-list" },
     { label: "Purchasing", href: "/admin/purchasing" },

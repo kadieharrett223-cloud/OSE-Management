@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
+import { usePathname } from "next/navigation";
 
 type PayrollMeta = {
   payFrequency: string;
@@ -23,6 +23,8 @@ type PayrollMember = {
   lastIncreaseDate: string | null;
   lastIncreaseAmount: number;
   perPayrollCost: number;
+  previousPayrollCost: number;
+  payrollChange: number;
 };
 
 type PayrollResponse = {
@@ -30,60 +32,9 @@ type PayrollResponse = {
   period: { startDate: string; endDate: string };
   payrollMeta: PayrollMeta;
   team: PayrollMember[];
+  terminated: PayrollMember[];
+  previousPeriod?: { startDate: string; endDate: string };
 };
-
-interface RepData {
-  repName: string;
-  totalSales: number;
-  invoiceCount: number;
-}
-
-interface InvoiceLine {
-  description: string;
-  qty: number;
-  unitPrice: number;
-  lineAmount: number;
-  shippingDeducted: number;
-  commissionable: number;
-}
-
-interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  txnDate: string;
-  totalAmount: number;
-  totalCommissionable: number;
-  totalShippingDeducted: number;
-  commission: number;
-  lines: InvoiceLine[];
-}
-
-interface InvoiceData {
-  ok: boolean;
-  repName: string;
-  invoices: Invoice[];
-  count: number;
-  commissionRate: number;
-  totalCommission: number;
-  totalCommissionable: number;
-  totalShippingDeducted: number;
-}
-
-type OpenInvoice = {
-  Id: string;
-  DocNumber?: string;
-  TxnDate?: string;
-  DueDate?: string;
-  TotalAmt?: number;
-  Balance?: number;
-  CustomerRef?: { name?: string };
-};
-
-const mockReps = [
-  { id: "1", name: "John Smith", qboCode: "JS", totalSales: 3250.5, invoiceCount: 12 },
-  { id: "2", name: "Sarah Johnson", qboCode: "SJ", totalSales: 4120.75, invoiceCount: 18 },
-  { id: "3", name: "Mike Chen", qboCode: "MC", totalSales: 2890.0, invoiceCount: 9 },
-];
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
@@ -98,28 +49,6 @@ const formatShortDate = (value?: string | null) => {
 };
 
 const getFirstName = (fullName: string) => fullName.split(" ")[0] || fullName;
-
-const money = (value: number | undefined) => {
-  if (value === undefined || value === null) return "0.00";
-  return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "—";
-  return new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-};
-
-const withinDays = (value?: string | null, days = 120) => {
-  if (!value) return false;
-  const today = new Date();
-  const target = new Date(`${value}T00:00:00`);
-  const diff = today.getTime() - target.getTime();
-  return diff >= 0 && diff <= days * 24 * 60 * 60 * 1000;
-};
 
 const getDefaultPeriod = () => {
   const end = new Date();
@@ -139,25 +68,12 @@ export default function PayrollPage() {
   const [error, setError] = useState<string | null>(null);
   const [payrollMeta, setPayrollMeta] = useState<PayrollMeta | null>(null);
   const [team, setTeam] = useState<PayrollMember[]>([]);
-  const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentCommissionMonth());
-  const [connectError, setConnectError] = useState<string | null>(null);
-  const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
-  const [loadingReps, setLoadingReps] = useState(true);
-  const [invoiceStatus, setInvoiceStatus] = useState<"paid" | "unpaid" | "all">("paid");
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loadingInvoices, setLoadingInvoices] = useState(false);
-  const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
-  const [commissionData, setCommissionData] = useState<{
-    rate: number;
-    total: number;
-    commissionable: number;
-    shippingDeducted: number;
-  } | null>(null);
-  const [openInvoices, setOpenInvoices] = useState<OpenInvoice[]>([]);
-  const [loadingOpenInvoices, setLoadingOpenInvoices] = useState(false);
-  const [openInvoiceError, setOpenInvoiceError] = useState<string | null>(null);
+  const pathname = usePathname();
+  const tabs = [
+    { label: "Payroll", href: "/payroll" },
+    { label: "Commissions", href: "/commissions" },
+    { label: "Terminated", href: "/payroll/terminated" },
+  ];
 
   useEffect(() => {
     const fetchPayroll = async () => {
@@ -183,122 +99,32 @@ export default function PayrollPage() {
     fetchPayroll();
   }, [startDate, endDate]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const { startDate: commissionStart, endDate: commissionEnd } = getCommissionDateRange(selectedMonth);
-
-    fetch(
-      `/api/qbo/invoice/sales-by-rep?startDate=${commissionStart}&endDate=${commissionEnd}&status=${invoiceStatus}&_=${Date.now()}`
-    )
-      .then(async (res) => {
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("API Error Response:", errorText);
-          throw new Error("Failed to fetch sales by rep");
-        }
-        return await res.json();
-      })
-      .then((data) => {
-        if (!isMounted) return;
-        if (data.ok && data.reps) {
-          setRepSalesData(data.reps);
-          if (data.reps.length > 0) {
-            setSelectedRepId(data.reps[0].repName);
-          }
-        } else {
-          console.error("Invalid data structure:", data);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to fetch rep sales:", err);
-      })
-      .finally(() => {
-        if (isMounted) setLoadingReps(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedMonth, invoiceStatus]);
-
-  useEffect(() => {
-    if (!selectedRepId) {
-      setInvoices([]);
-      setCommissionData(null);
-      return;
-    }
-
-    let isMounted = true;
-    setLoadingInvoices(true);
-    setInvoices([]);
-    setCommissionData(null);
-    const { startDate: commissionStart, endDate: commissionEnd } = getCommissionDateRange(selectedMonth);
-
-    fetch(
-      `/api/qbo/invoice/by-rep?repName=${encodeURIComponent(selectedRepId)}&startDate=${commissionStart}&endDate=${commissionEnd}&status=${invoiceStatus}`
-    )
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to fetch invoices");
-        return await res.json();
-      })
-      .then((data: InvoiceData) => {
-        if (!isMounted) return;
-        if (data.ok && data.invoices) {
-          setInvoices(data.invoices);
-          setCommissionData({
-            rate: data.commissionRate,
-            total: data.totalCommission,
-            commissionable: data.totalCommissionable,
-            shippingDeducted: data.totalShippingDeducted,
-          });
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to fetch invoices:", err);
-      })
-      .finally(() => {
-        if (isMounted) setLoadingInvoices(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedRepId, selectedMonth, invoiceStatus]);
-
-  const startQboConnect = () => {
-    setConnectError(null);
-    try {
-      window.location.href = "/api/qbo/connect";
-    } catch (error) {
-      setConnectError(error instanceof Error ? error.message : "Failed to start QuickBooks connect.");
-    }
-  };
-
-  const handlePrintOpenInvoices = async () => {
-    setLoadingOpenInvoices(true);
-    setOpenInvoiceError(null);
-    try {
-      const res = await fetch("/api/qbo/invoice/query?status=unpaid");
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data?.error || "Failed to load open invoices");
-      }
-      setOpenInvoices(data.invoices || []);
-      setTimeout(() => window.print(), 150);
-    } catch (error: any) {
-      setOpenInvoiceError(error?.message || "Failed to load open invoices");
-    } finally {
-      setLoadingOpenInvoices(false);
-    }
-  };
 
   const totalPayrollCost = useMemo(
     () => team.reduce((sum, member) => sum + (Number(member.perPayrollCost) || 0), 0),
     [team]
   );
 
-  const recentIncreases = useMemo(
-    () => team.filter((member) => withinDays(member.lastIncreaseDate, 120)),
+  const payrollChangeStats = useMemo(() => {
+    return team.reduce(
+      (acc, member) => {
+        const change = member.payrollChange || 0;
+        if (change > 0) {
+          acc.increaseCount += 1;
+          acc.increaseTotal += change;
+        }
+        if (change < 0) {
+          acc.decreaseCount += 1;
+          acc.decreaseTotal += Math.abs(change);
+        }
+        return acc;
+      },
+      { increaseCount: 0, increaseTotal: 0, decreaseCount: 0, decreaseTotal: 0 }
+    );
+  }, [team]);
+
+  const payrollIncreases = useMemo(
+    () => team.filter((member) => member.payrollChange > 0),
     [team]
   );
 
@@ -310,50 +136,31 @@ export default function PayrollPage() {
     return Math.max(diffDays, 0);
   }, [payrollMeta]);
 
-  const monthYearDisplay = new Date(selectedMonth + "-01").toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-  });
-
-  const filteredReps = useMemo(() => {
-    const displayReps = repSalesData.length > 0
-      ? repSalesData.map((rep) => ({
-          id: rep.repName,
-          name: rep.repName,
-          qboCode: rep.repName.split(" ")[0][0] + (rep.repName.split(" ")[1]?.[0] || ""),
-          totalSales: rep.totalSales,
-          invoiceCount: rep.invoiceCount,
-        }))
-      : mockReps;
-    const sorted = [...displayReps].sort((a, b) => (b.totalSales || 0) - (a.totalSales || 0));
-    return sorted.filter((rep) => rep.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [repSalesData, searchTerm]);
-
-  const selectedRep = filteredReps.find((rep) => rep.id === selectedRepId);
-
-  const selectedTotals = useMemo(() => {
-    const totalSales = selectedRep?.totalSales || 0;
-    const count = selectedRep?.invoiceCount || 0;
-    return { totalSales, count };
-  }, [selectedRep]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <style jsx global>{`
-        @media print {
-          .print-hidden {
-            display: none !important;
-          }
-          .print-only {
-            display: block !important;
-          }
-        }
-      `}</style>
       <div className="flex min-h-screen">
         <Sidebar activePage="Payroll" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          <div className="mx-auto max-w-7xl px-8 py-8 space-y-10 print-hidden">
+          <div className="mx-auto max-w-7xl px-8 py-8 space-y-10">
+            <div className="bg-slate-800 border-b border-slate-700 rounded-2xl">
+              <div className="flex gap-1 px-4">
+                {tabs.map((tab) => (
+                  <a
+                    key={tab.href}
+                    href={tab.href}
+                    className={`px-6 py-3 text-sm font-medium transition relative ${
+                      pathname === tab.href
+                        ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
+                        : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                    }`}
+                  >
+                    {tab.label}
+                  </a>
+                ))}
+              </div>
+            </div>
             <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-blue-700">Payroll Overview</p>
@@ -402,7 +209,7 @@ export default function PayrollPage() {
                   </span>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full hidden md:table">
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Member</th>
@@ -410,19 +217,20 @@ export default function PayrollPage() {
                         <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Type</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">Rate</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">Per Payroll</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">Change</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {loading && (
                         <tr>
-                          <td className="px-6 py-6 text-sm text-slate-500" colSpan={5}>
+                          <td className="px-6 py-6 text-sm text-slate-500" colSpan={6}>
                             Loading payroll data from QBO…
                           </td>
                         </tr>
                       )}
                       {!loading && team.length === 0 && (
                         <tr>
-                          <td className="px-6 py-6 text-sm text-slate-500" colSpan={5}>
+                          <td className="px-6 py-6 text-sm text-slate-500" colSpan={6}>
                             No payroll data found for this period.
                           </td>
                         </tr>
@@ -448,14 +256,88 @@ export default function PayrollPage() {
                             <td className="px-6 py-4 text-sm text-right font-semibold text-slate-900">
                               {formatCurrency(member.perPayrollCost || 0)}
                             </td>
+                            <td className="px-6 py-4 text-sm text-right font-semibold">
+                              {member.payrollChange === 0 ? (
+                                <span className="text-slate-500">—</span>
+                              ) : member.payrollChange > 0 ? (
+                                <span className="text-emerald-600">
+                                  +{formatCurrency(member.payrollChange)}
+                                  <span className="ml-1 text-xs font-normal text-emerald-600/80">more than last pay</span>
+                                </span>
+                              ) : (
+                                <span className="text-amber-600">
+                                  -{formatCurrency(Math.abs(member.payrollChange))}
+                                  <span className="ml-1 text-xs font-normal text-amber-600/80">less than last pay</span>
+                                </span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                     </tbody>
                   </table>
+                  <div className="md:hidden px-4 py-4 space-y-3">
+                    {loading ? (
+                      <div className="text-sm text-slate-500">Loading payroll data from QBO…</div>
+                    ) : team.length === 0 ? (
+                      <div className="text-sm text-slate-500">No payroll data found for this period.</div>
+                    ) : (
+                      team.map((member) => (
+                        <div key={member.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-slate-900">{getFirstName(member.fullName)}</span>
+                            <span className="text-xs text-slate-500">{member.type}</span>
+                          </div>
+                          <p className="text-xs text-slate-500">{member.role}</p>
+                          <div className="mt-2 flex items-center justify-between text-sm">
+                            <span className="text-slate-600">
+                              {member.rate > 0
+                                ? member.type === "Hourly"
+                                  ? `${formatCurrency(member.rate)}/hr`
+                                  : `${formatCurrency(member.rate)}/yr`
+                                : "—"}
+                            </span>
+                            <span className="font-semibold text-slate-900">
+                              {formatCurrency(member.perPayrollCost || 0)}
+                            </span>
+                          </div>
+                          <div className="mt-2 text-xs">
+                            {member.payrollChange === 0 ? (
+                              <span className="text-slate-500">No change vs last pay</span>
+                            ) : member.payrollChange > 0 ? (
+                              <span className="text-emerald-600">+{formatCurrency(member.payrollChange)} more than last pay</span>
+                            ) : (
+                              <span className="text-amber-600">-{formatCurrency(Math.abs(member.payrollChange))} less than last pay</span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </section>
 
               <div className="space-y-6">
+                <section className="rounded-2xl bg-white px-6 py-5 shadow-sm ring-1 ring-slate-200">
+                  <h2 className="text-lg font-semibold text-slate-900">Change Watch</h2>
+                  <p className="text-xs text-slate-500">Compare current pay period to the previous one.</p>
+                  <div className="mt-4 space-y-3 text-sm text-slate-600">
+                    <div className="flex items-center justify-between">
+                      <span>Higher than last pay</span>
+                      <span className="font-semibold text-emerald-700">
+                        {payrollChangeStats.increaseCount} • +{formatCurrency(payrollChangeStats.increaseTotal)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Lower than last pay</span>
+                      <span className="font-semibold text-amber-700">
+                        {payrollChangeStats.decreaseCount} • -{formatCurrency(payrollChangeStats.decreaseTotal)}
+                      </span>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                      Flag increases that are not approved before payroll runs.
+                    </div>
+                  </div>
+                </section>
                 <section className="rounded-2xl bg-white px-6 py-5 shadow-sm ring-1 ring-slate-200">
                   <h2 className="text-lg font-semibold text-slate-900">Next Payroll</h2>
                   <div className="mt-4 space-y-3 text-sm text-slate-600">
@@ -495,27 +377,23 @@ export default function PayrollPage() {
 
                 <section className="rounded-2xl bg-white px-6 py-5 shadow-sm ring-1 ring-slate-200">
                   <h2 className="text-lg font-semibold text-slate-900">Wage Increases</h2>
-                  <p className="text-xs text-slate-500">Recent employee updates in QBO.</p>
+                  <p className="text-xs text-slate-500">Higher paychecks vs last period.</p>
                   <div className="mt-4 space-y-3">
-                    {recentIncreases.map((member) => (
+                    {payrollIncreases.map((member) => (
                       <div key={member.id} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-semibold text-slate-900">{getFirstName(member.fullName)}</p>
                           <span className="text-xs text-emerald-600 font-semibold">
-                            {member.rate > 0
-                              ? member.type === "Hourly"
-                                ? `+${formatCurrency(member.rate)}/hr`
-                                : `+${formatCurrency(member.rate)}/yr`
-                              : "Updated"}
+                            +{formatCurrency(member.payrollChange)}
                           </span>
                         </div>
                         <p className="text-xs text-slate-500">{member.role}</p>
-                        <p className="text-xs text-slate-400">Updated {formatShortDate(member.lastIncreaseDate)}</p>
+                        <p className="text-xs text-slate-400">More than last paycheck</p>
                       </div>
                     ))}
-                    {!loading && recentIncreases.length === 0 && (
+                    {!loading && payrollIncreases.length === 0 && (
                       <div className="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-sm text-slate-500">
-                        No recent wage updates found in QBO.
+                        No increases detected in this period.
                       </div>
                     )}
                   </div>
@@ -523,264 +401,6 @@ export default function PayrollPage() {
               </div>
             </div>
 
-            <section id="commissions" className="scroll-mt-24 space-y-6">
-              <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-blue-700">Commissions</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-slate-900">Sales Commission Tracker</h2>
-                  <p className="mt-1 text-sm text-slate-600">Track sales by rep for {monthYearDisplay}.</p>
-                </div>
-                <div className="flex flex-wrap items-end gap-3">
-                  <div>
-                    <label className="block text-xs uppercase text-slate-600">Month</label>
-                    <input
-                      type="month"
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(e.target.value)}
-                      className="mt-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase text-slate-600">Status</label>
-                    <select
-                      value={invoiceStatus}
-                      onChange={(e) => setInvoiceStatus(e.target.value as "paid" | "unpaid" | "all")}
-                      className="mt-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-                    >
-                      <option value="paid">Paid</option>
-                      <option value="unpaid">Unpaid</option>
-                      <option value="all">All</option>
-                    </select>
-                  </div>
-                  <button
-                    onClick={startQboConnect}
-                    className="mt-5 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition hover:bg-blue-700"
-                    type="button"
-                  >
-                    Connect QuickBooks
-                  </button>
-                  <button
-                    onClick={handlePrintOpenInvoices}
-                    className="mt-5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-blue-400"
-                    type="button"
-                  >
-                    {loadingOpenInvoices ? "Loading Open Invoices…" : "Print Open Invoices"}
-                  </button>
-                </div>
-              </header>
-
-              {connectError && (
-                <div className="rounded-lg bg-red-50 text-red-900 ring-1 ring-red-200 px-4 py-3 text-sm">
-                  {connectError}
-                </div>
-              )}
-
-              {openInvoiceError && (
-                <div className="rounded-lg bg-red-50 text-red-900 ring-1 ring-red-200 px-4 py-3 text-sm">
-                  {openInvoiceError}
-                </div>
-              )}
-
-              <div className="grid grid-cols-12 gap-6">
-                <div className="col-span-12 md:col-span-4 lg:col-span-3 rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-                  <div className="border-b border-slate-200 px-4 py-3">
-                    <h3 className="text-lg font-semibold text-slate-900">Sales Reps</h3>
-                    <input
-                      type="text"
-                      placeholder="Search reps..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="mt-3 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none"
-                    />
-                  </div>
-                  <div className="divide-y divide-slate-100">
-                    {loadingReps ? (
-                      <div className="px-4 py-8 text-center text-slate-600">Loading...</div>
-                    ) : filteredReps.length === 0 ? (
-                      <div className="px-4 py-8 text-center text-slate-600">No reps found</div>
-                    ) : (
-                      filteredReps.map((rep) => (
-                        <button
-                          key={rep.id}
-                          onClick={() => setSelectedRepId(rep.id)}
-                          className={`w-full text-left px-4 py-5 transition ${
-                            selectedRepId === rep.id
-                              ? "bg-blue-50/70 border-l-4 border-blue-600"
-                              : "hover:bg-slate-50 border-l-4 border-transparent"
-                          }`}
-                          type="button"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-900 truncate">{rep.name}</p>
-                              <p className="text-xs text-slate-600">{rep.qboCode}</p>
-                            </div>
-                            <span className="ml-2 shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                              {rep.invoiceCount}
-                            </span>
-                          </div>
-                          <div className="mt-2 flex gap-4 text-xs">
-                            <div>
-                              <p className="text-slate-600">Sales</p>
-                              <p className="font-semibold text-slate-900">${money(rep.totalSales)}</p>
-                            </div>
-                            <div>
-                              <p className="text-slate-600">Invoices</p>
-                              <p className="font-semibold text-slate-900">{rep.invoiceCount}</p>
-                            </div>
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {selectedRep && (
-                  <div className="col-span-12 md:col-span-8 lg:col-span-9 space-y-6">
-                    <div className="rounded-2xl bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200">
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <p className="text-xs uppercase text-slate-600">Total Sales MTD</p>
-                          <p className="mt-1 text-3xl font-semibold text-slate-900">
-                            ${money(selectedTotals.totalSales)}
-                          </p>
-                          <p className="mt-2 text-sm text-slate-600">{selectedTotals.count} invoices</p>
-                        </div>
-                        {commissionData && (
-                          <div>
-                            <p className="text-xs uppercase text-slate-600">Commission Owed</p>
-                            <p className="mt-1 text-3xl font-semibold text-green-600">
-                              ${money(commissionData.total)}
-                            </p>
-                            <p className="mt-2 text-sm text-slate-600">
-                              Rate: {(commissionData.rate * 100).toFixed(1)}% | Shipping Deducted: ${money(commissionData.shippingDeducted)}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {loadingInvoices ? (
-                      <div className="rounded-2xl bg-white px-6 py-8 shadow-sm ring-1 ring-slate-200 text-center text-slate-600">
-                        Loading invoices...
-                      </div>
-                    ) : invoices.length === 0 ? (
-                      <div className="rounded-2xl bg-white px-6 py-8 shadow-sm ring-1 ring-slate-200 text-center text-slate-600">
-                        No invoices found
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead className="bg-slate-50 border-b border-slate-200">
-                              <tr>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-900">Invoice #</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-900">Date</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-900">Items</th>
-                                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-900">Total</th>
-                                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-900">Commission</th>
-                                <th className="px-6 py-3 text-center text-xs font-semibold text-slate-900">Details</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {invoices.map((invoice) => (
-                                <>
-                                  <tr key={invoice.id}>
-                                    <td className="px-6 py-4 text-sm font-semibold text-slate-900">{invoice.invoiceNumber}</td>
-                                    <td className="px-6 py-4 text-sm text-slate-600">
-                                      {new Date(invoice.txnDate).toLocaleDateString("en-US")}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-slate-600">{invoice.lines.length} items</td>
-                                    <td className="px-6 py-4 text-sm font-semibold text-slate-900 text-right">
-                                      ${money(invoice.totalAmount)}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm font-semibold text-green-600 text-right">
-                                      ${money(invoice.commission)}
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                      <button
-                                        onClick={() => setExpandedInvoice(expandedInvoice === invoice.id ? null : invoice.id)}
-                                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                                        type="button"
-                                      >
-                                        {expandedInvoice === invoice.id ? "Hide" : "Show"}
-                                      </button>
-                                    </td>
-                                  </tr>
-                                  {expandedInvoice === invoice.id && (
-                                    <tr key={`${invoice.id}-details`} className="bg-slate-50">
-                                      <td colSpan={6} className="px-6 py-4">
-                                        <table className="w-full">
-                                          <thead>
-                                            <tr className="border-b border-slate-200">
-                                              <th className="text-left text-xs font-semibold text-slate-700 py-2">Item</th>
-                                              <th className="text-right text-xs font-semibold text-slate-700 py-2">Qty</th>
-                                              <th className="text-right text-xs font-semibold text-slate-700 py-2">Unit Price</th>
-                                              <th className="text-right text-xs font-semibold text-slate-700 py-2">Amount</th>
-                                              <th className="text-right text-xs font-semibold text-slate-700 py-2">Shipping Deducted</th>
-                                              <th className="text-right text-xs font-semibold text-slate-700 py-2">Commissionable</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody className="divide-y divide-slate-200">
-                                            {invoice.lines.map((line, idx) => (
-                                              <tr key={idx}>
-                                                <td className="text-sm text-slate-700 py-2">{line.description}</td>
-                                                <td className="text-sm text-slate-700 py-2 text-right">{line.qty}</td>
-                                                <td className="text-sm text-slate-700 py-2 text-right">${money(line.unitPrice)}</td>
-                                                <td className="text-sm font-semibold text-slate-900 py-2 text-right">${money(line.lineAmount)}</td>
-                                                <td className="text-sm text-red-600 py-2 text-right">${money(line.shippingDeducted)}</td>
-                                                <td className="text-sm font-semibold text-green-600 py-2 text-right">${money(line.commissionable)}</td>
-                                              </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                      </td>
-                                    </tr>
-                                  )}
-                                </>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
-          <div className="print-only hidden bg-white px-8 py-6 text-slate-900">
-            <div className="mb-6">
-              <h1 className="text-2xl font-semibold">Open Invoices</h1>
-              <p className="text-sm text-slate-600">Pulled from QBO • {openInvoices.length} invoices</p>
-            </div>
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="py-2">Invoice</th>
-                  <th className="py-2">Customer</th>
-                  <th className="py-2">Date</th>
-                  <th className="py-2">Due</th>
-                  <th className="py-2 text-right">Total</th>
-                  <th className="py-2 text-right">Balance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {openInvoices.map((invoice) => (
-                  <tr key={invoice.Id} className="text-sm">
-                    <td className="py-2 font-semibold text-slate-900">{invoice.DocNumber || invoice.Id}</td>
-                    <td className="py-2 text-slate-700">{invoice.CustomerRef?.name || "—"}</td>
-                    <td className="py-2 text-slate-700">{formatDate(invoice.TxnDate)}</td>
-                    <td className="py-2 text-slate-700">{formatDate(invoice.DueDate)}</td>
-                    <td className="py-2 text-right text-slate-900">${money(invoice.TotalAmt)}</td>
-                    <td className="py-2 text-right text-slate-900">${money(invoice.Balance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {openInvoices.length === 0 && (
-              <div className="py-6 text-sm text-slate-500">No open invoices found.</div>
-            )}
           </div>
         </main>
       </div>

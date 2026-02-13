@@ -63,6 +63,7 @@ export default function SalaryBonusPage() {
   const pathname = usePathname();
   const tabs = [
     { label: "Payroll", href: "/payroll" },
+    { label: "Commissions", href: "/commissions" },
     { label: "Salary Bonus", href: "/commissions/salary-bonus" },
     { label: "Wholesalers", href: "/admin/wholesalers" },
   ];
@@ -70,7 +71,7 @@ export default function SalaryBonusPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
-        <Sidebar activePage="Payroll" />
+        <Sidebar activePage="Commissions" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
           {/* Chrome-style Tabs */}

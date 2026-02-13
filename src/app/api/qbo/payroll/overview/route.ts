@@ -37,6 +37,11 @@ const parseHours = (value: unknown) => {
   return 0;
 };
 
+const ACTIVE_EMPLOYEES = new Set(
+  ["chad", "deacon", "emma", "kadie", "michael", "nick", "paul", "peter", "robert", "shandra", "traci"]
+    .map((name) => name.toLowerCase())
+);
+
 type QboEmployee = {
   Id: string;
   DisplayName?: string;
@@ -59,6 +64,44 @@ type QboTimeActivity = {
   HourlyRateSpecified?: boolean;
 };
 
+const getPeriodWindow = (startDate: string, endDate: string) => {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+  const prevEnd = new Date(start);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevStart.getDate() - (diffDays - 1));
+  return {
+    prevStartDate: formatDate(prevStart),
+    prevEndDate: formatDate(prevEnd),
+  };
+};
+
+const getFirstNameFromLabel = (fullName: string) =>
+  (fullName.split(" ")[0] || fullName || "Unknown").toLowerCase();
+
+const buildTimeMap = (activities: QboTimeActivity[]) => {
+  const map = new Map<string, { hours: number; rates: number[]; name?: string }>();
+
+  for (const activity of activities) {
+    const employeeKey = activity.EmployeeRef?.value || activity.EmployeeRef?.name || activity.NameOf || "Unknown";
+    const entry = map.get(employeeKey) || { hours: 0, rates: [], name: activity.EmployeeRef?.name };
+    const hours = parseHours(activity.Hours);
+    const hourlyRate = toNumber(
+      (activity.HourlyRate && "value" in (activity.HourlyRate as object)
+        ? (activity.HourlyRate as { value?: number | string }).value
+        : activity.HourlyRate) ?? 0
+    );
+
+    entry.hours += hours;
+    if (hourlyRate > 0) entry.rates.push(hourlyRate);
+    map.set(employeeKey, entry);
+  }
+
+  return map;
+};
+
 export async function GET(req: NextRequest) {
   try {
     const userId = await getUserId();
@@ -67,7 +110,9 @@ export async function GET(req: NextRequest) {
     const startDate = params.get("startDate") || defaultStart;
     const endDate = params.get("endDate") || defaultEnd;
 
-    const [employeeData, timeData] = await Promise.all([
+    const { prevStartDate, prevEndDate } = getPeriodWindow(startDate, endDate);
+
+    const [employeeData, timeData, previousTimeData] = await Promise.all([
       authorizedQboFetch<any>(
         `/query?query=${encodeURIComponent("SELECT * FROM Employee ORDERBY DisplayName")}&minorversion=65`,
         {},
@@ -85,33 +130,27 @@ export async function GET(req: NextRequest) {
         }
         throw error;
       }),
+      authorizedQboFetch<any>(
+        `/query?query=${encodeURIComponent(
+          `SELECT * FROM TimeActivity WHERE TxnDate >= '${prevStartDate}' AND TxnDate <= '${prevEndDate}'`
+        )}&minorversion=65`,
+        {},
+        userId || undefined
+      ).catch((error: unknown) => {
+        if (error instanceof QboApiError) {
+          return { QueryResponse: { TimeActivity: [] } };
+        }
+        throw error;
+      }),
     ]);
 
     const employees: QboEmployee[] = employeeData?.QueryResponse?.Employee || [];
     const timeActivities: QboTimeActivity[] = timeData?.QueryResponse?.TimeActivity || [];
+    const previousTimeActivities: QboTimeActivity[] = previousTimeData?.QueryResponse?.TimeActivity || [];
+    const timeByEmployee = buildTimeMap(timeActivities);
+    const previousTimeByEmployee = buildTimeMap(previousTimeActivities);
 
-    const timeByEmployee = new Map<
-      string,
-      { hours: number; rates: number[]; lastDate?: string; name?: string }
-    >();
-
-    for (const activity of timeActivities) {
-      const employeeKey = activity.EmployeeRef?.value || activity.EmployeeRef?.name || activity.NameOf || "Unknown";
-      const entry = timeByEmployee.get(employeeKey) || { hours: 0, rates: [], name: activity.EmployeeRef?.name };
-      const hours = parseHours(activity.Hours);
-      const hourlyRate = toNumber(
-        (activity.HourlyRate && "value" in (activity.HourlyRate as object)
-          ? (activity.HourlyRate as { value?: number | string }).value
-          : activity.HourlyRate) ?? 0
-      );
-
-      entry.hours += hours;
-      if (hourlyRate > 0) entry.rates.push(hourlyRate);
-      if (activity.TxnDate) entry.lastDate = activity.TxnDate;
-      timeByEmployee.set(employeeKey, entry);
-    }
-
-    const team = employees.map((employee) => {
+    const mappedEmployees = employees.map((employee) => {
       const rawType = (employee.EmployeeType || "").toLowerCase();
       const type = rawType.includes("salary") ? "Salary" : "Hourly";
       const employeeKey = employee.Id || employee.DisplayName || employee.GivenName || "Unknown";
@@ -119,6 +158,9 @@ export async function GET(req: NextRequest) {
         hours: 0,
         rates: [],
       };
+      const previousTimeInfo = previousTimeByEmployee.get(employeeKey)
+        || previousTimeByEmployee.get(employee.DisplayName || "")
+        || { hours: 0, rates: [] };
       const inferredRate = timeInfo.rates.length
         ? timeInfo.rates.reduce((sum, rate) => sum + rate, 0) / timeInfo.rates.length
         : 0;
@@ -127,6 +169,12 @@ export async function GET(req: NextRequest) {
       const perPayrollCost = type === "Salary"
         ? (baseRate > 0 ? baseRate / 26 : 0)
         : (timeInfo.hours > 0 ? timeInfo.hours * baseRate : baseRate * 80);
+
+      const previousPayrollCost = type === "Salary"
+        ? (baseRate > 0 ? baseRate / 26 : 0)
+        : (previousTimeInfo.hours > 0 ? previousTimeInfo.hours * baseRate : 0);
+
+      const payrollChange = perPayrollCost - previousPayrollCost;
 
       const displayName = employee.DisplayName || `${employee.GivenName || ""} ${employee.FamilyName || ""}`.trim();
       const lastUpdated = employee.MetaData?.LastUpdatedTime?.slice(0, 10) || null;
@@ -141,8 +189,15 @@ export async function GET(req: NextRequest) {
         lastIncreaseDate: lastUpdated,
         lastIncreaseAmount: baseRate,
         perPayrollCost,
+        previousPayrollCost,
+        payrollChange,
       };
     });
+
+    const team = mappedEmployees.filter((employee) => ACTIVE_EMPLOYEES.has(getFirstNameFromLabel(employee.fullName)));
+    const terminated = mappedEmployees.filter(
+      (employee) => !ACTIVE_EMPLOYEES.has(getFirstNameFromLabel(employee.fullName))
+    );
 
     const payrollMeta = {
       payFrequency: "Bi-weekly",
@@ -158,6 +213,8 @@ export async function GET(req: NextRequest) {
       period: { startDate, endDate },
       payrollMeta,
       team,
+      terminated,
+      previousPeriod: { startDate: prevStartDate, endDate: prevEndDate },
     });
   } catch (error: any) {
     if (error instanceof QboApiError) {
