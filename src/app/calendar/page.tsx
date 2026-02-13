@@ -197,54 +197,31 @@ export default function CalendarPage() {
         console.log('[calendar] Selected month:', selectedMonth);
         console.log('[calendar] Fetching sales for calendar month:', startDate, 'to', endDate);
         
-        // Fetch payments for the calendar month (use payment date)
-        const paymentsUrl = `/api/qbo/payment/query?startDate=${startDate}&endDate=${endDate}`;
-        console.log('[calendar] Payments API URL:', paymentsUrl);
-        const paymentsResponse = await fetch(paymentsUrl);
-        let payments: any[] = [];
-        if (paymentsResponse.ok) {
-          const paymentsResult = await paymentsResponse.json();
-          payments = paymentsResult.payments || paymentsResult.QueryResponse?.Payment || (Array.isArray(paymentsResult) ? paymentsResult : []);
-        } else {
-          console.warn('[calendar] Failed to fetch payments, falling back to invoices');
-        }
+        // Fetch paid invoices for the calendar month (use invoice TxnDate)
+        const invoicesUrl = `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`;
+        console.log('[calendar] Invoices API URL:', invoicesUrl);
+        const invoiceResponse = await fetch(invoicesUrl);
+        if (!invoiceResponse.ok) throw new Error("Failed to fetch paid invoices");
+        const invoiceResult = await invoiceResponse.json();
+        const invoices = invoiceResult.invoices || [];
         
-        // If no payments returned, fall back to invoices (invoice creation date)
-        let invoices: any[] = [];
-        if (payments.length === 0) {
-          const invoicesUrl = `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`;
-          console.log('[calendar] Invoices API URL (fallback):', invoicesUrl);
-          const invoiceResponse = await fetch(invoicesUrl);
-          if (!invoiceResponse.ok) throw new Error("Failed to fetch invoices");
-          const invoiceResult = await invoiceResponse.json();
-          invoices = invoiceResult.invoices || invoiceResult.QueryResponse?.Invoice || (Array.isArray(invoiceResult) ? invoiceResult : []);
-        }
+        console.log('[calendar] Paid invoices fetched:', invoices.length);
+        if (invoices.length > 0) console.log('[calendar] Sample invoice structure:', invoices[0]);
         
-        const usingPayments = payments.length > 0;
-        console.log('[calendar] Using payments:', usingPayments, 'payments:', payments.length, 'invoices fallback:', invoices.length);
-        if (usingPayments) console.log('[calendar] Sample payment structure:', payments[0]);
-        if (!usingPayments) console.log('[calendar] Sample invoice structure:', invoices[0]);
-        
-        // Group sales by payment date (preferred) or invoice date (fallback)
+        // Group sales by invoice TxnDate
         const salesByDate: Record<string, { total: number; count: number }> = {};
         
-        const source = usingPayments ? payments : invoices;
-        source.forEach((item: any) => {
-          // Prefer payment creation date if available, fall back to TxnDate
-          const rawDate = item.MetaData?.CreateTime || item.TxnDate || item.MetaData?.LastUpdatedTime;
+        invoices.forEach((invoice: any) => {
+          const rawDate = invoice.TxnDate;
           if (!rawDate) return;
           const date = rawDate.split('T')[0];
           if (!salesByDate[date]) {
             salesByDate[date] = { total: 0, count: 0 };
           }
-          if (usingPayments) {
-            const total = Number(item.TotalAmt) || 0;
-            const unapplied = Number(item.UnappliedAmt) || 0;
-            const applied = total - unapplied;
-            salesByDate[date].total += applied > 0 ? applied : 0;
-          } else {
-            salesByDate[date].total += item.TotalAmt || 0;
-          }
+          const total = Number(invoice.TotalAmt) || 0;
+          const balance = Number(invoice.Balance) || 0;
+          const paid = total - balance;
+          salesByDate[date].total += paid;
           salesByDate[date].count += 1;
         });
         
