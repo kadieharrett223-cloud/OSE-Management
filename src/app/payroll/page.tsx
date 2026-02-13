@@ -143,9 +143,9 @@ export default function PayrollPage() {
         <Sidebar activePage="Payroll" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          <div className="mx-auto max-w-7xl px-8 py-8 space-y-10">
-            <div className="bg-slate-800 border-b border-slate-700 rounded-2xl">
-              <div className="flex gap-1 px-4">
+          <div className="bg-slate-800 border-b border-slate-700">
+            <div className="mx-auto max-w-7xl px-8">
+              <div className="flex gap-1">
                 {tabs.map((tab) => (
                   <a
                     key={tab.href}
@@ -161,6 +161,8 @@ export default function PayrollPage() {
                 ))}
               </div>
             </div>
+          </div>
+          <div className="mx-auto max-w-7xl px-8 py-8 space-y-10">
             <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-blue-700">Payroll Overview</p>
