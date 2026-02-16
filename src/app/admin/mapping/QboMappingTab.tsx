@@ -42,6 +42,10 @@ export default function QboMappingTab() {
   const [shippingAmount, setShippingAmount] = useState<string>("");
   const [selectedPriceListSku, setSelectedPriceListSku] = useState<string>("");
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [createNewItem, setCreateNewItem] = useState(false);
+  const [newItemSku, setNewItemSku] = useState("");
+  const [newItemDescription, setNewItemDescription] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -131,6 +135,27 @@ export default function QboMappingTab() {
     setEditingItem(item);
     setShippingAmount(item.priceListItem?.shipping_included_per_unit?.toString() || "0");
     setSelectedPriceListSku(item.priceListItem?.sku || "");
+    setCreateNewItem(false);
+    setNewItemSku("");
+    setNewItemDescription("");
+  };
+
+  const createPriceListItem = async () => {
+    const response = await fetch("/api/price-list/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        item_no: newItemSku,
+        description: newItemDescription,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || "Failed to create price list item");
+    }
+
+    return data.item as { sku: string };
   };
 
   const filteredItems = mappedItems.filter((item) => {
@@ -294,6 +319,7 @@ export default function QboMappingTab() {
                 <select
                   value={selectedPriceListSku}
                   onChange={(e) => setSelectedPriceListSku(e.target.value)}
+                  disabled={createNewItem}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
                   <option value="">Select a price list item...</option>
@@ -303,6 +329,43 @@ export default function QboMappingTab() {
                     </option>
                   ))}
                 </select>
+                <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={createNewItem}
+                    onChange={(e) => setCreateNewItem(e.target.checked)}
+                  />
+                  Create a new price list item
+                </label>
+              </div>
+
+              {createNewItem && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      New SKU
+                    </label>
+                    <input
+                      type="text"
+                      value={newItemSku}
+                      onChange={(e) => setNewItemSku(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      placeholder="SKU"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Description
+                    </label>
+                    <input
+                      type="text"
+                      value={newItemDescription}
+                      onChange={(e) => setNewItemDescription(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      placeholder="Description"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -335,19 +398,48 @@ export default function QboMappingTab() {
               </button>
               <button
                 onClick={() => {
-                  if (!selectedPriceListSku || !shippingAmount || !editingItem) {
+                  if (!editingItem || !shippingAmount) {
                     setStatusMessage({ type: "error", text: "Please fill in all fields" });
                     return;
                   }
+
+                  if (createNewItem) {
+                    if (!newItemSku || !newItemDescription) {
+                      setStatusMessage({ type: "error", text: "Please provide SKU and description" });
+                      return;
+                    }
+                    setIsSaving(true);
+                    createPriceListItem()
+                      .then((item) =>
+                        handleSaveMapping(
+                          editingItem.qboItem,
+                          item.sku || newItemSku,
+                          parseFloat(shippingAmount)
+                        )
+                      )
+                      .catch((error: any) => {
+                        setStatusMessage({ type: "error", text: error.message || "Failed to save mapping" });
+                      })
+                      .finally(() => setIsSaving(false));
+                    return;
+                  }
+
+                  if (!selectedPriceListSku) {
+                    setStatusMessage({ type: "error", text: "Please select a price list item" });
+                    return;
+                  }
+
+                  setIsSaving(true);
                   handleSaveMapping(
                     editingItem.qboItem,
                     selectedPriceListSku,
                     parseFloat(shippingAmount)
-                  );
+                  ).finally(() => setIsSaving(false));
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
+                disabled={isSaving}
               >
-                Save Mapping
+                {isSaving ? "Saving..." : "Save Mapping"}
               </button>
             </div>
           </div>
