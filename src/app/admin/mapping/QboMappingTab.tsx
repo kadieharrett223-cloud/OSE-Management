@@ -366,8 +366,7 @@ export default function QboMappingTab() {
                     />
                   </div>
                 </div>
-              </div>
-
+              )}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Shipping Deduction (per unit)
