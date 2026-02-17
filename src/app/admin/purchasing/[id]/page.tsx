@@ -82,6 +82,9 @@ export default function ViewPO() {
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [draggedLineId, setDraggedLineId] = useState<string | null>(null);
+  const [editingLineItems, setEditingLineItems] = useState(false);
+  const [tempLines, setTempLines] = useState<any[]>([]);
+  const [draggedLineIndex, setDraggedLineIndex] = useState<number | null>(null);
   const [newProductForm, setNewProductForm] = useState({
     item_no: "",
     description: "",
@@ -451,6 +454,67 @@ export default function ViewPO() {
     }
   };
 
+  const startInlineEditingLineItems = () => {
+    setTempLines(JSON.parse(JSON.stringify(po?.lines || [])));
+    setEditingLineItems(true);
+  };
+
+  const cancelInlineEditingLineItems = () => {
+    setEditingLineItems(false);
+    setTempLines([]);
+    setDraggedLineIndex(null);
+  };
+
+  const updateTempLine = (index: number, field: string, value: any) => {
+    const updated = [...tempLines];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'quantity' || field === 'unit_price') {
+      updated[index].line_total = (updated[index].quantity || 0) * (updated[index].unit_price || 0);
+    }
+    setTempLines(updated);
+  };
+
+  const removeTempLine = (index: number) => {
+    setTempLines(tempLines.filter((_, i) => i !== index));
+  };
+
+  const reorderTempLine = (fromIndex: number, toIndex: number) => {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+    const updated = [...tempLines];
+    const [removed] = updated.splice(fromIndex, 1);
+    updated.splice(toIndex, 0, removed);
+    setTempLines(updated);
+  };
+
+  const saveTempLineItems = async () => {
+    if (!po?.id) return;
+    setSavingLineItem(true);
+    try {
+      const newTotal = tempLines.reduce((sum, line) => sum + (line.line_total || 0), 0);
+      const res = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: tempLines,
+          total_amount: newTotal,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save line items");
+
+      const result = await res.json();
+      setPO(result.data);
+      setEditingLineItems(false);
+      setTempLines([]);
+      alert("Line items saved successfully");
+    } catch (error) {
+      console.error("Error saving line items:", error);
+      alert("Failed to save line items");
+    } finally {
+      setSavingLineItem(false);
+    }
+  };
+
   const containerMaxLbs = 44000;
   const totalWeightLbs = (po?.lines || []).reduce((sum, line) => {
     const weightEach = Number(line.weight_lbs) || 0;
@@ -756,127 +820,260 @@ export default function ViewPO() {
 
           {/* Line Items Table */}
           <div className="mb-2 flex items-center gap-2 print:hidden">
-            <button
-              onClick={() => openLineItemModal()}
-              className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700"
-            >
-              + Add Line Item
-            </button>
-            <button
-              onClick={handleSaveAllLineItems}
-              disabled={savingLineItem}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {savingLineItem ? "Saving..." : "Save"}
-            </button>
+            {!editingLineItems ? (
+              <>
+                <button
+                  onClick={() => openLineItemModal()}
+                  className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700"
+                >
+                  + Add Line Item
+                </button>
+                <button
+                  onClick={handleSaveAllLineItems}
+                  disabled={savingLineItem}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingLineItem ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={startInlineEditingLineItems}
+                  className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700"
+                >
+                  Edit Line Items
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={saveTempLineItems}
+                  disabled={savingLineItem}
+                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {savingLineItem ? "Saving..." : "Save Changes"}
+                </button>
+                <button
+                  onClick={cancelInlineEditingLineItems}
+                  disabled={savingLineItem}
+                  className="rounded-lg bg-slate-400 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-500 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
           </div>
           <div className="mb-2">
-            <table className="w-full border-collapse border border-gray-400 text-[9px]">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-6">
-                    ⋮
-                  </th>
-                  <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-8">
-                    n#
-                  </th>
-                  <th className="border-r border-gray-400 px-2 py-1.5 text-left text-[8px] font-bold text-slate-900 uppercase tracking-wider">
-                    Part number
-                  </th>
-                  <th className="border-r border-gray-400 px-2 py-1.5 text-left text-[8px] font-bold text-slate-900 uppercase tracking-wider">
-                    Description
-                  </th>
-                  <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-12">
-                    QTY
-                  </th>
-                  <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-20">
-                    Weight (lbs)
-                  </th>
-                  <th className="border-r border-gray-400 px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-20">
-                    Unit Price
-                  </th>
-                  <th className="px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-24">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {po.lines.map((line, index) => (
-                  <tr
-                    key={line.id}
-                    draggable
-                    onDragStart={() => setDraggedLineId(line.id)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => {
-                      if (draggedLineId && draggedLineId !== line.id) {
-                        handleReorderLineItems(draggedLineId, line.id);
-                      }
-                    }}
-                    onDragEnd={() => setDraggedLineId(null)}
-                    className={`border-b border-gray-300 cursor-move ${
-                      draggedLineId === line.id ? 'bg-blue-100 opacity-70' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    }`}
-                  >
-                    <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-400 hover:text-slate-600 align-top select-none">
+            {!editingLineItems ? (
+              /* NORMAL TABLE VIEW */
+              <table className="w-full border-collapse border border-gray-400 text-[9px]">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-6">
                       ⋮
+                    </th>
+                    <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-8">
+                      n#
+                    </th>
+                    <th className="border-r border-gray-400 px-2 py-1.5 text-left text-[8px] font-bold text-slate-900 uppercase tracking-wider">
+                      Part number
+                    </th>
+                    <th className="border-r border-gray-400 px-2 py-1.5 text-left text-[8px] font-bold text-slate-900 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-12">
+                      QTY
+                    </th>
+                    <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-20">
+                      Weight (lbs)
+                    </th>
+                    <th className="border-r border-gray-400 px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-20">
+                      Unit Price
+                    </th>
+                    <th className="px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-24">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {po.lines.map((line, index) => (
+                    <tr
+                      key={line.id}
+                      draggable
+                      onDragStart={() => setDraggedLineId(line.id)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (draggedLineId && draggedLineId !== line.id) {
+                          handleReorderLineItems(draggedLineId, line.id);
+                        }
+                      }}
+                      onDragEnd={() => setDraggedLineId(null)}
+                      className={`border-b border-gray-300 cursor-move ${
+                        draggedLineId === line.id ? 'bg-blue-100 opacity-70' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      }`}
+                    >
+                      <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-400 hover:text-slate-600 align-top select-none">
+                        ⋮
+                      </td>
+                      <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-700 align-top">
+                        {index + 1}
+                      </td>
+                      <td className="border-r border-gray-300 px-2 py-1.5 text-slate-900 align-top font-medium">
+                        {line.sku || "—"}
+                      </td>
+                      <td className="border-r border-gray-300 px-2 py-1.5 text-slate-800 align-top whitespace-pre-wrap leading-tight">
+                        <div className="flex items-start justify-between gap-2">
+                          <span>{line.description}</span>
+                          <span className="shrink-0 space-x-1 print:hidden">
+                            <button
+                              onClick={() => openLineItemModal(line)}
+                              className="text-blue-600 hover:text-blue-800 font-semibold text-[8px] px-1"
+                              title="Edit"
+                            >
+                              ✎
+                            </button>
+                            <button
+                              onClick={() => handleDeleteLineItem(line.id)}
+                              className="text-red-600 hover:text-red-800 font-semibold text-[8px] px-1"
+                              title="Delete"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        </div>
+                      </td>
+                      <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-900 align-top font-medium">
+                        {line.quantity}
+                      </td>
+                      <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-900 align-top">
+                        {line.weight_lbs ? line.weight_lbs.toFixed(0) : "—"}
+                      </td>
+                      <td className="border-r border-gray-300 px-2 py-1.5 text-right text-slate-900 align-top font-medium">
+                        ${money(line.unit_price)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right text-slate-900 align-top font-semibold">
+                        ${money(line.line_total)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-gray-500">
+                    <td colSpan={6} className="px-2 py-2 text-right text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Total Net (USD)
                     </td>
-                    <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-700 align-top">
-                      {index + 1}
-                    </td>
-                    <td className="border-r border-gray-300 px-2 py-1.5 text-slate-900 align-top font-medium">
-                      {line.sku || "—"}
-                    </td>
-                    <td className="border-r border-gray-300 px-2 py-1.5 text-slate-800 align-top whitespace-pre-wrap leading-tight">
-                      <div className="flex items-start justify-between gap-2">
-                        <span>{line.description}</span>
-                        <span className="shrink-0 space-x-1 print:hidden">
-                          <button
-                            onClick={() => openLineItemModal(line)}
-                            className="text-blue-600 hover:text-blue-800 font-semibold text-[8px] px-1"
-                            title="Edit"
-                          >
-                            ✎
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLineItem(line.id)}
-                            className="text-red-600 hover:text-red-800 font-semibold text-[8px] px-1"
-                            title="Delete"
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      </div>
-                    </td>
-                    <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-900 align-top font-medium">
-                      {line.quantity}
-                    </td>
-                    <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-900 align-top">
-                      {line.weight_lbs ? line.weight_lbs.toFixed(0) : "—"}
-                    </td>
-                    <td className="border-r border-gray-300 px-2 py-1.5 text-right text-slate-900 align-top font-medium">
-                      ${money(line.unit_price)}
-                    </td>
-                    <td className="px-2 py-1.5 text-right text-slate-900 align-top font-semibold">
-                      ${money(line.line_total)}
+                    <td className="px-2 py-2 text-right text-sm font-bold text-slate-900">
+                      ${money(po.total_amount)}
                     </td>
                   </tr>
+                  <tr className="border-t border-gray-300">
+                    <td colSpan={6} className="px-2 py-2 text-right text-[10px] font-semibold text-slate-700 uppercase tracking-wide">
+                      Container Weight Remaining
+                    </td>
+                    <td className="px-2 py-2 text-right text-[10px] font-semibold text-slate-900">
+                      {remainingWeightLbs.toLocaleString()} lbs (of {containerMaxLbs.toLocaleString()} lbs)
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            ) : (
+              /* INLINE EDITING VIEW */
+              <div className="border border-slate-300 rounded bg-white">
+                <div className="grid grid-cols-12 gap-0 bg-slate-100 border-b border-slate-300">
+                  <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">⋮</div>
+                  <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">SKU</div>
+                  <div className="col-span-3 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
+                  <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">QTY</div>
+                  <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">Weight</div>
+                  <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">Rate</div>
+                  <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right">Amount</div>
+                </div>
+                {tempLines.map((line, index) => (
+                  <div
+                    key={line.id || index}
+                    draggable
+                    onDragStart={() => setDraggedLineIndex(index)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      if (draggedLineIndex !== null && draggedLineIndex !== index) {
+                        reorderTempLine(draggedLineIndex, index);
+                        setDraggedLineIndex(null);
+                      }
+                    }}
+                    onDragEnd={() => setDraggedLineIndex(null)}
+                    className={`grid grid-cols-12 gap-0 border-b border-slate-200 ${
+                      draggedLineIndex === index ? 'bg-blue-100 opacity-70' : 'hover:bg-slate-50'
+                    } cursor-move`}
+                  >
+                    <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center text-slate-400 hover:text-slate-600">⋮</div>
+                    <div className="col-span-2 border-r border-slate-200 p-2">
+                      <input
+                        type="text"
+                        placeholder="SKU"
+                        value={line.sku || ""}
+                        onChange={(e) => updateTempLine(index, "sku", e.target.value)}
+                        className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                      />
+                    </div>
+                    <div className="col-span-3 border-r border-slate-200 p-2">
+                      <textarea
+                        placeholder="Description"
+                        value={line.description || ""}
+                        onChange={(e) => updateTempLine(index, "description", e.target.value)}
+                        className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none bg-transparent"
+                        rows={2}
+                      />
+                    </div>
+                    <div className="col-span-1 border-r border-slate-200 p-2">
+                      <input
+                        type="number"
+                        step="1"
+                        value={line.quantity || ""}
+                        onChange={(e) => updateTempLine(index, "quantity", Number(e.target.value) || 0)}
+                        className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                      />
+                    </div>
+                    <div className="col-span-1 border-r border-slate-200 p-2">
+                      <input
+                        type="number"
+                        step="1"
+                        value={line.weight_lbs || ""}
+                        onChange={(e) => updateTempLine(index, "weight_lbs", Number(e.target.value) || 0)}
+                        placeholder="lbs"
+                        className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                      />
+                    </div>
+                    <div className="col-span-2 border-r border-slate-200 p-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={line.unit_price || ""}
+                        onChange={(e) => updateTempLine(index, "unit_price", Number(e.target.value) || 0)}
+                        className="w-full border-0 px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                      />
+                    </div>
+                    <div className="col-span-2 p-2 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-900">
+                        ${((line.quantity || 0) * (line.unit_price || 0)).toFixed(2)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeTempLine(index)}
+                        className="ml-2 text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-xl px-2 py-0 rounded"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
                 ))}
-                <tr className="border-t-2 border-gray-500">
-                  <td colSpan={6} className="px-2 py-2 text-right text-xs font-bold text-slate-900 uppercase tracking-wide">
-                    Total Net (USD)
-                  </td>
-                  <td className="px-2 py-2 text-right text-sm font-bold text-slate-900">
-                    ${money(po.total_amount)}
-                  </td>
-                </tr>
-                <tr className="border-t border-gray-300">
-                  <td colSpan={6} className="px-2 py-2 text-right text-[10px] font-semibold text-slate-700 uppercase tracking-wide">
-                    Container Weight Remaining
-                  </td>
-                  <td className="px-2 py-2 text-right text-[10px] font-semibold text-slate-900">
-                    {remainingWeightLbs.toLocaleString()} lbs (of {containerMaxLbs.toLocaleString()} lbs)
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                <div className="grid grid-cols-12 gap-0 bg-slate-50 border-t-2 border-slate-300">
+                  <div className="col-span-10 px-3 py-3 text-right text-sm font-bold text-slate-700">Total Weight:</div>
+                  <div className="col-span-2 px-3 py-3 text-right text-sm font-bold text-slate-900">
+                    {(tempLines.reduce((sum, line) => sum + ((line.quantity || 0) * (line.weight_lbs || 0)), 0) || 0).toLocaleString()} lbs
+                  </div>
+                </div>
+                <div className="grid grid-cols-12 gap-0 bg-slate-50">
+                  <div className="col-span-10 px-3 py-3 text-right text-sm font-bold text-slate-700">Total Amount:</div>
+                  <div className="col-span-2 px-3 py-3 text-right text-sm font-bold text-slate-900">
+                    ${tempLines.reduce((sum, line) => sum + ((line.quantity || 0) * (line.unit_price || 0)), 0).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
