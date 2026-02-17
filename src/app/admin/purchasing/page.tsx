@@ -140,6 +140,7 @@ export default function PurchasingPage() {
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [creatingForLineIndex, setCreatingForLineIndex] = useState<number | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
+  const [draggedLineIndex, setDraggedLineIndex] = useState<number | null>(null);
   const [newProductForm, setNewProductForm] = useState({
     item_no: "",
     description: "",
@@ -477,6 +478,13 @@ export default function PurchasingPage() {
       ...formData,
       lines: formData.lines.filter((_, i) => i !== index),
     });
+  }
+
+  function reorderLine(fromIndex: number, toIndex: number) {
+    const newLines = [...formData.lines];
+    const [removed] = newLines.splice(fromIndex, 1);
+    newLines.splice(toIndex, 0, removed);
+    setFormData({ ...formData, lines: newLines });
   }
 
   function updateLine(index: number, field: string, value: any) {
@@ -875,15 +883,32 @@ export default function PurchasingPage() {
                   </div>
                   <div className="border border-slate-300 rounded">
                     <div className="grid grid-cols-12 gap-0 bg-slate-100 border-b border-slate-300">
+                      <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300 text-center">⋮</div>
                       <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Part Number</div>
-                      <div className="col-span-4 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
+                      <div className="col-span-3 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
                       <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">QTY</div>
                       <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">Weight</div>
                       <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">Rate</div>
                       <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right">Amount</div>
                     </div>
                     {formData.lines.map((line, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-0 border-b border-slate-200 hover:bg-slate-50">
+                      <div
+                        key={index}
+                        draggable
+                        onDragStart={() => setDraggedLineIndex(index)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => {
+                          if (draggedLineIndex !== null && draggedLineIndex !== index) {
+                            reorderLine(draggedLineIndex, index);
+                            setDraggedLineIndex(null);
+                          }
+                        }}
+                        onDragEnd={() => setDraggedLineIndex(null)}
+                        className={`grid grid-cols-12 gap-0 border-b border-slate-200 ${
+                          draggedLineIndex === index ? 'bg-blue-100 opacity-70' : 'hover:bg-slate-50'
+                        } cursor-move`}
+                      >
+                        <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center text-slate-400 hover:text-slate-600">⋮</div>
                         <div className="col-span-2 border-r border-slate-200 p-2">
                           <div className="flex flex-col gap-1">
                             <input
@@ -911,7 +936,7 @@ export default function PurchasingPage() {
                             )}
                           </div>
                         </div>
-                        <div className="col-span-4 border-r border-slate-200 p-2">
+                        <div className="col-span-3 border-r border-slate-200 p-2">
                           <textarea
                             placeholder="Description"
                             value={line.description}

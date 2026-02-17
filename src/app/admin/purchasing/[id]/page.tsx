@@ -81,6 +81,7 @@ export default function ViewPO() {
   const [categories, setCategories] = useState<any[]>([]);
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
   const [creatingProduct, setCreatingProduct] = useState(false);
+  const [draggedLineId, setDraggedLineId] = useState<string | null>(null);
   const [newProductForm, setNewProductForm] = useState({
     item_no: "",
     description: "",
@@ -415,6 +416,41 @@ export default function ViewPO() {
     }
   };
 
+  const handleReorderLineItems = async (fromId: string, toId: string) => {
+    if (!po?.id || fromId === toId) return;
+
+    try {
+      const updatedLines = [...po.lines];
+      const fromIndex = updatedLines.findIndex(l => l.id === fromId);
+      const toIndex = updatedLines.findIndex(l => l.id === toId);
+
+      if (fromIndex < 0 || toIndex < 0) return;
+
+      const [removed] = updatedLines.splice(fromIndex, 1);
+      updatedLines.splice(toIndex, 0, removed);
+
+      const newTotal = updatedLines.reduce((sum, line) => sum + line.line_total, 0);
+
+      const res = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: updatedLines,
+          total_amount: newTotal,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to reorder line items");
+
+      const result = await res.json();
+      setPO(result.data);
+      setDraggedLineId(null);
+    } catch (error) {
+      console.error("Error reordering line items:", error);
+      setDraggedLineId(null);
+    }
+  };
+
   const containerMaxLbs = 44000;
   const totalWeightLbs = (po?.lines || []).reduce((sum, line) => {
     const weightEach = Number(line.weight_lbs) || 0;
@@ -738,6 +774,9 @@ export default function ViewPO() {
             <table className="w-full border-collapse border border-gray-400 text-[9px]">
               <thead>
                 <tr className="bg-gray-100">
+                  <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-6">
+                    ⋮
+                  </th>
                   <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-8">
                     n#
                   </th>
@@ -761,7 +800,24 @@ export default function ViewPO() {
               </thead>
               <tbody>
                 {po.lines.map((line, index) => (
-                  <tr key={line.id} className={`border-b border-gray-300 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                  <tr
+                    key={line.id}
+                    draggable
+                    onDragStart={() => setDraggedLineId(line.id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      if (draggedLineId && draggedLineId !== line.id) {
+                        handleReorderLineItems(draggedLineId, line.id);
+                      }
+                    }}
+                    onDragEnd={() => setDraggedLineId(null)}
+                    className={`border-b border-gray-300 cursor-move ${
+                      draggedLineId === line.id ? 'bg-blue-100 opacity-70' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                    }`}
+                  >
+                    <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-400 hover:text-slate-600 align-top select-none">
+                      ⋮
+                    </td>
                     <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-700 align-top">
                       {index + 1}
                     </td>
