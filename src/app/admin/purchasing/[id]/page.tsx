@@ -529,6 +529,19 @@ export default function ViewPO() {
     lineItemForm.sku && priceList.some((item) => (item.sku || item.item_no)?.toLowerCase() === lineItemForm.sku.toLowerCase())
   );
 
+  const handlePrint = () => {
+    if (!po) return;
+    const originalTitle = document.title;
+    const supplierName = po.vendor_name || "Purchase Order";
+    const poNumber = po.po_number || "";
+    document.title = `${supplierName} PO# ${poNumber}`;
+    
+    setTimeout(() => {
+      window.print();
+      document.title = originalTitle;
+    }, 100);
+  };
+
   const openCreateProductModal = () => {
     setNewProductForm((prev) => ({
       ...prev,
@@ -635,7 +648,7 @@ export default function ViewPO() {
               Send Email
             </button>
             <button
-              onClick={() => window.print()}
+              onClick={handlePrint}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
             >
               Print
