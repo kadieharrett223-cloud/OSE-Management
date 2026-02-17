@@ -1599,7 +1599,7 @@ export default function ViewPO() {
                     onChange={(e) => {
                       const sku = e.target.value;
                       setLineItemForm({ ...lineItemForm, sku });
-                      // Auto-fill from price list when exact match
+                      // Auto-fill from price list ONLY when exact match found
                       const found = priceList.find(item => (item.sku || item.item_no)?.toLowerCase() === sku.toLowerCase());
                       if (found) {
                         const isNote = (found.item_no || "").toLowerCase() === "note";
@@ -1613,6 +1613,7 @@ export default function ViewPO() {
                       }
                     }}
                     className="w-full border border-slate-300 px-2 py-1 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    autoFocus
                     required
                   />
                   <datalist id="sku-list-edit">
