@@ -1674,7 +1674,7 @@ export default function ViewPO() {
                         }));
                       }
                     }}
-                    className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent text-slate-900"
+                    className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white text-slate-900"
                     required
                   />
                   <datalist id="sku-list-edit">
@@ -1698,7 +1698,7 @@ export default function ViewPO() {
                     placeholder="Description"
                     value={lineItemForm.description}
                     onChange={(e) => setLineItemForm({ ...lineItemForm, description: e.target.value })}
-                    className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent text-slate-900"
+                    className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white text-slate-900"
                     required
                   />
                 </div>
@@ -1708,7 +1708,7 @@ export default function ViewPO() {
                     step="1"
                     value={lineItemForm.quantity}
                     onChange={(e) => setLineItemForm({ ...lineItemForm, quantity: Number(e.target.value) })}
-                    className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent text-slate-900"
+                    className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white text-slate-900"
                     required
                   />
                 </div>
@@ -1718,7 +1718,7 @@ export default function ViewPO() {
                     step="0.01"
                     value={lineItemForm.unit_price}
                     onChange={(e) => setLineItemForm({ ...lineItemForm, unit_price: Number(e.target.value) })}
-                    className="w-full border-0 px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent text-slate-900"
+                    className="w-full border-0 px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white text-slate-900"
                     required
                   />
                 </div>
