@@ -182,6 +182,7 @@ export default function AdminPriceListPage() {
     version_tag: "v1",
     item_no: "",
     description: "",
+    supplier: "",
     category_id: "",
     fob_cost: null,
     quantity: null,
@@ -290,6 +291,7 @@ export default function AdminPriceListPage() {
         .update({
           item_no: editingItem.item_no,
           description: editingItem.description,
+          supplier: editingItem.supplier,
           fob_cost: editingItem.fob_cost,
           quantity: editingItem.quantity,
           ocean_frt: editingItem.ocean_frt,
@@ -399,6 +401,7 @@ export default function AdminPriceListPage() {
           version_tag: newProduct.version_tag || "v1",
           item_no: newProduct.item_no,
           description: newProduct.description || null,
+          supplier: newProduct.supplier || null,
           category_id: newProduct.category_id,
           fob_cost: newProduct.fob_cost,
           quantity: newProduct.quantity,
@@ -418,6 +421,7 @@ export default function AdminPriceListPage() {
         version_tag: "v1",
         item_no: "",
         description: "",
+        supplier: "",
         category_id: "",
         fob_cost: null,
         quantity: null,
@@ -855,9 +859,18 @@ export default function AdminPriceListPage() {
                                 )}
                               </td>
 
-                              {/* Supplier */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                <span className="text-slate-600 text-xs">{item.supplier || "—"}</span>
+                              {/* Supplier (INPUT) */}
+                              <td className="px-2 py-1.5 text-left">
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    value={displayItem.supplier || ""}
+                                    onChange={(e) => setEditingItem((prev) => prev ? ({ ...prev, supplier: e.target.value || null }) : prev)}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-xs font-medium text-slate-700 bg-white"
+                                  />
+                                ) : (
+                                  <span className="text-slate-600 text-xs">{item.supplier || "—"}</span>
+                                )}
                               </td>
 
                               {/* FOB Cost (INPUT) */}
@@ -1195,6 +1208,18 @@ export default function AdminPriceListPage() {
                   value={newProduct.description || ""}
                   onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
                   placeholder="Product description"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                />
+              </div>
+
+              {/* Supplier */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Supplier</label>
+                <input
+                  type="text"
+                  value={newProduct.supplier || ""}
+                  onChange={(e) => setNewProduct({ ...newProduct, supplier: e.target.value })}
+                  placeholder="e.g., HK, YZ, Hiker, Yizhan"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                 />
               </div>
