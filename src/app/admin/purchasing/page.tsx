@@ -500,10 +500,26 @@ export default function PurchasingPage() {
         updated[index].description = item.description || "";
         updated[index].unit_price = item.fob_cost || 0;
         updated[index].weight_lbs = item.weight_lbs || 0;
+        setFormData({ ...formData, lines: updated });
+      } else {
+        // If not found in cache, fetch fresh price list to get latest data
+        fetch("/api/price-list?_=" + Date.now(), { cache: "no-store" })
+          .then((res) => res.json())
+          .then((data) => {
+            const freshItem = data.find((p: any) => p.sku === value);
+            if (freshItem) {
+              const freshUpdated = [...formData.lines];
+              freshUpdated[index].description = freshItem.description || "";
+              freshUpdated[index].unit_price = freshItem.fob_cost || 0;
+              freshUpdated[index].weight_lbs = freshItem.weight_lbs || 0;
+              setFormData({ ...formData, lines: freshUpdated });
+            }
+          })
+          .catch((err) => console.error("Failed to fetch fresh product data:", err));
       }
+    } else {
+      setFormData({ ...formData, lines: updated });
     }
-
-    setFormData({ ...formData, lines: updated });
   }
 
   const totalPaid = (po: PurchaseOrder) =>
