@@ -854,25 +854,25 @@ export default function ViewPO() {
           </table>
 
           {/* Line Items Table */}
-          <div className="mb-2 flex items-center gap-2 print:hidden">
+          <div className="mb-2 flex flex-col sm:flex-row items-center gap-2 print:hidden">
             {!editingLineItems ? (
               <>
                 <button
                   onClick={() => openLineItemModal()}
-                  className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700"
+                  className="w-full sm:w-auto rounded-lg bg-green-600 px-3 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold text-white hover:bg-green-700"
                 >
                   + Add Line Item
                 </button>
                 <button
                   onClick={handleSaveAllLineItems}
                   disabled={savingLineItem}
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="w-full sm:w-auto rounded-lg bg-blue-600 px-3 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                   {savingLineItem ? "Saving..." : "Save"}
                 </button>
                 <button
                   onClick={startInlineEditingLineItems}
-                  className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700"
+                  className="w-full sm:w-auto rounded-lg bg-purple-600 px-3 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold text-white hover:bg-purple-700"
                 >
                   Edit Line Items
                 </button>
@@ -882,14 +882,14 @@ export default function ViewPO() {
                 <button
                   onClick={saveTempLineItems}
                   disabled={savingLineItem}
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  className="w-full sm:w-auto rounded-lg bg-emerald-600 px-3 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {savingLineItem ? "Saving..." : "Save Changes"}
                 </button>
                 <button
                   onClick={cancelInlineEditingLineItems}
                   disabled={savingLineItem}
-                  className="rounded-lg bg-slate-400 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-500 disabled:opacity-50"
+                  className="w-full sm:w-auto rounded-lg bg-slate-400 px-3 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold text-white hover:bg-slate-500 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1454,8 +1454,8 @@ export default function ViewPO() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-4 sm:p-6 shadow-lg">
             <h2 className="text-xl font-bold text-slate-900 mb-2">Delete Purchase Order?</h2>
             <p className="text-slate-600 mb-6">
               Are you sure you want to delete PO #{po?.po_number}? This action cannot be undone.
@@ -1484,8 +1484,8 @@ export default function ViewPO() {
 
       {/* Edit PO Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md max-h-96 overflow-y-auto rounded-lg bg-white p-6 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+          <div className="w-full max-w-sm sm:max-w-md rounded-lg bg-white p-4 sm:p-6 shadow-lg max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-slate-900 mb-4">Edit Purchase Order</h2>
             <div className="space-y-3">
               <div>
@@ -1576,8 +1576,8 @@ export default function ViewPO() {
 
       {/* Line Item Modal */}
       {showLineItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+          <div className="w-full max-w-sm sm:max-w-2xl rounded-lg bg-white p-4 sm:p-6 shadow-lg max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-slate-900 mb-4">
               {editingLineItem ? "Edit Line Item" : "Add Line Item"}
             </h2>
@@ -1691,10 +1691,10 @@ export default function ViewPO() {
       )}
 
       {showCreateProductModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+          <div className="w-full max-w-sm sm:max-w-xl rounded-lg bg-white p-4 sm:p-6 shadow-lg max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-slate-900 mb-4">Create New Product</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               <div className="col-span-1">
                 <label className="block text-sm font-semibold text-slate-700 mb-1">SKU *</label>
                 <input
