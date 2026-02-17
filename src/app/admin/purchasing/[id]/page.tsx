@@ -441,6 +441,43 @@ export default function ViewPO() {
     }
   };
 
+  const handleMoveLineItem = async (index: number, direction: 'up' | 'down') => {
+    if (!po?.id) return;
+    
+    try {
+      const updatedLines = [...po.lines];
+      
+      if (direction === 'up' && index > 0) {
+        // Swap with previous
+        [updatedLines[index - 1], updatedLines[index]] = [updatedLines[index], updatedLines[index - 1]];
+      } else if (direction === 'down' && index < updatedLines.length - 1) {
+        // Swap with next
+        [updatedLines[index], updatedLines[index + 1]] = [updatedLines[index + 1], updatedLines[index]];
+      } else {
+        return; // Can't move in that direction
+      }
+
+      const newTotal = updatedLines.reduce((sum, line) => sum + line.line_total, 0);
+
+      const res = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lines: updatedLines,
+          total_amount: newTotal,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to move line item");
+
+      const result = await res.json();
+      setPO(result.data);
+    } catch (error) {
+      console.error("Error moving line item:", error);
+      alert("Failed to move line item");
+    }
+  };
+
   const handleReorderLineItems = async (fromId: string, toId: string) => {
     if (!po?.id || fromId === toId) return;
 
@@ -902,8 +939,8 @@ export default function ViewPO() {
               <table className="w-full border-collapse border border-gray-400 text-[9px]">
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-6">
-                      ⋮
+                    <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-12">
+                      Move
                     </th>
                     <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-8">
                       n#
@@ -930,21 +967,27 @@ export default function ViewPO() {
                   {po.lines.map((line, index) => (
                     <tr
                       key={line.id}
-                      draggable
-                      onDragStart={() => setDraggedLineId(line.id)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => {
-                        if (draggedLineId && draggedLineId !== line.id) {
-                          handleReorderLineItems(draggedLineId, line.id);
-                        }
-                      }}
-                      onDragEnd={() => setDraggedLineId(null)}
-                      className={`border-b border-gray-300 cursor-move ${
-                        draggedLineId === line.id ? 'bg-blue-100 opacity-70' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                      }`}
+                      className={`border-b border-gray-300 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     >
-                      <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-400 hover:text-slate-600 align-top select-none">
-                        ⋮
+                      <td className="border-r border-gray-300 px-2 py-1.5 text-center align-top">
+                        <div className="flex flex-col gap-1 justify-center items-center">
+                          <button
+                            onClick={() => handleMoveLineItem(index, 'up')}
+                            disabled={index === 0}
+                            className="text-slate-600 hover:text-slate-900 disabled:text-slate-300 disabled:cursor-not-allowed font-bold text-lg leading-none"
+                            title="Move up"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={() => handleMoveLineItem(index, 'down')}
+                            disabled={index === po.lines.length - 1}
+                            className="text-slate-600 hover:text-slate-900 disabled:text-slate-300 disabled:cursor-not-allowed font-bold text-lg leading-none"
+                            title="Move down"
+                          >
+                            ↓
+                          </button>
+                        </div>
                       </td>
                       <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-700 align-top">
                         {index + 1}
@@ -1009,7 +1052,7 @@ export default function ViewPO() {
               /* INLINE EDITING VIEW */
               <div className="border border-slate-300 rounded bg-white">
                 <div className="grid grid-cols-12 gap-0 bg-slate-100 border-b border-slate-300">
-                  <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">⋮</div>
+                  <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">Move</div>
                   <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">SKU</div>
                   <div className="col-span-3 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
                   <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">QTY</div>
@@ -1020,21 +1063,40 @@ export default function ViewPO() {
                 {tempLines.map((line, index) => (
                   <div
                     key={line.id || index}
-                    draggable
-                    onDragStart={() => setDraggedLineIndex(index)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => {
-                      if (draggedLineIndex !== null && draggedLineIndex !== index) {
-                        reorderTempLine(draggedLineIndex, index);
-                        setDraggedLineIndex(null);
-                      }
-                    }}
-                    onDragEnd={() => setDraggedLineIndex(null)}
-                    className={`grid grid-cols-12 gap-0 border-b border-slate-200 ${
-                      draggedLineIndex === index ? 'bg-blue-100 opacity-70' : 'hover:bg-slate-50'
-                    } cursor-move`}
+                    className="grid grid-cols-12 gap-0 border-b border-slate-200 hover:bg-slate-50"
                   >
-                    <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center text-slate-400 hover:text-slate-600">⋮</div>
+                    <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center">
+                      <div className="flex flex-col gap-1 justify-center items-center">
+                        <button
+                          onClick={() => {
+                            if (index > 0) {
+                              const updated = [...tempLines];
+                              [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+                              setTempLines(updated);
+                            }
+                          }}
+                          disabled={index === 0}
+                          className="text-slate-600 hover:text-slate-900 disabled:text-slate-300 disabled:cursor-not-allowed font-bold text-lg leading-none"
+                          title="Move up"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (index < tempLines.length - 1) {
+                              const updated = [...tempLines];
+                              [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+                              setTempLines(updated);
+                            }
+                          }}
+                          disabled={index === tempLines.length - 1}
+                          className="text-slate-600 hover:text-slate-900 disabled:text-slate-300 disabled:cursor-not-allowed font-bold text-lg leading-none"
+                          title="Move down"
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </div>
                     <div className="col-span-2 border-r border-slate-200 p-2">
                       <input
                         type="text"
