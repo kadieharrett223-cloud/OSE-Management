@@ -41,6 +41,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     const { lines, ...poData } = body;
 
+    // Convert empty date strings to null
+    if (poData.expected_delivery === "") {
+      poData.expected_delivery = null;
+    }
+
     // Update PO fields
     const { data, error } = await supabase
       .from("purchase_orders")
