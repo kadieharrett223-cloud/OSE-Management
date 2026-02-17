@@ -82,6 +82,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           unit_price: line.unit_price,
           line_total: line.line_total,
           weight_lbs: line.weight_lbs || null,
+          note: line.note || null,
         };
         console.log("Inserting line:", insertData);
         const { error: insertError } = await supabase
