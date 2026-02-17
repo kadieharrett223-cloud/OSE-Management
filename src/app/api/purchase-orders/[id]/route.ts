@@ -60,71 +60,37 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (lines && Array.isArray(lines)) {
       console.log("Processing lines:", lines);
       
-      // Get existing line IDs
-      const { data: existingLines } = await supabase
+      // Delete all existing lines for this PO (we'll re-insert with fresh line numbers)
+      const { error: deleteError } = await supabase
         .from("purchase_order_lines")
-        .select("id")
+        .delete()
         .eq("purchase_order_id", params.id);
-
-      const existingIds = new Set(existingLines?.map(l => l.id) || []);
-      const newIds = new Set(lines.filter(l => !l.id.startsWith("new_")).map(l => l.id));
-
-      // Delete line items that are no longer present
-      const toDelete = Array.from(existingIds).filter(id => !newIds.has(id));
-      if (toDelete.length > 0) {
-        console.log("Deleting lines:", toDelete);
-        const { error: deleteError } = await supabase
-          .from("purchase_order_lines")
-          .delete()
-          .in("id", toDelete);
-        if (deleteError) {
-          console.error("Error deleting lines:", deleteError);
-          throw deleteError;
-        }
+      
+      if (deleteError) {
+        console.error("Error deleting existing lines:", deleteError);
+        throw deleteError;
       }
 
-      // Upsert line items
+      // Insert all lines (both new and existing) with fresh line numbers
       for (const [index, line] of lines.entries()) {
-        if (line.id.startsWith("new_")) {
-          // Insert new line
-          const insertData = {
-            purchase_order_id: params.id,
-            line_number: index + 1,
-            sku: line.sku || null,
-            description: line.description,
-            quantity: line.quantity,
-            unit_price: line.unit_price,
-            line_total: line.line_total,
-            weight_lbs: line.weight_lbs || null,
-          };
-          console.log("Inserting new line:", insertData);
-          const { error: insertError } = await supabase
-            .from("purchase_order_lines")
-            .insert(insertData);
-          if (insertError) {
-            console.error("Error inserting new line:", insertError);
-            throw insertError;
-          }
-        } else {
-          // Update existing line
-          const updateData = {
-            line_number: index + 1,
-            sku: line.sku || null,
-            description: line.description,
-            quantity: line.quantity,
-            unit_price: line.unit_price,
-            line_total: line.line_total,
-            weight_lbs: line.weight_lbs || null,
-          };
-          console.log("Updating line:", line.id, updateData);
-          const { error: updateError } = await supabase
-            .from("purchase_order_lines")
-            .update(updateData)
-            .eq("id", line.id);
-          if (updateError) {
-            console.error("Error updating line:", updateError, "Line ID:", line.id);
-            throw updateError;
-          }
+        const insertData = {
+          purchase_order_id: params.id,
+          line_number: index + 1,
+          sku: line.sku || null,
+          description: line.description,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          line_total: line.line_total,
+          weight_lbs: line.weight_lbs || null,
+        };
+        console.log("Inserting line:", insertData);
+        const { error: insertError } = await supabase
+          .from("purchase_order_lines")
+          .insert(insertData);
+        
+        if (insertError) {
+          console.error("Error inserting line:", insertError, insertData);
+          throw insertError;
         }
       }
     }
