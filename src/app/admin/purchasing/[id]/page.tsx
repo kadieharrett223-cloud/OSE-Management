@@ -57,6 +57,7 @@ export default function ViewPO() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPO, setEditingPO] = useState(false);
   const [editForm, setEditForm] = useState({
+    po_number: "",
     vendor_name: "",
     vendor_contact_name: "",
     vendor_email: "",
@@ -108,6 +109,7 @@ export default function ViewPO() {
             setPO(result.data);
             setPoNotes(result.data.notes || "");
             setEditForm({
+              po_number: result.data.po_number || "",
               vendor_name: result.data.vendor_name || "",
               vendor_contact_name: result.data.vendor_contact_name || "",
               vendor_email: result.data.vendor_email || "",
@@ -1466,6 +1468,15 @@ export default function ViewPO() {
           <div className="w-full max-w-md max-h-96 overflow-y-auto rounded-lg bg-white p-6 shadow-lg">
             <h2 className="text-xl font-bold text-slate-900 mb-4">Edit Purchase Order</h2>
             <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">PO Number</label>
+                <input
+                  type="text"
+                  value={editForm.po_number}
+                  onChange={(e) => setEditForm({ ...editForm, po_number: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Vendor Name</label>
                 <input
