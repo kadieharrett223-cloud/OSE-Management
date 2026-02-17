@@ -33,7 +33,6 @@ interface PurchaseOrder {
     unit_price: number;
     line_total: number;
     weight_lbs?: number;
-    note?: string;
   }>;
 }
 
@@ -74,7 +73,6 @@ export default function ViewPO() {
     quantity: 0,
     unit_price: 0,
     weight_lbs: 0,
-    note: "",
   });
   const [savingLineItem, setSavingLineItem] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -258,7 +256,6 @@ export default function ViewPO() {
         quantity: line.quantity || 0,
         unit_price: line.unit_price || 0,
         weight_lbs: line.weight_lbs || 0,
-        note: line.note || "",
       });
     } else {
       setEditingLineItem(null);
@@ -268,7 +265,6 @@ export default function ViewPO() {
         quantity: 0,
         unit_price: 0,
         weight_lbs: 0,
-        note: "",
       });
     }
     setShowLineItemModal(true);
@@ -308,7 +304,6 @@ export default function ViewPO() {
       quantity: lineItemForm.quantity || 1,
       unit_price: product.fob_port_cost || product.cost_with_shipping || 0,
       weight_lbs: lineItemForm.weight_lbs || 0,
-      note: lineItemForm.note || "",
     });
     setShowSearchResults(false);
     setSearchResults([]);
@@ -1014,91 +1009,80 @@ export default function ViewPO() {
                   <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right">Amount</div>
                 </div>
                 {tempLines.map((line, index) => (
-                  <div key={line.id || index}>
-                    <div
-                      draggable
-                      onDragStart={() => setDraggedLineIndex(index)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => {
-                        if (draggedLineIndex !== null && draggedLineIndex !== index) {
-                          reorderTempLine(draggedLineIndex, index);
-                          setDraggedLineIndex(null);
-                        }
-                      }}
-                      onDragEnd={() => setDraggedLineIndex(null)}
-                      className={`grid grid-cols-12 gap-0 border-b border-slate-200 ${
-                        draggedLineIndex === index ? 'bg-blue-100 opacity-70' : 'hover:bg-slate-50'
-                      } cursor-move`}
-                    >
-                      <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center text-slate-400 hover:text-slate-600">⋮</div>
-                      <div className="col-span-2 border-r border-slate-200 p-2">
-                        <input
-                          type="text"
-                          placeholder="SKU"
-                          value={line.sku || ""}
-                          onChange={(e) => updateTempLine(index, "sku", e.target.value)}
-                          className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                        />
-                      </div>
-                      <div className="col-span-3 border-r border-slate-200 p-2">
-                        <textarea
-                          placeholder="Description"
-                          value={line.description || ""}
-                          onChange={(e) => updateTempLine(index, "description", e.target.value)}
-                          className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none"
-                          rows={2}
-                        />
-                      </div>
-                      <div className="col-span-1 border-r border-slate-200 p-2">
-                        <input
-                          type="number"
-                          step="1"
-                          value={line.quantity || ""}
-                          onChange={(e) => updateTempLine(index, "quantity", Number(e.target.value) || 0)}
-                          className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white text-center focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                        />
-                      </div>
-                      <div className="col-span-1 border-r border-slate-200 p-2">
-                        <input
-                          type="number"
-                          step="1"
-                          value={line.weight_lbs || ""}
-                          onChange={(e) => updateTempLine(index, "weight_lbs", Number(e.target.value) || 0)}
-                          placeholder="lbs"
-                          className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white text-center focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                        />
-                      </div>
-                      <div className="col-span-2 border-r border-slate-200 p-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={line.unit_price || ""}
-                          onChange={(e) => updateTempLine(index, "unit_price", Number(e.target.value) || 0)}
-                          className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white text-right focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                        />
-                      </div>
-                      <div className="col-span-2 p-2 flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-900">
-                          ${((line.quantity || 0) * (line.unit_price || 0)).toFixed(2)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeTempLine(index)}
-                          className="ml-2 text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-xl px-2 py-0 rounded"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                    <div className="col-span-12 border-b border-slate-200 p-2 bg-slate-50 border-r border-slate-200">
-                      <label className="text-xs font-semibold text-slate-600">Note:</label>
+                  <div
+                    key={line.id || index}
+                    draggable
+                    onDragStart={() => setDraggedLineIndex(index)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      if (draggedLineIndex !== null && draggedLineIndex !== index) {
+                        reorderTempLine(draggedLineIndex, index);
+                        setDraggedLineIndex(null);
+                      }
+                    }}
+                    onDragEnd={() => setDraggedLineIndex(null)}
+                    className={`grid grid-cols-12 gap-0 border-b border-slate-200 ${
+                      draggedLineIndex === index ? 'bg-blue-100 opacity-70' : 'hover:bg-slate-50'
+                    } cursor-move`}
+                  >
+                    <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center text-slate-400 hover:text-slate-600">⋮</div>
+                    <div className="col-span-2 border-r border-slate-200 p-2">
                       <input
                         type="text"
-                        placeholder="Add note for this line item (optional)"
-                        value={line.note || ""}
-                        onChange={(e) => updateTempLine(index, "note", e.target.value)}
+                        placeholder="SKU"
+                        value={line.sku || ""}
+                        onChange={(e) => updateTempLine(index, "sku", e.target.value)}
                         className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                       />
+                    </div>
+                    <div className="col-span-3 border-r border-slate-200 p-2">
+                      <textarea
+                        placeholder="Description"
+                        value={line.description || ""}
+                        onChange={(e) => updateTempLine(index, "description", e.target.value)}
+                        className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none"
+                        rows={2}
+                      />
+                    </div>
+                    <div className="col-span-1 border-r border-slate-200 p-2">
+                      <input
+                        type="number"
+                        step="1"
+                        value={line.quantity || ""}
+                        onChange={(e) => updateTempLine(index, "quantity", Number(e.target.value) || 0)}
+                        className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white text-center focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-1 border-r border-slate-200 p-2">
+                      <input
+                        type="number"
+                        step="1"
+                        value={line.weight_lbs || ""}
+                        onChange={(e) => updateTempLine(index, "weight_lbs", Number(e.target.value) || 0)}
+                        placeholder="lbs"
+                        className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white text-center focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2 border-r border-slate-200 p-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={line.unit_price || ""}
+                        onChange={(e) => updateTempLine(index, "unit_price", Number(e.target.value) || 0)}
+                        className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white text-right focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2 p-2 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-900">
+                        ${((line.quantity || 0) * (line.unit_price || 0)).toFixed(2)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeTempLine(index)}
+                        className="ml-2 text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-xl px-2 py-0 rounded"
+                      >
+                        ×
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1671,16 +1655,6 @@ export default function ViewPO() {
                   </span>
                 </div>
               </div>
-            </div>
-            <div className="mt-4">
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Note (Optional)</label>
-              <textarea
-                placeholder="Add any notes for this line item"
-                value={lineItemForm.note}
-                onChange={(e) => setLineItemForm({ ...lineItemForm, note: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none"
-                rows={2}
-              />
             </div>
             <div className="flex gap-3 mt-6">
               <button
