@@ -27,6 +27,9 @@ BEGIN
   -- 5) Sell price = (Cost * Multiplier) + Shipping
   NEW.sell_price := (NEW.per_unit * COALESCE(NEW.multiplier, 1)) + COALESCE(NEW.zone5_shipping, 0);
 
+  -- 5.5) Profit = sell_price - final_cost
+  NEW.profit := NEW.sell_price - NEW.cost_with_shipping;
+
   -- 6) Rounded normal price = floor(sell_price / 5) * 5
   NEW.rounded_normal_price := FLOOR(NEW.sell_price / 5) * 5;
 
