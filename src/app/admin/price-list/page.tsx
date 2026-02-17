@@ -175,6 +175,8 @@ export default function AdminPriceListPage() {
   const [showGuide, setShowGuide] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [showGroupFilters, setShowGroupFilters] = useState(false);
+  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [showSupplierFilters, setShowSupplierFilters] = useState(false);
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -453,15 +455,23 @@ export default function AdminPriceListPage() {
     }
   };
 
-  // Filter items by search query
+  // Filter items by search query and supplier
   const filteredItems = items.filter((item) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      item.item_no.toLowerCase().includes(query) ||
-      (item.description?.toLowerCase() || "").includes(query)
+    const matchesSearch = !searchQuery || (
+      item.item_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.description?.toLowerCase() || "").includes(searchQuery.toLowerCase())
     );
+    
+    const matchesSupplier = selectedSuppliers.length === 0 || 
+      (item.supplier && selectedSuppliers.includes(item.supplier));
+    
+    return matchesSearch && matchesSupplier;
   });
+
+  // Get unique suppliers for filter dropdown
+  const uniqueSuppliers = Array.from(
+    new Set(items.filter((item) => item.supplier).map((item) => item.supplier!))
+  ).sort();
 
   // Group items by category, apply calculations, sort items by sell price within each group
   const itemsByCategory = [...categories]
@@ -649,6 +659,59 @@ export default function AdminPriceListPage() {
                             }`}
                           >
                             {cat.category_name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowSupplierFilters((prev) => !prev)}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-100"
+                  >
+                    Filter suppliers
+                    <span className="text-[10px] text-slate-500">{showSupplierFilters ? "▲" : "▼"}</span>
+                  </button>
+                  {selectedSuppliers.length > 0 && (
+                    <span className="ml-2 text-xs text-slate-500">{selectedSuppliers.length} supplier(s) selected.</span>
+                  )}
+
+                  {showSupplierFilters && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSuppliers([])}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                          selectedSuppliers.length === 0
+                            ? "border-blue-500 bg-blue-600 text-white"
+                            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        All suppliers
+                      </button>
+                      {uniqueSuppliers.map((supplier) => {
+                        const isSelected = selectedSuppliers.includes(supplier);
+                        return (
+                          <button
+                            key={supplier}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSuppliers((prev) =>
+                                isSelected
+                                  ? prev.filter((name) => name !== supplier)
+                                  : [...prev, supplier]
+                              );
+                            }}
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                              isSelected
+                                ? "border-blue-500 bg-blue-600 text-white"
+                                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                            }`}
+                          >
+                            {supplier}
                           </button>
                         );
                       })}
