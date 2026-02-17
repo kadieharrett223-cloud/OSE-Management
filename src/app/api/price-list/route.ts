@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   const supabase = getServerSupabaseClient();
 
@@ -31,7 +34,9 @@ export async function GET(req: NextRequest) {
       shopify_variant_id: item.shopify_variant_id || null,
     }));
 
-    return NextResponse.json(items);
+    const response = NextResponse.json(items);
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    return response;
   } catch (error: any) {
     console.error("Fetch price list error:", error);
     return NextResponse.json({ error: error.message || "Failed to fetch" }, { status: 500 });

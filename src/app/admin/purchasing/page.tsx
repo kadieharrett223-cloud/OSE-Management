@@ -211,7 +211,9 @@ export default function PurchasingPage() {
 
   async function fetchPriceList() {
     try {
-      const res = await fetch("/api/price-list");
+      const res = await fetch("/api/price-list?_=" + Date.now(), { 
+        cache: "no-store"
+      });
       if (!res.ok) {
         console.error("Price list fetch failed with status:", res.status);
         return;

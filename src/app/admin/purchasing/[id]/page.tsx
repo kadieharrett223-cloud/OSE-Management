@@ -126,7 +126,9 @@ export default function ViewPO() {
 
   // Load price list for autocomplete
   useEffect(() => {
-    fetch("/api/price-list")
+    fetch("/api/price-list?_=" + Date.now(), {
+      cache: "no-store"
+    })
       .then((res) => res.json())
       .then((data) => {
         // API returns array directly, or wrapped in object
