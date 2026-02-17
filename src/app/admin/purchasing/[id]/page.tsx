@@ -1480,7 +1480,7 @@ export default function ViewPO() {
                   type="text"
                   value={editForm.po_number}
                   onChange={(e) => setEditForm({ ...editForm, po_number: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                 />
               </div>
               <div>
@@ -1489,7 +1489,7 @@ export default function ViewPO() {
                   type="text"
                   value={editForm.vendor_name}
                   onChange={(e) => setEditForm({ ...editForm, vendor_name: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                 />
               </div>
               <div>
@@ -1498,7 +1498,7 @@ export default function ViewPO() {
                   type="text"
                   value={editForm.vendor_contact_name}
                   onChange={(e) => setEditForm({ ...editForm, vendor_contact_name: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                 />
               </div>
               <div>
@@ -1507,7 +1507,7 @@ export default function ViewPO() {
                   type="email"
                   value={editForm.vendor_email}
                   onChange={(e) => setEditForm({ ...editForm, vendor_email: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                 />
               </div>
               <div>
@@ -1516,7 +1516,7 @@ export default function ViewPO() {
                   type="tel"
                   value={editForm.vendor_phone}
                   onChange={(e) => setEditForm({ ...editForm, vendor_phone: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                 />
               </div>
               <div>
@@ -1525,7 +1525,7 @@ export default function ViewPO() {
                   type="text"
                   value={editForm.terms}
                   onChange={(e) => setEditForm({ ...editForm, terms: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                 />
               </div>
               <div>
@@ -1534,7 +1534,7 @@ export default function ViewPO() {
                   type="date"
                   value={editForm.expected_delivery}
                   onChange={(e) => setEditForm({ ...editForm, expected_delivery: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                 />
               </div>
             </div>
