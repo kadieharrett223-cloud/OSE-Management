@@ -899,7 +899,8 @@ export default function ViewPO() {
           <div className="mb-2">
             {!editingLineItems ? (
               /* NORMAL TABLE VIEW */
-              <table className="w-full border-collapse border border-gray-400 text-[9px]">
+              <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-400 text-[9px] sm:text-[10px]">
                 <thead>
                   <tr className="bg-gray-100">
                     <th className="border-r border-gray-400 px-2 py-1.5 text-center text-[8px] font-bold text-slate-900 uppercase tracking-wider w-6">
@@ -1005,9 +1006,10 @@ export default function ViewPO() {
                   </tr>
                 </tbody>
               </table>
+              </div>
             ) : (
               /* INLINE EDITING VIEW */
-              <div className="border border-slate-300 rounded bg-white">
+              <div className="border border-slate-300 rounded bg-white overflow-x-auto">
                 <div className="grid grid-cols-12 gap-0 bg-slate-100 border-b border-slate-300">
                   <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">⋮</div>
                   <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">SKU</div>
