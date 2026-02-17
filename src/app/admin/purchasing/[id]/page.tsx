@@ -215,10 +215,16 @@ export default function ViewPO() {
     
     setEditingPO(true);
     try {
+      // Convert empty date strings to null for database compatibility
+      const formData = {
+        ...editForm,
+        expected_delivery: editForm.expected_delivery || null,
+      };
+
       const res = await fetch(`/api/purchase-orders/${po.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(formData),
       });
 
       if (!res.ok) {
