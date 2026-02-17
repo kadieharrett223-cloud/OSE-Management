@@ -298,11 +298,12 @@ export default function ViewPO() {
   };
 
   const handleSelectProduct = (product: any) => {
+    const isNote = (product.item_no || "").toLowerCase() === "note";
     setLineItemForm({
       sku: product.item_no || "",
       description: product.description || "",
-      quantity: lineItemForm.quantity || 1,
-      unit_price: product.fob_port_cost || product.cost_with_shipping || 0,
+      quantity: isNote ? 0 : (lineItemForm.quantity || 1),
+      unit_price: isNote ? 0 : (product.fob_port_cost || product.cost_with_shipping || 0),
       weight_lbs: lineItemForm.weight_lbs || 0,
     });
     setShowSearchResults(false);
@@ -310,8 +311,16 @@ export default function ViewPO() {
   };
 
   const handleSaveLineItem = async () => {
-    if (!po?.id || !lineItemForm.description || lineItemForm.quantity <= 0 || lineItemForm.unit_price < 0) {
-      alert("Please fill in all required fields (Description, Quantity, Unit Price)");
+    const isNote = (lineItemForm.sku || "").toLowerCase() === "note";
+    
+    // Validate: description is always required, but price/qty only required for non-note items
+    if (!po?.id || !lineItemForm.description) {
+      alert("Please fill in description");
+      return;
+    }
+    
+    if (!isNote && (lineItemForm.quantity <= 0 || lineItemForm.unit_price < 0)) {
+      alert("Please fill in Quantity and Unit Price (required for product items)");
       return;
     }
 
@@ -1593,11 +1602,13 @@ export default function ViewPO() {
                       // Auto-fill from price list when exact match
                       const found = priceList.find(item => (item.sku || item.item_no)?.toLowerCase() === sku.toLowerCase());
                       if (found) {
+                        const isNote = (found.item_no || "").toLowerCase() === "note";
                         setLineItemForm(prev => ({
                           ...prev,
                           sku: found.sku || found.item_no || "",
                           description: found.description || "",
-                          unit_price: found.fob_cost || found.cost_with_shipping || 0,
+                          unit_price: isNote ? 0 : (found.fob_cost || found.cost_with_shipping || 0),
+                          quantity: isNote ? 0 : prev.quantity,
                         }));
                       }
                     }}
@@ -1609,7 +1620,7 @@ export default function ViewPO() {
                       <option key={item.id} value={item.sku || item.item_no || ""}>{item.description}</option>
                     ))}
                   </datalist>
-                  {!skuExists && lineItemForm.sku && (
+                  {!priceList.find(item => (item.sku || item.item_no || "").toLowerCase() === lineItemForm.sku.toLowerCase()) && lineItemForm.sku && (
                     <button
                       type="button"
                       onClick={openCreateProductModal}
@@ -1668,7 +1679,7 @@ export default function ViewPO() {
               <button
                 type="button"
                 onClick={handleSaveLineItem}
-                disabled={savingLineItem || !lineItemForm.sku || !lineItemForm.description || lineItemForm.quantity <= 0}
+                disabled={savingLineItem || !lineItemForm.description}
                 className="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
               >
                 {savingLineItem ? "Saving..." : "Save Item"}
