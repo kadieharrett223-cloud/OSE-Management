@@ -418,14 +418,17 @@ export default function ViewPO() {
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to delete line item");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to delete line item");
+      }
 
       const result = await res.json();
       setPO(result.data);
       alert("Line item deleted successfully");
     } catch (error) {
       console.error("Error deleting line item:", error);
-      alert("Failed to delete line item");
+      alert(`Failed to delete line item: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
