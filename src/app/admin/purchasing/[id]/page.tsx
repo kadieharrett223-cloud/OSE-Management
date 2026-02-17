@@ -1027,7 +1027,7 @@ export default function ViewPO() {
                         placeholder="SKU"
                         value={line.sku || ""}
                         onChange={(e) => updateTempLine(index, "sku", e.target.value)}
-                        className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                        className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
                       />
                     </div>
                     <div className="col-span-3 border-r border-slate-200 p-2">
@@ -1035,7 +1035,7 @@ export default function ViewPO() {
                         placeholder="Description"
                         value={line.description || ""}
                         onChange={(e) => updateTempLine(index, "description", e.target.value)}
-                        className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none bg-transparent"
+                        className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none"
                         rows={2}
                       />
                     </div>
@@ -1045,7 +1045,7 @@ export default function ViewPO() {
                         step="1"
                         value={line.quantity || ""}
                         onChange={(e) => updateTempLine(index, "quantity", Number(e.target.value) || 0)}
-                        className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                        className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white text-center focus:ring-1 focus:ring-blue-500 focus:outline-none"
                       />
                     </div>
                     <div className="col-span-1 border-r border-slate-200 p-2">
@@ -1055,7 +1055,7 @@ export default function ViewPO() {
                         value={line.weight_lbs || ""}
                         onChange={(e) => updateTempLine(index, "weight_lbs", Number(e.target.value) || 0)}
                         placeholder="lbs"
-                        className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                        className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white text-center focus:ring-1 focus:ring-blue-500 focus:outline-none"
                       />
                     </div>
                     <div className="col-span-2 border-r border-slate-200 p-2">
@@ -1064,7 +1064,7 @@ export default function ViewPO() {
                         step="0.01"
                         value={line.unit_price || ""}
                         onChange={(e) => updateTempLine(index, "unit_price", Number(e.target.value) || 0)}
-                        className="w-full border-0 px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                        className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white text-right focus:ring-1 focus:ring-blue-500 focus:outline-none"
                       />
                     </div>
                     <div className="col-span-2 p-2 flex items-center justify-between">
