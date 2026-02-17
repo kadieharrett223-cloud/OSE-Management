@@ -253,7 +253,7 @@ export default function PurchasingPage() {
       const res = await fetch("/api/price-list/categories");
       const data = await res.json();
       if (res.ok) {
-        setCategories(data.categories || []);
+        setCategories(data.items || []);
       }
     } catch (error) {
       console.error("Failed to fetch categories:", error);
