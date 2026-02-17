@@ -3,22 +3,25 @@ export type PricingInput = {
   description: string;
   supplier: string;
   fobCost: number;
-  oceanFrt: number;
-  importing: number;
-  zone5: number;
+  quantity: number; // Container capacity
+  shipping: number; // Zone 5 shipping
   multiplier: number;
-  quantity?: number;
+  listPrice?: number; // Optional manual list price
+  discount?: number; // % off list price (default 20)
 };
 
 export type PricingResult = PricingInput & {
-  tariff105: number;
-  perUnit: number;
-  costWithShipping: number;
+  tariff: number;
+  oceanPerUnit: number;
+  importingPerUnit: number;
+  costNoShipping: number;
+  finalCost: number;
   sellPrice: number;
-  roundedNormalPrice: number;
-  listPrice: number;
-  blackFridayPrice: number;
-  roundedSalePrice: number;
+  profit: number;
+  calculatedListPrice: number;
+  appliedListPrice: number; // Manual or calculated
+  discountPercent: number;
+  discountedPrice: number; // Final sale price
 };
 
 const FIELD_KEYS: Record<keyof PricingInput, string[]> = {
@@ -26,11 +29,11 @@ const FIELD_KEYS: Record<keyof PricingInput, string[]> = {
   description: ["description", "desc"],
   supplier: ["supplier", "vendor"],
   fobCost: ["fob cost", "fob", "cost"],
-  oceanFrt: ["ocean frt", "ocean", "ocean freight"],
-  importing: ["importing", "import"],
-  zone5: ["zone 5", "zone5", "zone"],
+  quantity: ["quantity", "qty", "container capacity"],
+  shipping: ["shipping", "zone 5", "zone5"],
   multiplier: ["multiplier", "mult", "markup"],
-  quantity: ["quantity", "qty"],
+  listPrice: ["list price", "manual list price", "suggested retail"],
+  discount: ["discount", "discount %", "discount percent"],
 };
 
 const normalizeNumber = (value: unknown): number => {
@@ -55,32 +58,47 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
     description: normalizeText(raw.description),
     supplier: normalizeText(raw.supplier),
     fobCost: normalizeNumber(raw.fobCost),
-    oceanFrt: normalizeNumber(raw.oceanFrt),
-    importing: normalizeNumber(raw.importing),
-    zone5: normalizeNumber(raw.zone5),
+    quantity: normalizeNumber(raw.quantity) || 1,
+    shipping: normalizeNumber(raw.shipping),
     multiplier: normalizeNumber(raw.multiplier) || 1,
-    quantity: raw.quantity !== undefined ? normalizeNumber(raw.quantity) : undefined,
+    listPrice: raw.listPrice !== undefined ? normalizeNumber(raw.listPrice) : undefined,
+    discount: raw.discount !== undefined ? normalizeNumber(raw.discount) : 20, // Default 20%
   };
 
-  const tariff105 = base.fobCost * 2;
-  const perUnit = tariff105 + base.oceanFrt + base.importing;
-  const costWithShipping = perUnit + base.zone5;
-  const sellPrice = costWithShipping * base.multiplier;
-  const roundedNormalPrice = floorTo(sellPrice, 5);
-  const listPrice = sellPrice * 1.2;
-  const blackFridayPrice = listPrice * 0.75;
-  const roundedSalePrice = floorTo(blackFridayPrice, 100) - 1;
+  // Constants
+  const OCEAN_FREIGHT_PER_CONTAINER = 3000;
+  const IMPORTING_PER_CONTAINER = 2100;
+
+  // Pricing calculations
+  const tariff = base.fobCost * 2; // Tariff = FOB × 2
+  const oceanPerUnit = OCEAN_FREIGHT_PER_CONTAINER / base.quantity;
+  const importingPerUnit = IMPORTING_PER_CONTAINER / base.quantity;
+  const costNoShipping = tariff + oceanPerUnit + importingPerUnit;
+  const finalCost = costNoShipping + base.shipping;
+  const sellPrice = costNoShipping * base.multiplier + base.shipping; // (Cost × Multiplier) + Shipping
+  const profit = sellPrice - finalCost;
+  
+  // List price: use manual input if provided, otherwise calculate
+  const calculatedListPrice = sellPrice * (1 + (base.discount || 20) / 100); // Markup based on discount %
+  const appliedListPrice = base.listPrice !== undefined ? base.listPrice : calculatedListPrice;
+  
+  // Final discounted price
+  const discountPercent = base.discount || 20;
+  const discountedPrice = appliedListPrice * (1 - discountPercent / 100);
 
   return {
     ...base,
-    tariff105,
-    perUnit,
-    costWithShipping,
+    tariff,
+    oceanPerUnit,
+    importingPerUnit,
+    costNoShipping,
+    finalCost,
     sellPrice,
-    roundedNormalPrice,
-    listPrice,
-    blackFridayPrice,
-    roundedSalePrice,
+    profit,
+    calculatedListPrice,
+    appliedListPrice,
+    discountPercent,
+    discountedPrice,
   };
 };
 
@@ -106,11 +124,11 @@ export const mapSheetRowToInput = (raw: Record<string, unknown>): PricingInput |
     description: normalizeText(pickField("description")),
     supplier: normalizeText(pickField("supplier")),
     fobCost: normalizeNumber(pickField("fobCost")),
-    oceanFrt: normalizeNumber(pickField("oceanFrt")),
-    importing: normalizeNumber(pickField("importing")),
-    zone5: normalizeNumber(pickField("zone5")),
+    quantity: normalizeNumber(pickField("quantity")) || 1,
+    shipping: normalizeNumber(pickField("shipping")),
     multiplier: normalizeNumber(pickField("multiplier")) || 1,
-    quantity: pickField("quantity") !== undefined ? normalizeNumber(pickField("quantity")) : undefined,
+    listPrice: pickField("listPrice") !== undefined ? normalizeNumber(pickField("listPrice")) : undefined,
+    discount: pickField("discount") !== undefined ? normalizeNumber(pickField("discount")) : 20,
   };
 };
 
@@ -122,20 +140,23 @@ export const exportRowShape = {
     "Description",
     "Supplier",
     "FOB Cost",
-    "Ocean frt",
-    "importing",
-    "Zone 5",
+    "Quantity (Container Capacity)",
+    "Shipping",
     "Multiplier",
+    "List Price (Optional)",
+    "Discount %",
   ],
   computedHeaders: [
-    "TARIFF + 105%",
-    "Per Unit",
-    "Cost (w/shipping)",
+    "Tariff (FOB × 2)",
+    "Ocean Per Unit",
+    "Importing Per Unit",
+    "Cost (no shipping)",
+    "Final Cost",
     "Sell Price",
-    "Rounded Normal Price",
-    "List Price",
-    "Black Friday Pricing",
-    "Rounded Sale Price",
+    "Profit",
+    "Calculated List Price",
+    "Applied List Price",
+    "Discounted Price (Sale)",
   ],
 };
 
@@ -144,16 +165,19 @@ export const toExportRow = (row: PricingResult) => ({
   Description: row.description,
   Supplier: row.supplier,
   "FOB Cost": row.fobCost,
-  "Ocean frt": row.oceanFrt,
-  importing: row.importing,
-  "Zone 5": row.zone5,
+  "Quantity (Container Capacity)": row.quantity,
+  Shipping: row.shipping,
   Multiplier: row.multiplier,
-  "TARIFF + 105%": row.tariff105,
-  "Per Unit": row.perUnit,
-  "Cost (w/shipping)": row.costWithShipping,
+  "List Price (Optional)": row.listPrice ?? "",
+  "Discount %": row.discount,
+  "Tariff (FOB × 2)": row.tariff,
+  "Ocean Per Unit": row.oceanPerUnit,
+  "Importing Per Unit": row.importingPerUnit,
+  "Cost (no shipping)": row.costNoShipping,
+  "Final Cost": row.finalCost,
   "Sell Price": row.sellPrice,
-  "Rounded Normal Price": row.roundedNormalPrice,
-  "List Price": row.listPrice,
-  "Black Friday Pricing": row.blackFridayPrice,
-  "Rounded Sale Price": row.roundedSalePrice,
+  Profit: row.profit,
+  "Calculated List Price": row.calculatedListPrice,
+  "Applied List Price": row.appliedListPrice,
+  "Discounted Price (Sale)": row.discountedPrice,
 });

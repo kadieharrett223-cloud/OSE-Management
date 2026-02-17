@@ -7,39 +7,85 @@ describe("pricing calculations", () => {
     description: "Widget",
     supplier: "ACME",
     fobCost: 100,
-    oceanFrt: 20,
-    importing: 10,
-    zone5: 5,
+    quantity: 100, // Container capacity
+    shipping: 50,
     multiplier: 1.5,
   } as const;
 
-  it("matches Excel-equivalent math", () => {
+  it("matches new pricing formula", () => {
     const result = computePricingRow(baseRow);
 
-    expect(result.tariff105).toBe(200);
-    expect(result.perUnit).toBe(230);
-    expect(result.costWithShipping).toBe(235);
-    expect(result.sellPrice).toBeCloseTo(352.5);
-    expect(result.roundedNormalPrice).toBe(350);
-    expect(result.listPrice).toBeCloseTo(423);
-    expect(result.blackFridayPrice).toBeCloseTo(317.25);
-    expect(result.roundedSalePrice).toBe(299);
+    // tariff = fobCost × 2
+    expect(result.tariff).toBe(200);
+    
+    // oceanPerUnit = 3000 / quantity
+    expect(result.oceanPerUnit).toBe(30);
+    
+    // importingPerUnit = 2100 / quantity
+    expect(result.importingPerUnit).toBe(21);
+    
+    // costNoShipping = tariff + oceanPerUnit + importingPerUnit
+    expect(result.costNoShipping).toBe(251);
+    
+    // finalCost = costNoShipping + shipping
+    expect(result.finalCost).toBe(301);
+    
+    // sellPrice = (costNoShipping × multiplier) + shipping
+    expect(result.sellPrice).toBeCloseTo(426.5);
+    
+    // profit = sellPrice - finalCost
+    expect(result.profit).toBeCloseTo(125.5);
+    
+    // calculated list price = sellPrice × 1.2 (20% markup for 20% discount)
+    expect(result.calculatedListPrice).toBeCloseTo(511.8);
+    
+    // discounted price = appliedListPrice × (1 - discountPercent / 100)
+    expect(result.discountedPrice).toBeCloseTo(409.44);
   });
 
-  it("parses sheet rows using header aliases", () => {
+  it("allows manual list price override", () => {
+    const rowWithManualPrice = {
+      ...baseRow,
+      listPrice: 500,
+    };
+    
+    const result = computePricingRow(rowWithManualPrice);
+    
+    // Should use manual list price, not calculated
+    expect(result.appliedListPrice).toBe(500);
+    
+    // Discounted price based on manual list price
+    expect(result.discountedPrice).toBeCloseTo(400); // 500 × 0.8
+  });
+
+  it("supports custom discount percentage", () => {
+    const rowWithCustomDiscount = {
+      ...baseRow,
+      discount: 30, // 30% off
+    };
+    
+    const result = computePricingRow(rowWithCustomDiscount);
+    
+    // List price should account for custom discount
+    expect(result.discountedPrice).toBeLessThan(result.appliedListPrice);
+    expect(result.discountedPrice).toBeCloseTo(result.appliedListPrice * 0.7);
+  });
+
+  it("parses sheet rows using new header aliases", () => {
     const row = mapSheetRowToInput({
       "Item No": "XYZ",
       description: "Thing",
       supplier: "Supplier",
-      "FOB COST": "80",
-      "Ocean frt": 15,
-      importing: 7,
-      "Zone 5": 4,
-      Multiplier: 2,
+      "FOB COST": "100",
+      "Quantity": 100,
+      "Shipping": 50,
+      "Multiplier": 1.5,
     });
 
     expect(row).not.toBeNull();
-    const computed = row && computePricingRow(row);
-    expect(computed?.sellPrice).toBe(2 * ((80 * 2) + 15 + 7 + 4));
+    expect(row?.fobCost).toBe(100);
+    expect(row?.quantity).toBe(100);
+    expect(row?.shipping).toBe(50);
+    expect(row?.multiplier).toBe(1.5);
   });
 });
