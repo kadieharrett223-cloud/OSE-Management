@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { Sidebar } from "@/components/Sidebar";
 import { supabase } from "@/lib/supabase";
 import { usePathname } from "next/navigation";
+import { canonicalizeRep } from "@/lib/repAliases";
 
 type PriceListItem = {
   id: string;
@@ -463,14 +464,14 @@ export default function AdminPriceListPage() {
     );
     
     const matchesSupplier = selectedSuppliers.length === 0 || 
-      (item.supplier && selectedSuppliers.includes(item.supplier));
+      (item.supplier && selectedSuppliers.includes(canonicalizeRep(item.supplier)));
     
     return matchesSearch && matchesSupplier;
   });
 
-  // Get unique suppliers for filter dropdown
+  // Get unique suppliers for filter dropdown (canonicalized)
   const uniqueSuppliers = Array.from(
-    new Set(items.filter((item) => item.supplier).map((item) => item.supplier!))
+    new Set(items.filter((item) => item.supplier).map((item) => canonicalizeRep(item.supplier!)))
   ).sort();
 
   // Group items by category, apply calculations, sort items by sell price within each group

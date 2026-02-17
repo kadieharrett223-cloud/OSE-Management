@@ -8,6 +8,8 @@ export const REP_ALIASES: Record<string, string[]> = {
   "Northern Tool & Equipment": ["Northern Tool & Equipment", "Northern Tool", "NT"],
   "SC": ["SC", "sc"],
   "CR": ["CR", "cr"],
+  "Hiker": ["Hiker", "HK"],
+  "Yizhan": ["Yizhan", "YZ", "yz"],
 };
 
 export const WHOLESALER_CANONICALS = [
