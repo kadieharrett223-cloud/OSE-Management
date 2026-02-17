@@ -136,10 +136,29 @@ export default function PurchasingPage() {
     notes: "",
   });
 
+  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
+  const [creatingProduct, setCreatingProduct] = useState(false);
+  const [creatingForLineIndex, setCreatingForLineIndex] = useState<number | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [newProductForm, setNewProductForm] = useState({
+    item_no: "",
+    description: "",
+    category_id: "",
+    supplier: "",
+    fob_cost: 0,
+    quantity: 0,
+    ocean_frt: 0,
+    importing: 0,
+    zone5_shipping: 0,
+    multiplier: 1,
+    weight_lbs: 0,
+  });
+
   useEffect(() => {
     fetchPOs();
     fetchPriceList();
     fetchSuppliers();
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -228,6 +247,94 @@ export default function PurchasingPage() {
       setLoading(false);
     }
   }
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch("/api/price-list/categories");
+      const data = await res.json();
+      if (res.ok) {
+        setCategories(data.categories || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch categories:", error);
+    }
+  };
+
+  const openCreateProductModal = (lineIndex: number) => {
+    setCreatingForLineIndex(lineIndex);
+    const line = formData.lines[lineIndex];
+    setNewProductForm({
+      ...newProductForm,
+      item_no: line.sku,
+      description: line.description,
+    });
+    setShowCreateProductModal(true);
+  };
+
+  const handleCreateProduct = async () => {
+    if (!newProductForm.item_no || !newProductForm.description) {
+      alert("SKU and Description are required");
+      return;
+    }
+
+    setCreatingProduct(true);
+    try {
+      const res = await fetch("/api/price-list/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item_no: newProductForm.item_no,
+          description: newProductForm.description,
+          category_id: newProductForm.category_id || null,
+          supplier: newProductForm.supplier || null,
+          fob_cost: Number.isFinite(newProductForm.fob_cost) ? newProductForm.fob_cost : null,
+          quantity: Number.isFinite(newProductForm.quantity) ? newProductForm.quantity : null,
+          ocean_frt: Number.isFinite(newProductForm.ocean_frt) ? newProductForm.ocean_frt : null,
+          importing: Number.isFinite(newProductForm.importing) ? newProductForm.importing : null,
+          zone5_shipping: Number.isFinite(newProductForm.zone5_shipping) ? newProductForm.zone5_shipping : null,
+          multiplier: Number.isFinite(newProductForm.multiplier) ? newProductForm.multiplier : 1,
+          weight_lbs: Number.isFinite(newProductForm.weight_lbs) ? newProductForm.weight_lbs : null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Failed to create product");
+        return;
+      }
+
+      const data = await res.json();
+      const newItem = data.item;
+      if (newItem) {
+        setPriceList((prev) => [newItem, ...prev]);
+        // Update the line item with the created product info
+        if (creatingForLineIndex !== null) {
+          updateLine(creatingForLineIndex, "unit_price", newItem.fob_cost || 0);
+        }
+      }
+
+      setShowCreateProductModal(false);
+      setNewProductForm({
+        item_no: "",
+        description: "",
+        category_id: "",
+        supplier: "",
+        fob_cost: 0,
+        quantity: 0,
+        ocean_frt: 0,
+        importing: 0,
+        zone5_shipping: 0,
+        multiplier: 1,
+        weight_lbs: 0,
+      });
+      setCreatingForLineIndex(null);
+    } catch (error) {
+      console.error("Create product error:", error);
+      alert("Failed to create product");
+    } finally {
+      setCreatingProduct(false);
+    }
+  };
 
   async function handleCreatePO(e: React.FormEvent) {
     e.preventDefault();
@@ -778,20 +885,31 @@ export default function PurchasingPage() {
                     {formData.lines.map((line, index) => (
                       <div key={index} className="grid grid-cols-12 gap-0 border-b border-slate-200 hover:bg-slate-50">
                         <div className="col-span-2 border-r border-slate-200 p-2">
-                          <input
-                            type="text"
-                            list={`sku-list-${index}`}
-                            placeholder="Enter or search SKU"
-                            value={line.sku}
-                            onChange={(e) => updateLine(index, "sku", e.target.value)}
-                            className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
-                            required
-                          />
-                          <datalist id={`sku-list-${index}`}>
-                            {priceList.map((item) => (
-                              <option key={item.id} value={item.sku}>{item.description}</option>
-                            ))}
-                          </datalist>
+                          <div className="flex flex-col gap-1">
+                            <input
+                              type="text"
+                              list={`sku-list-${index}`}
+                              placeholder="Enter or search SKU"
+                              value={line.sku}
+                              onChange={(e) => updateLine(index, "sku", e.target.value)}
+                              className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                              required
+                            />
+                            <datalist id={`sku-list-${index}`}>
+                              {priceList.map((item) => (
+                                <option key={item.id} value={item.sku}>{item.description}</option>
+                              ))}
+                            </datalist>
+                            {!priceList.some((item) => item.sku === line.sku) && line.sku && (
+                              <button
+                                type="button"
+                                onClick={() => openCreateProductModal(index)}
+                                className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                              >
+                                + Create new product
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div className="col-span-4 border-r border-slate-200 p-2">
                           <textarea
@@ -922,6 +1040,95 @@ export default function PurchasingPage() {
                   <div className="flex gap-2 pt-2">
                     <button type="button" onClick={()=>setSupplierModal({open:false,mode:"create"})} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
                     <button type="button" onClick={handleSaveSupplier} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Create Product Modal */}
+            {showCreateProductModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+                <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl space-y-4 max-h-96 overflow-y-auto">
+                  <h2 className="text-xl font-semibold text-slate-900">Create Product</h2>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-1">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">SKU *</label>
+                      <input
+                        type="text"
+                        value={newProductForm.item_no}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, item_no: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">Category</label>
+                      <select
+                        value={newProductForm.category_id}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, category_id: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      >
+                        <option value="">Select category</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>{cat.category_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">Description *</label>
+                      <input
+                        type="text"
+                        value={newProductForm.description}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, description: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">Supplier</label>
+                      <input
+                        type="text"
+                        value={newProductForm.supplier}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, supplier: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">FOB Cost</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newProductForm.fob_cost}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, fob_cost: Number(e.target.value) })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">Weight (lbs)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={newProductForm.weight_lbs}
+                        onChange={(e) => setNewProductForm({ ...newProductForm, weight_lbs: Number(e.target.value) })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateProductModal(false)}
+                      disabled={creatingProduct}
+                      className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateProduct}
+                      disabled={creatingProduct}
+                      className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {creatingProduct ? "Creating..." : "Create Product"}
+                    </button>
                   </div>
                 </div>
               </div>
