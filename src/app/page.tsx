@@ -907,15 +907,15 @@ export default function Dashboard() {
       <div className="flex min-h-screen">
         <Sidebar activePage="Dashboard" />
         {/* Main Content */}
-        <main className="flex-1 bg-slate-100 text-slate-900">
-          <div className="mx-auto max-w-7xl px-3 md:px-4 py-3 md:py-4 space-y-4 md:space-y-8 sm:px-6 lg:px-8 print-hidden">
+        <main className="flex-1 bg-slate-50 text-slate-900">
+          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 print-hidden space-y-8">
             {/* Header */}
-            <header className="flex flex-col gap-2 md:gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">Dashboard</p>
-              <div className="flex flex-col justify-between gap-3 md:gap-4 lg:flex-row lg:items-center">
-                <div className="space-y-1 md:space-y-2">
-                  <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">Company Performance</h1>
-                  <p className="max-w-2xl text-sm text-slate-600">
+            <header className="">
+              <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-3">Dashboard</p>
+              <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
+                <div>
+                  <h1 className="text-[28px] font-semibold text-slate-900 leading-tight">Company Performance</h1>
+                  <p className="mt-1.5 max-w-2xl text-sm text-slate-600 leading-relaxed">
                     Business health at a glance with monthly trends, action items, and recent activity.
                   </p>
                 </div>
@@ -923,62 +923,56 @@ export default function Dashboard() {
             </header>
 
             {/* Key Metrics */}
-            <div className="rounded-md bg-white p-4 shadow-sm ring-1 ring-slate-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Key Metrics</h2>
-                <span className="text-xs text-slate-400">This month</span>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="bg-white border border-slate-200 rounded-lg p-4">
+                <div className="text-xs font-medium text-slate-500 mb-3">Sales This Month</div>
+                <div className="text-[26px] font-semibold text-slate-900 leading-none">
+                  {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedMonthlyTotal))}`}
+                </div>
+                <div className="mt-2 text-xs text-slate-600 leading-relaxed">
+                  {loadingLastMonthTotal ? "Loading last month..." : `$${money(lastMonthTotal)} last month`}
+                </div>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-md border border-slate-200 px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Sales This Month</div>
-                  <div className="mt-2 text-2xl font-semibold text-slate-900">
-                    {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedMonthlyTotal))}`}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {loadingLastMonthTotal ? "Loading last month..." : `${money(lastMonthTotal)} last month • paid invoices`}
-                  </div>
-                </div>
 
-                <div className="rounded-md border border-slate-200 px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">This Month Last Year</div>
-                  <div className="mt-2 text-2xl font-semibold text-slate-900">
-                    {loadingLastYearMonth ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedLastYearSales))}`}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">Same month last year • paid invoices</div>
+              <div className="bg-white border border-slate-200 rounded-lg p-4">
+                <div className="text-xs font-medium text-slate-500 mb-3">This Month Last Year</div>
+                <div className="text-[26px] font-semibold text-slate-900 leading-none">
+                  {loadingLastYearMonth ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedLastYearSales))}`}
                 </div>
+                <div className="mt-2 text-xs text-slate-600 leading-relaxed">Same month 2025</div>
+              </div>
 
-                <div className="rounded-md border border-slate-200 px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Customer Payments Today</div>
-                  <div className="mt-2 text-2xl font-semibold text-slate-900">${money(Math.round(animatedPaymentsTotal))}</div>
-                  <div className="mt-1 text-xs text-slate-500">Customers paying us today</div>
-                </div>
+              <div className="bg-white border border-slate-200 rounded-lg p-4">
+                <div className="text-xs font-medium text-slate-500 mb-3">Payments Today</div>
+                <div className="text-[26px] font-semibold text-slate-900 leading-none">${money(Math.round(animatedPaymentsTotal))}</div>
+                <div className="mt-2 text-xs text-slate-600 leading-relaxed">Received from customers</div>
+              </div>
 
-                <div className="rounded-md border border-slate-200 px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Last Sync Status</div>
-                  <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <span className={`h-2 w-2 rounded-full ${qboSyncStatus === "ok" ? "bg-emerald-500" : qboSyncStatus === "error" ? "bg-red-500" : "bg-slate-300"}`} />
-                    {qboSyncStatus === "ok" ? "QB Sync OK" : qboSyncStatus === "error" ? "QB Sync Error" : "Checking"}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">Data reliability check</div>
+              <div className="bg-white border border-slate-200 rounded-lg p-4">
+                <div className="text-xs font-medium text-slate-500 mb-3">QuickBooks</div>
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-900 leading-none mt-[10px]">
+                  <span className={`h-1.5 w-1.5 rounded-full ${qboSyncStatus === "ok" ? "bg-emerald-500" : qboSyncStatus === "error" ? "bg-red-500" : "bg-slate-300"}`} />
+                  {qboSyncStatus === "ok" ? "Synced" : qboSyncStatus === "error" ? "Sync error" : "Checking"}
                 </div>
+                <div className="mt-2 text-xs text-slate-600 leading-relaxed">Data connection</div>
               </div>
             </div>
 
             {/* Overview */}
             <div className="space-y-6">
-              <div className="rounded-md bg-white p-5 shadow-sm ring-1 ring-slate-200">
+              <div className="bg-white border border-slate-200 rounded-lg p-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-xl font-bold text-slate-900">Monthly Performance</h2>
-                      <p className="mt-1 text-sm text-slate-600">Last month vs this month (so far)</p>
+                      <h2 className="text-lg font-semibold text-slate-900">Monthly Performance</h2>
+                      <p className="mt-0.5 text-sm text-slate-600">Last month vs this month (so far)</p>
                     </div>
                     <div className="text-right text-xs text-slate-500">
                       {loadingMonthlyTotal || loadingLastMonthTotal
                         ? "Loading totals..."
-                        : `${money(monthlyTotal)} this month • ${money(lastMonthTotal)} last month`}
+                        : `$${money(monthlyTotal)} this month • $${money(lastMonthTotal)} last month`}
                     </div>
                   </div>
-                  <div className="mt-6">
+                  <div className="mt-5">
                     {currentMonthTrend.length === 0 && lastMonthTrend.length === 0 ? (
                       <div className="h-32 flex items-center justify-center bg-slate-50 rounded-md text-sm text-slate-500">
                         Loading trend data...
@@ -988,11 +982,11 @@ export default function Dashboard() {
                         <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="h-24 w-full">
                           <defs>
                             <linearGradient id="incomeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.2" />
+                              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.08" />
                               <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
                             </linearGradient>
                           </defs>
-                          <g stroke="#cbd5e1" strokeWidth="1" strokeOpacity="0.2">
+                          <g stroke="#e5e7eb" strokeWidth="1" strokeOpacity="0.5">
                             <line x1="0" y1="30" x2="320" y2="30" />
                             <line x1="0" y1="60" x2="320" y2="60" />
                             <line x1="0" y1="90" x2="320" y2="90" />
@@ -1001,8 +995,8 @@ export default function Dashboard() {
                             <path
                               d={buildLinePath(lastMonthTrend, monthlyTrendMax, 320, 120, 12)}
                               fill="none"
-                              stroke="#cbd5e1"
-                              strokeWidth="2.5"
+                              stroke="#94a3b8"
+                              strokeWidth="2"
                               strokeLinecap="round"
                               strokeLinejoin="round"
                             />
@@ -1017,7 +1011,7 @@ export default function Dashboard() {
                                 d={buildLinePath(currentMonthTrend, monthlyTrendMax, 320, 120, 12)}
                                 fill="none"
                                 stroke="#2563eb"
-                                strokeWidth="3"
+                                strokeWidth="2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                               />
@@ -1027,8 +1021,8 @@ export default function Dashboard() {
                             <path
                               d={buildLinePath(expenseTrend, monthlyTrendMax, 320, 120, 12)}
                               fill="none"
-                              stroke="#f59e0b"
-                              strokeWidth="2.5"
+                              stroke="#d97706"
+                              strokeWidth="2"
                               strokeLinecap="round"
                               strokeLinejoin="round"
                             />
@@ -1036,15 +1030,15 @@ export default function Dashboard() {
                         </svg>
                         <div className="mt-4 flex items-center gap-4 text-xs text-slate-600">
                           <span className="inline-flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-slate-400" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                             Last month
                           </span>
                           <span className="inline-flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-blue-500" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
                             Income
                           </span>
                           <span className="inline-flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-amber-500" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-600" />
                             Expenses
                           </span>
                         </div>
@@ -1053,11 +1047,11 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="rounded-md bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                <div className="bg-white border border-slate-200 rounded-lg p-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-xl font-bold text-slate-900">Profit vs Expenses</h2>
-                      <p className="mt-1 text-sm text-slate-600">Month-to-date breakdown</p>
+                      <h2 className="text-lg font-semibold text-slate-900">Profit vs Expenses</h2>
+                      <p className="mt-0.5 text-sm text-slate-600">Month-to-date breakdown</p>
                     </div>
                     <div className="text-right text-xs text-slate-500">
                       {loadingProfit || loadingMonthlyTotal
@@ -1066,45 +1060,45 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="mt-4">
+                  <div className="mt-5">
                     {loadingProfit || loadingMonthlyTotal ? (
                       <div className="h-28 flex items-center justify-center bg-slate-50 rounded-md text-sm text-slate-500">
                         Loading expenses...
                       </div>
                     ) : (
                       <>
-                        <div className="rounded-md bg-white p-4 border border-slate-200">
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                           <div className="mb-4">
-                            <div className="text-sm font-medium text-slate-600 uppercase tracking-wider">Profit (Month-to-Date)</div>
-                            <div className="mt-2 text-2xl font-semibold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
+                            <div className="text-xs font-medium text-slate-500 mb-2">Profit (Month-to-Date)</div>
+                            <div className="text-[26px] font-semibold text-slate-900 leading-none">${money(Math.round(animatedProfitThisMonth))}</div>
                           </div>
                           
                           <div className="mt-4 h-24 flex items-end gap-5">
                             <div className="flex-1">
-                              <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Profit</div>
+                              <div className="text-xs font-medium text-slate-500 mb-2">Profit</div>
                               <div
-                                className={`w-full rounded-md ${profitThisMonth >= 0 ? "bg-emerald-600" : "bg-red-600"} transition-all duration-300`}
-                                style={{ height: `${(Math.abs(profitThisMonth) / profitVsExpenseMax) * 100}%`, minHeight: "20px" }}
+                                className={`w-full rounded ${profitThisMonth >= 0 ? "bg-emerald-600" : "bg-red-600"} transition-all duration-300`}
+                                style={{ height: `${(Math.abs(profitThisMonth) / profitVsExpenseMax) * 100}%`, minHeight: "16px" }}
                               />
-                              <div className="mt-3 text-sm font-semibold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
+                              <div className="mt-2.5 text-sm font-medium text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
                             </div>
                             <div className="flex-1">
-                              <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Expenses</div>
+                              <div className="text-xs font-medium text-slate-500 mb-2">Expenses</div>
                               <div
-                                className="w-full rounded-md bg-amber-600 transition-all duration-300"
-                                style={{ height: `${(totalExpenses / profitVsExpenseMax) * 100}%`, minHeight: "20px" }}
+                                className="w-full rounded bg-amber-600 transition-all duration-300"
+                                style={{ height: `${(totalExpenses / profitVsExpenseMax) * 100}%`, minHeight: "16px" }}
                               />
-                              <div className="mt-3 text-sm font-semibold text-slate-900">${money(Math.round(animatedTotalExpenses))}</div>
+                              <div className="mt-2.5 text-sm font-medium text-slate-900">${money(Math.round(animatedTotalExpenses))}</div>
                             </div>
                           </div>
                           
                           <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
                             <div>
-                              <div className="text-xs font-medium text-slate-600 uppercase tracking-wider">Payroll</div>
+                              <div className="text-xs font-medium text-slate-500">Payroll</div>
                               <div className="mt-1 text-base font-semibold text-slate-900">${money(Math.round(animatedPayrollTotal))}</div>
                             </div>
                             <div>
-                              <div className="text-xs font-medium text-slate-600 uppercase tracking-wider">Bills</div>
+                              <div className="text-xs font-medium text-slate-500">Bills</div>
                               <div className="mt-1 text-base font-semibold text-slate-900">${money(paidExpensesTotal)}</div>
                             </div>
                           </div>
@@ -1117,24 +1111,24 @@ export default function Dashboard() {
 
             {/* Quick Tables */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-md bg-white shadow-sm ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 px-6 py-5 flex items-center justify-between">
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">Open Invoices</h2>
-                    <p className="mt-1 text-sm text-slate-600">Unpaid invoices awaiting payment</p>
+                    <h2 className="text-lg font-semibold text-slate-900">Open Invoices</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">Unpaid invoices awaiting payment</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={handlePrintOpenInvoices}
-                      className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+                      className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
                     >
                       {printingOpenInvoices ? "Preparing…" : "Print"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowOpenInvoicesModal(true)}
-                      className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                     >
                       View all →
                     </button>
@@ -1145,27 +1139,27 @@ export default function Dashboard() {
                 )}
                 <div className="overflow-x-auto">
                   <table className="w-full hidden sm:table">
-                    <thead className="bg-slate-50 text-xs uppercase text-slate-600 font-semibold">
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-medium">
                       <tr className="border-b border-slate-100">
-                        <th className="px-6 py-4 text-left font-semibold">Invoice</th>
-                        <th className="px-6 py-4 text-left font-semibold">Customer</th>
-                        <th className="px-6 py-4 text-right font-semibold">Amount Due</th>
-                        <th className="px-6 py-4 text-right font-semibold">Status</th>
+                        <th className="px-5 py-3 text-left font-medium">Invoice</th>
+                        <th className="px-5 py-3 text-left font-medium">Customer</th>
+                        <th className="px-5 py-3 text-right font-medium">Amount Due</th>
+                        <th className="px-5 py-3 text-right font-medium">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {loadingRecentInvoices ? (
-                        <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td></tr>
+                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
                       ) : recentInvoices.length === 0 ? (
-                        <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">No open invoices</td></tr>
+                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">No open invoices</td></tr>
                       ) : (
                         recentInvoices.slice(0, 5).map((inv) => (
                           <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 font-mono text-sm text-slate-700">{inv.docNumber}</td>
-                            <td className="px-6 py-4 text-sm text-slate-700">{inv.customerName}</td>
-                            <td className="px-6 py-4 text-right text-sm font-semibold text-slate-900">${money(inv.balance)}</td>
-                            <td className="px-6 py-4 text-right">
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            <td className="px-5 py-3 font-mono text-sm text-slate-700">{inv.docNumber}</td>
+                            <td className="px-5 py-3 text-sm text-slate-700">{inv.customerName}</td>
+                            <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">${money(inv.balance)}</td>
+                            <td className="px-5 py-3 text-right">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                                 {inv.status}
                               </span>
                             </td>
@@ -1197,11 +1191,11 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="rounded-md bg-white shadow-sm ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 px-6 py-5 flex items-center justify-between">
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">Customer Payments Today</h2>
-                    <p className="mt-1 text-sm text-slate-600">Payments received today</p>
+                    <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">Payments received today</p>
                     <p className="mt-1 text-sm font-semibold text-slate-900">
                       Total: ${money(paymentsTotal)}
                     </p>
@@ -1209,7 +1203,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setShowCustomerPaymentsModal(true)}
-                    className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                   >
                     View all →
                   </button>
@@ -1218,26 +1212,26 @@ export default function Dashboard() {
                   <table className="w-full hidden sm:table">
                     <thead className="bg-slate-50 border-b border-slate-100">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-slate-600">Customer</th>
-                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-slate-600">Applied</th>
-                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-slate-600">Total Amount</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
+                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Applied</th>
+                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Total Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {loadingCustomerPayments ? (
                         <tr>
-                          <td colSpan={3} className="px-6 py-6 text-center text-slate-500">Loading...</td>
+                          <td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td>
                         </tr>
                       ) : customerPaymentsToday.length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
+                          <td colSpan={3} className="px-5 py-6 text-center text-slate-500">No customer payments received today</td>
                         </tr>
                       ) : (
                         customerPaymentsToday.slice(0, 5).map((payment) => (
                           <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 font-medium text-slate-900">{payment.customerName}</td>
-                            <td className="px-6 py-4 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
-                            <td className="px-6 py-4 text-right text-sm text-slate-600">${money(payment.totalAmount)}</td>
+                            <td className="px-5 py-3 font-medium text-slate-900">{payment.customerName}</td>
+                            <td className="px-5 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
+                            <td className="px-5 py-3 text-right text-sm text-slate-600">${money(payment.totalAmount)}</td>
                           </tr>
                         ))
                       )}
@@ -1266,37 +1260,37 @@ export default function Dashboard() {
 
             {/* Recent Purchases + Top SKUs */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
-                <div className="border-b border-slate-100 px-6 py-5 flex items-center justify-between">
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">Recent Purchases</h2>
-                    <p className="mt-1 text-sm text-slate-600">Latest purchase orders</p>
+                    <h2 className="text-lg font-semibold text-slate-900">Recent Purchases</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">Latest purchase orders</p>
                   </div>
                   <a href="/admin/purchasing" className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</a>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase text-slate-600 font-semibold">
+                    <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase text-slate-500 font-medium">
                       <tr>
-                        <th className="px-6 py-4 text-left">PO</th>
-                        <th className="px-6 py-4 text-left">Vendor</th>
-                        <th className="px-6 py-4 text-right">Total</th>
-                        <th className="px-6 py-4 text-right">Status</th>
+                        <th className="px-5 py-3 text-left">PO</th>
+                        <th className="px-5 py-3 text-left">Vendor</th>
+                        <th className="px-5 py-3 text-right">Total</th>
+                        <th className="px-5 py-3 text-right">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {loadingRecentPurchases ? (
-                        <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td></tr>
+                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
                       ) : recentPurchases.length === 0 ? (
-                        <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">No recent purchases</td></tr>
+                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">No recent purchases</td></tr>
                       ) : (
                         recentPurchases.map((po) => (
                           <tr key={po.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 font-mono text-sm text-slate-700">{po.poNumber}</td>
-                            <td className="px-6 py-4 text-sm text-slate-700">{po.vendorName}</td>
-                            <td className="px-6 py-4 text-right text-sm font-semibold text-slate-900">${money(po.totalAmount)}</td>
-                            <td className="px-6 py-4 text-right">
-                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            <td className="px-5 py-3 font-mono text-sm text-slate-700">{po.poNumber}</td>
+                            <td className="px-5 py-3 text-sm text-slate-700">{po.vendorName}</td>
+                            <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">${money(po.totalAmount)}</td>
+                            <td className="px-5 py-3 text-right">
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
                                 {po.status}
                               </span>
                             </td>
@@ -1308,12 +1302,12 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
-                <div className="border-b border-slate-100 px-6 py-5">
-                  <h2 className="text-xl font-bold text-slate-900">Top SKUs This Month</h2>
-                  <p className="mt-1 text-sm text-slate-600">Most popular units sold</p>
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="border-b border-slate-200 px-5 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Top SKUs This Month</h2>
+                  <p className="mt-0.5 text-sm text-slate-600">Most popular units sold</p>
                 </div>
-                <div className="px-6 py-4 space-y-3 max-h-96 overflow-y-auto">
+                <div className="px-5 py-4 space-y-3 max-h-96 overflow-y-auto">
                   <TopSkuChart compact={true} />
                 </div>
               </div>
@@ -1321,37 +1315,37 @@ export default function Dashboard() {
 
             {/* Bottom Listed Cards */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
-                <div className="border-b border-slate-100 px-6 py-5">
-                  <h2 className="text-xl font-bold text-slate-900">Vendors Paid Today</h2>
-                  <p className="mt-1 text-sm text-slate-600">Payments our company made today</p>
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="border-b border-slate-200 px-5 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Vendors Paid Today</h2>
+                  <p className="mt-0.5 text-sm text-slate-600">Payments our company made today</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="border-b border-slate-100 bg-slate-50">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-slate-600">Vendor</th>
-                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-slate-600">Payments</th>
-                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-slate-600">Amount Paid</th>
-                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-slate-600">Last Payment</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Vendor</th>
+                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Payments</th>
+                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount Paid</th>
+                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Last Payment</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {loadingVendorPayments ? (
                         <tr>
-                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td>
+                          <td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td>
                         </tr>
                       ) : vendorPaymentsToday.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No vendor payments recorded today</td>
+                          <td colSpan={4} className="px-5 py-6 text-center text-slate-500">No vendor payments recorded today</td>
                         </tr>
                       ) : (
                         vendorPaymentsToday.map((payment) => (
                           <tr key={payment.vendorName} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 font-medium text-slate-900">{payment.vendorName}</td>
-                            <td className="px-6 py-4 text-right text-sm text-slate-600">{payment.paymentCount}</td>
-                            <td className="px-6 py-4 text-right text-sm font-semibold text-indigo-700">${money(payment.totalPaid)}</td>
-                            <td className="px-6 py-4 text-right text-sm text-slate-600">{payment.lastTxnDate}</td>
+                            <td className="px-5 py-3 font-medium text-slate-900">{payment.vendorName}</td>
+                            <td className="px-5 py-3 text-right text-sm text-slate-600">{payment.paymentCount}</td>
+                            <td className="px-5 py-3 text-right text-sm font-semibold text-indigo-700">${money(payment.totalPaid)}</td>
+                            <td className="px-5 py-3 text-right text-sm text-slate-600">{payment.lastTxnDate}</td>
                           </tr>
                         ))
                       )}
@@ -1363,27 +1357,27 @@ export default function Dashboard() {
 
             {showOpenInvoicesModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-                <div className="w-full max-w-4xl rounded-lg bg-white shadow-xl ring-1 ring-slate-200">
-                  <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+                <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
-                      <h2 className="text-xl font-bold text-slate-900">All Open Invoices</h2>
-                      <p className="mt-1 text-sm text-slate-600">Full list of unpaid invoices</p>
+                      <h2 className="text-lg font-semibold text-slate-900">All Open Invoices</h2>
+                      <p className="mt-0.5 text-sm text-slate-600">Full list of unpaid invoices</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowOpenInvoicesModal(false)}
-                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       Close
                     </button>
                   </div>
                   <div className="max-h-[70vh] overflow-y-auto">
                     <table className="w-full">
-                      <thead className="bg-slate-50 text-xs uppercase text-slate-600 font-semibold border-b border-slate-100">
+                      <thead className="bg-slate-50 text-xs uppercase text-slate-500 font-medium border-b border-slate-100">
                         <tr>
-                          <th className="px-6 py-4 text-left">Invoice</th>
-                          <th className="px-6 py-4 text-left">Customer</th>
-                          <th className="px-6 py-4 text-right">Amount Due</th>
+                          <th className="px-5 py-3 text-left">Invoice</th>
+                          <th className="px-5 py-3 text-left">Customer</th>
+                          <th className="px-5 py-3 text-right">Amount Due</th>
                           <th className="px-6 py-4 text-right">Status</th>
                         </tr>
                       </thead>
@@ -1417,16 +1411,16 @@ export default function Dashboard() {
 
             {showCustomerPaymentsModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-                <div className="w-full max-w-4xl rounded-lg bg-white shadow-xl ring-1 ring-slate-200">
-                  <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+                <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
-                      <h2 className="text-xl font-bold text-slate-900">All Customer Payments Today</h2>
-                      <p className="mt-1 text-sm text-slate-600">Total received: ${money(paymentsTotal)}</p>
+                      <h2 className="text-lg font-semibold text-slate-900">All Customer Payments Today</h2>
+                      <p className="mt-0.5 text-sm text-slate-600">Total received: ${money(paymentsTotal)}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowCustomerPaymentsModal(false)}
-                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       Close
                     </button>
