@@ -222,11 +222,15 @@ export default function Dashboard() {
   const [lastMonthTrend, setLastMonthTrend] = useState<number[]>([]);
   const [expenseTrend, setExpenseTrend] = useState<number[]>([]);
 
+  // Compute derived values first (needed for animated count-ups)
+  const totalExpenses = paidExpensesTotal + payrollExpenseTotal;
+  const profitThisMonth = monthlyTotal - totalExpenses;
+
   // Animated values using count-up hook
   const animatedMonthlyTotal = useCountUp(monthlyTotal);
   const animatedLastYearSales = useCountUp(lastYearMonthSales ?? 0);
   const animatedPaymentsTotal = useCountUp(paymentsTotal);
-  const animatedProfitThisMonth = useCountUp(Math.max(monthlyTotal - totalExpenses, 0));
+  const animatedProfitThisMonth = useCountUp(Math.max(profitThisMonth, 0));
   const animatedTotalExpenses = useCountUp(totalExpenses);
   const animatedPayrollTotal = useCountUp(payrollExpenseTotal);
 
@@ -282,8 +286,6 @@ export default function Dashboard() {
   const totalCommission = repSalesData.length > 0
     ? repSalesData.reduce((sum, rep) => sum + rep.commission, 0)
     : mockReps.reduce((sum, rep) => sum + rep.commission, 0);
-  const totalExpenses = paidExpensesTotal + payrollExpenseTotal;
-  const profitThisMonth = monthlyTotal - totalExpenses;
   const monthlyTrendMax = Math.max(...currentMonthTrend, ...lastMonthTrend, ...expenseTrend, 1);
   const topExpenseSeries = topExpenses.map((expense) => expense.total);
   const maxTopExpense = Math.max(...topExpenseSeries, 1);
