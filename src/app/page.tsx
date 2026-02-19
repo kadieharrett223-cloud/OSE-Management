@@ -921,7 +921,7 @@ export default function Dashboard() {
         <Sidebar activePage="Dashboard" />
         {/* Main Content */}
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
-          <div className="mx-auto max-w-7xl px-3 md:px-4 py-3 md:py-4 space-y-4 md:space-y-8 sm:px-6 lg:px-8 print-hidden">
+          <div className="w-full px-3 md:px-4 py-3 md:py-4 space-y-4 md:space-y-8 sm:px-6 lg:px-8 print-hidden">
             {/* Header */}
             <header className="flex flex-col gap-2 md:gap-3">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-blue-700">Dashboard</p>
