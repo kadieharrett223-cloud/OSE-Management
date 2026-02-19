@@ -98,11 +98,6 @@ const mockReps = [
 
 type LineSeries = Array<number | null>;
 
-const getSeriesMax = (...series: LineSeries[]) => {
-  const values = series.flat().filter((val): val is number => typeof val === "number" && !Number.isNaN(val));
-  return Math.max(...values, 1);
-};
-
 const buildLinePath = (values: LineSeries, maxValue: number, width: number, height: number, padding: number) => {
   const usableWidth = width - padding * 2;
   const usableHeight = height - padding * 2;
@@ -223,9 +218,9 @@ export default function Dashboard() {
   const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
   const [loadingRecentPurchases, setLoadingRecentPurchases] = useState(true);
   const [qboSyncStatus, setQboSyncStatus] = useState<"idle" | "ok" | "error">("idle");
-  const [currentMonthTrend, setCurrentMonthTrend] = useState<LineSeries>([]);
-  const [lastMonthTrend, setLastMonthTrend] = useState<LineSeries>([]);
-  const [expenseTrend, setExpenseTrend] = useState<LineSeries>([]);
+  const [currentMonthTrend, setCurrentMonthTrend] = useState<number[]>([]);
+  const [lastMonthTrend, setLastMonthTrend] = useState<number[]>([]);
+  const [expenseTrend, setExpenseTrend] = useState<number[]>([]);
 
   // Compute derived values first (needed for animated count-ups)
   const totalExpenses = paidExpensesTotal + payrollExpenseTotal;
@@ -291,7 +286,7 @@ export default function Dashboard() {
   const totalCommission = repSalesData.length > 0
     ? repSalesData.reduce((sum, rep) => sum + rep.commission, 0)
     : mockReps.reduce((sum, rep) => sum + rep.commission, 0);
-  const monthlyTrendMax = getSeriesMax(currentMonthTrend, lastMonthTrend, expenseTrend);
+  const monthlyTrendMax = Math.max(...currentMonthTrend, ...lastMonthTrend, ...expenseTrend, 1);
   const topExpenseSeries = topExpenses.map((expense) => expense.total);
   const maxTopExpense = Math.max(...topExpenseSeries, 1);
   const profitVsExpenseMax = Math.max(Math.abs(profitThisMonth), totalExpenses, 1);
@@ -705,11 +700,6 @@ export default function Dashboard() {
       return cumulative;
     };
 
-    const padSeriesToDays = (series: number[], targetDays: number): LineSeries => {
-      if (series.length >= targetDays) return series;
-      return [...series, ...Array.from({ length: targetDays - series.length }, () => null)];
-    };
-
     const fetchMonthlyComparison = async () => {
       try {
         const today = new Date();
@@ -748,10 +738,7 @@ export default function Dashboard() {
         console.log(`[dashboard] Monthly data - current: ${currentPayments.length} payments, last month: ${lastPayments.length} payments`);
 
         const currentSeries = buildCumulativeSeries(currentPayments, daysSoFar, currentMonthStart);
-        const lastSeries = padSeriesToDays(
-          buildCumulativeSeries(lastPayments, compareDays, lastMonthStart),
-          daysSoFar
-        );
+        const lastSeries = buildCumulativeSeries(lastPayments, compareDays, lastMonthStart);
 
         if (isMounted) {
           setCurrentMonthTrend(currentSeries);
@@ -921,7 +908,7 @@ export default function Dashboard() {
         <Sidebar activePage="Dashboard" />
         {/* Main Content */}
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
-          <div className="w-full px-3 md:px-4 py-3 md:py-4 space-y-4 md:space-y-8 sm:px-6 lg:px-8 print-hidden">
+          <div className="mx-auto max-w-7xl px-3 md:px-4 py-3 md:py-4 space-y-4 md:space-y-8 sm:px-6 lg:px-8 print-hidden">
             {/* Header */}
             <header className="flex flex-col gap-2 md:gap-3">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-blue-700">Dashboard</p>
@@ -935,218 +922,223 @@ export default function Dashboard() {
               </div>
             </header>
 
-            {/* Business Health Snapshot */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg bg-white px-6 py-6 shadow-sm ring-1 ring-slate-100 hover:shadow-md hover:ring-slate-200 transition-all duration-150">
-                <div className="text-xs uppercase font-medium tracking-wider text-slate-500">Sales This Month</div>
-                <div className="mt-3 text-4xl font-bold text-slate-900">
-                  {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedMonthlyTotal))}`}
-                </div>
-                <div className="mt-2 text-sm text-slate-600">
-                  {loadingLastMonthTotal ? "Loading last month..." : `${money(lastMonthTotal)} last month • paid invoices`}
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-white px-6 py-6 shadow-sm ring-1 ring-slate-100 hover:shadow-md hover:ring-slate-200 transition-all duration-150">
-                <div className="text-xs uppercase font-medium tracking-wider text-slate-500">This Month Last Year</div>
-                <div className="mt-3 text-4xl font-bold text-slate-900">
-                  {loadingLastYearMonth ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedLastYearSales))}`}
-                </div>
-                <div className="mt-2 text-sm text-slate-600">Same month last year • paid invoices</div>
-              </div>
-
-              <div className="rounded-lg bg-white px-6 py-6 shadow-sm ring-1 ring-slate-100 hover:shadow-md hover:ring-slate-200 transition-all duration-150">
-                <div className="text-xs uppercase font-medium tracking-wider text-slate-500">Customer Payments Today</div>
-                <div className="mt-3 text-4xl font-bold text-slate-900">${money(Math.round(animatedPaymentsTotal))}</div>
-                <div className="mt-2 text-sm text-slate-600">Customers paying us today</div>
-              </div>
-
-              <div className="rounded-lg bg-white px-6 py-6 shadow-sm ring-1 ring-slate-100 hover:shadow-md hover:ring-slate-200 transition-all duration-150">
-                <div className="text-xs uppercase font-medium tracking-wider text-slate-500">Last Sync Status</div>
-                <div className="mt-3 flex items-center gap-2 text-2xl font-bold text-slate-900">
-                  <span className={`h-2.5 w-2.5 rounded-full ${qboSyncStatus === "ok" ? "bg-emerald-500" : qboSyncStatus === "error" ? "bg-red-500" : "bg-slate-300"}`} />
-                  {qboSyncStatus === "ok" ? "QB Sync ✅" : qboSyncStatus === "error" ? "QB Sync ⚠️" : "Checking"}
-                </div>
-                <div className="mt-2 text-sm text-slate-600">Data reliability check</div>
-              </div>
-            </div>
-
-            {/* Main Visual + Action Required */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
-              <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-100 self-start">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">Monthly Performance</h2>
-                    <p className="mt-1 text-sm text-slate-600">Last month vs this month (so far)</p>
-                  </div>
-                  <div className="text-right text-xs text-slate-500">
-                    {loadingMonthlyTotal || loadingLastMonthTotal
-                      ? "Loading totals..."
-                      : `${money(monthlyTotal)} this month • ${money(lastMonthTotal)} last month`}
-                  </div>
-                </div>
-                <div className="mt-6">
-                  {currentMonthTrend.length === 0 && lastMonthTrend.length === 0 ? (
-                    <div className="flex items-center justify-center bg-slate-50 rounded-lg py-8 text-sm text-slate-500">
-                      Loading trend data...
+            {/* Overview */}
+            <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+              <div className="space-y-6">
+                <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">Monthly Performance</h2>
+                      <p className="mt-1 text-sm text-slate-600">Last month vs this month (so far)</p>
                     </div>
-                  ) : (
-                    <>
-                      <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="block w-full">
-                        <defs>
-                          <linearGradient id="incomeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor="#2563eb" stopOpacity="0.2" />
-                            <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
-                          </linearGradient>
-                        </defs>
-                        {/* Grid lines - reduced opacity */}
-                        <g stroke="#e2e8f0" strokeWidth="1" strokeOpacity="0.1">
-                          <line x1="0" y1="30" x2="320" y2="30" />
-                          <line x1="0" y1="60" x2="320" y2="60" />
-                          <line x1="0" y1="90" x2="320" y2="90" />
-                        </g>
-                        
-                        {lastMonthTrend.length > 0 && (
-                          <path
-                            d={buildLinePath(lastMonthTrend, monthlyTrendMax, 320, 120, 12)}
-                            fill="none"
-                            stroke="#cbd5e1"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        )}
-                        
-                        {currentMonthTrend.length > 0 && (
-                          <>
+                    <div className="text-right text-xs text-slate-500">
+                      {loadingMonthlyTotal || loadingLastMonthTotal
+                        ? "Loading totals..."
+                        : `${money(monthlyTotal)} this month • ${money(lastMonthTotal)} last month`}
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    {currentMonthTrend.length === 0 && lastMonthTrend.length === 0 ? (
+                      <div className="h-32 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
+                        Loading trend data...
+                      </div>
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="h-24 w-full">
+                          <defs>
+                            <linearGradient id="incomeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.2" />
+                              <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+                            </linearGradient>
+                          </defs>
+                          <g stroke="#e2e8f0" strokeWidth="1" strokeOpacity="0.1">
+                            <line x1="0" y1="30" x2="320" y2="30" />
+                            <line x1="0" y1="60" x2="320" y2="60" />
+                            <line x1="0" y1="90" x2="320" y2="90" />
+                          </g>
+                          {lastMonthTrend.length > 0 && (
                             <path
-                              d={buildAreaPath(currentMonthTrend, monthlyTrendMax, 320, 120, 12)}
-                              fill="url(#incomeGradient)"
-                            />
-                            <path
-                              d={buildLinePath(currentMonthTrend, monthlyTrendMax, 320, 120, 12)}
+                              d={buildLinePath(lastMonthTrend, monthlyTrendMax, 320, 120, 12)}
                               fill="none"
-                              stroke="#2563eb"
-                              strokeWidth="3"
+                              stroke="#cbd5e1"
+                              strokeWidth="2.5"
                               strokeLinecap="round"
                               strokeLinejoin="round"
                             />
-                          </>
-                        )}
-                        
-                        {expenseTrend.length > 0 && (
-                          <path
-                            d={buildLinePath(expenseTrend, monthlyTrendMax, 320, 120, 12)}
-                            fill="none"
-                            stroke="#f59e0b"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        )}
-                      </svg>
-                      <div className="mt-4 flex items-center gap-4 text-xs text-slate-600">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-slate-400" />
-                          Last month
-                        </span>
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-blue-500" />
-                          Income
-                        </span>
-                        <span className="inline-flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-amber-500" />
-                          Expenses
-                        </span>
+                          )}
+                          {currentMonthTrend.length > 0 && (
+                            <>
+                              <path
+                                d={buildAreaPath(currentMonthTrend, monthlyTrendMax, 320, 120, 12)}
+                                fill="url(#incomeGradient)"
+                              />
+                              <path
+                                d={buildLinePath(currentMonthTrend, monthlyTrendMax, 320, 120, 12)}
+                                fill="none"
+                                stroke="#2563eb"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </>
+                          )}
+                          {expenseTrend.length > 0 && (
+                            <path
+                              d={buildLinePath(expenseTrend, monthlyTrendMax, 320, 120, 12)}
+                              fill="none"
+                              stroke="#f59e0b"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          )}
+                        </svg>
+                        <div className="mt-4 flex items-center gap-4 text-xs text-slate-600">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-slate-400" />
+                            Last month
+                          </span>
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-blue-500" />
+                            Income
+                          </span>
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-amber-500" />
+                            Expenses
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">Profit vs Expenses</h2>
+                      <p className="mt-1 text-sm text-slate-600">Month-to-date breakdown</p>
+                    </div>
+                    <div className="text-right text-xs text-slate-500">
+                      {loadingProfit || loadingMonthlyTotal
+                        ? "Loading..."
+                        : `Income $${money(monthlyTotal)} • Expenses $${money(totalExpenses)}`}
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    {loadingProfit || loadingMonthlyTotal ? (
+                      <div className="h-32 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
+                        Loading expenses...
                       </div>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <div className="rounded-lg bg-gradient-to-br from-slate-50 to-slate-25 p-6 border border-slate-100">
+                          <div className="mb-4">
+                            <div className="text-sm font-medium text-slate-600 uppercase tracking-wider">Profit (Month-to-Date)</div>
+                            <div className="mt-2 text-3xl font-semibold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
+                          </div>
+                          
+                          <div className="mt-6 h-28 flex items-end gap-6">
+                            <div className="flex-1">
+                              <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Profit</div>
+                              <div
+                                className={`w-full rounded-lg ${profitThisMonth >= 0 ? "bg-emerald-500" : "bg-red-500"} transition-all duration-300`}
+                                style={{ height: `${(Math.abs(profitThisMonth) / profitVsExpenseMax) * 100}%`, minHeight: "20px" }}
+                              />
+                              <div className="mt-3 text-sm font-semibold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
+                            </div>
+                            <div className="flex-1">
+                              <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Expenses</div>
+                              <div
+                                className="w-full rounded-lg bg-amber-500 transition-all duration-300"
+                                style={{ height: `${(totalExpenses / profitVsExpenseMax) * 100}%`, minHeight: "20px" }}
+                              />
+                              <div className="mt-3 text-sm font-semibold text-slate-900">${money(Math.round(animatedTotalExpenses))}</div>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-6 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
+                            <div>
+                              <div className="text-xs font-medium text-slate-600 uppercase tracking-wider">Payroll</div>
+                              <div className="mt-1 text-base font-semibold text-slate-900">${money(Math.round(animatedPayrollTotal))}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs font-medium text-slate-600 uppercase tracking-wider">Bills</div>
+                              <div className="mt-1 text-base font-semibold text-slate-900">${money(paidExpensesTotal)}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-6">
+                          <div className="mb-4 text-sm font-bold text-slate-900 uppercase tracking-wider">Top Paid Expenses</div>
+                          <div className="space-y-4">
+                            {topExpenses.length === 0 ? (
+                              <div className="text-sm text-slate-500 py-4">No paid expenses yet this month.</div>
+                            ) : (
+                              topExpenses.map((item, idx) => (
+                                <div key={item.name}>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-medium text-slate-700">{item.name}</span>
+                                    <span className="text-sm font-bold text-slate-900">${money(item.total)}</span>
+                                  </div>
+                                  <div className="h-2 w-full rounded-full bg-slate-100">
+                                    <div
+                                      className="h-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500"
+                                      style={{ width: `${(item.total / maxTopExpense) * 100}%` }}
+                                    />
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">{((item.total / totalExpenses) * 100).toFixed(0)}% of expenses</div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">Profit vs Expenses</h2>
-                    <p className="mt-1 text-sm text-slate-600">Month-to-date breakdown</p>
+              <div className="space-y-6">
+                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Key Metrics</h2>
+                    <span className="text-xs text-slate-400">This month</span>
                   </div>
-                  <div className="text-right text-xs text-slate-500">
-                    {loadingProfit || loadingMonthlyTotal
-                      ? "Loading..."
-                      : `Income $${money(monthlyTotal)} • Expenses $${money(totalExpenses)}`}
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  {loadingProfit || loadingMonthlyTotal ? (
-                    <div className="h-32 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
-                      Loading expenses...
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-md border border-slate-100 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Sales This Month</div>
+                      <div className="mt-2 text-2xl font-semibold text-slate-900">
+                        {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedMonthlyTotal))}`}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {loadingLastMonthTotal ? "Loading last month..." : `${money(lastMonthTotal)} last month • paid invoices`}
+                      </div>
                     </div>
-                  ) : (
-                    <>
-                      <div className="rounded-md bg-slate-50 p-6 border border-slate-200">
-                        <div className="mb-4">
-                          <div className="text-sm font-medium text-slate-600 uppercase tracking-wider">Profit (Month-to-Date)</div>
-                          <div className="mt-2 text-4xl font-bold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
-                        </div>
-                        
-                        <div className="mt-6 h-28 flex items-end gap-6">
-                          <div className="flex-1">
-                            <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Profit</div>
-                            <div
-                              className={`w-full rounded-sm ${profitThisMonth >= 0 ? "bg-emerald-600" : "bg-red-600"} transition-all duration-300`}
-                              style={{ height: `${(Math.abs(profitThisMonth) / profitVsExpenseMax) * 100}%`, minHeight: "20px" }}
-                            />
-                            <div className="mt-3 text-sm font-semibold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Expenses</div>
-                            <div
-                              className="w-full rounded-sm bg-amber-600 transition-all duration-300"
-                              style={{ height: `${(totalExpenses / profitVsExpenseMax) * 100}%`, minHeight: "20px" }}
-                            />
-                            <div className="mt-3 text-sm font-semibold text-slate-900">${money(Math.round(animatedTotalExpenses))}</div>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-6 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
-                          <div>
-                            <div className="text-xs font-medium text-slate-600 uppercase tracking-wider">Payroll</div>
-                            <div className="mt-1 text-lg font-bold text-slate-900">${money(Math.round(animatedPayrollTotal))}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs font-medium text-slate-600 uppercase tracking-wider">Bills</div>
-                            <div className="mt-1 text-lg font-bold text-slate-900">${money(paidExpensesTotal)}</div>
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="mt-6">
-                        <div className="mb-4 text-sm font-bold text-slate-900 uppercase tracking-wider">Top Paid Expenses</div>
-                        <div className="space-y-4">
-                          {topExpenses.length === 0 ? (
-                            <div className="text-sm text-slate-500 py-4">No paid expenses yet this month.</div>
-                          ) : (
-                            topExpenses.map((item, idx) => (
-                              <div key={item.name}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-sm font-medium text-slate-700">{item.name}</span>
-                                  <span className="text-sm font-bold text-slate-900">${money(item.total)}</span>
-                                </div>
-                                <div className="h-2 w-full rounded-sm bg-slate-100">
-                                  <div
-                                    className="h-2 rounded-sm bg-amber-400 transition-all duration-500"
-                                    style={{ width: `${(item.total / maxTopExpense) * 100}%` }}
-                                  />
-                                </div>
-                                <div className="mt-1 text-xs text-slate-500">{((item.total / totalExpenses) * 100).toFixed(0)}% of expenses</div>
-                              </div>
-                            ))
-                          )}
-                        </div>
+                    <div className="rounded-md border border-slate-100 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">This Month Last Year</div>
+                      <div className="mt-2 text-2xl font-semibold text-slate-900">
+                        {loadingLastYearMonth ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedLastYearSales))}`}
                       </div>
-                    </>
-                  )}
+                      <div className="mt-1 text-xs text-slate-500">Same month last year • paid invoices</div>
+                    </div>
+
+                    <div className="rounded-md border border-slate-100 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Customer Payments Today</div>
+                      <div className="mt-2 text-2xl font-semibold text-slate-900">${money(Math.round(animatedPaymentsTotal))}</div>
+                      <div className="mt-1 text-xs text-slate-500">Customers paying us today</div>
+                    </div>
+
+                    <div className="rounded-md border border-slate-100 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Last Sync Status</div>
+                      <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <span className={`h-2 w-2 rounded-full ${qboSyncStatus === "ok" ? "bg-emerald-500" : qboSyncStatus === "error" ? "bg-red-500" : "bg-slate-300"}`} />
+                        {qboSyncStatus === "ok" ? "QB Sync ✅" : qboSyncStatus === "error" ? "QB Sync ⚠️" : "Checking"}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">Data reliability check</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
