@@ -927,17 +927,17 @@ export default function Dashboard() {
               <div className="bg-white border border-slate-200 rounded-lg p-4">
                 <div className="text-xs font-medium text-slate-500 mb-3">Sales This Month</div>
                 <div className="text-[26px] font-semibold text-slate-900 leading-none">
-                  {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedMonthlyTotal))}`}
+                  ${money(Math.round(animatedMonthlyTotal))}
                 </div>
                 <div className="mt-2 text-xs text-slate-600 leading-relaxed">
-                  {loadingLastMonthTotal ? "Loading last month..." : `$${money(lastMonthTotal)} last month`}
+                  ${money(lastMonthTotal)} last month
                 </div>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-lg p-4">
                 <div className="text-xs font-medium text-slate-500 mb-3">This Month Last Year</div>
                 <div className="text-[26px] font-semibold text-slate-900 leading-none">
-                  {loadingLastYearMonth ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedLastYearSales))}`}
+                  ${money(Math.round(animatedLastYearSales))}
                 </div>
                 <div className="mt-2 text-xs text-slate-600 leading-relaxed">Same month 2025</div>
               </div>
@@ -967,9 +967,7 @@ export default function Dashboard() {
                       <p className="mt-0.5 text-sm text-slate-600">Last month vs this month (so far)</p>
                     </div>
                     <div className="text-right text-xs text-slate-500">
-                      {loadingMonthlyTotal || loadingLastMonthTotal
-                        ? "Loading totals..."
-                        : `$${money(monthlyTotal)} this month • $${money(lastMonthTotal)} last month`}
+                      ${money(monthlyTotal)} this month • ${money(lastMonthTotal)} last month
                     </div>
                   </div>
                   <div className="mt-5">
@@ -1054,24 +1052,16 @@ export default function Dashboard() {
                       <p className="mt-0.5 text-sm text-slate-600">Month-to-date breakdown</p>
                     </div>
                     <div className="text-right text-xs text-slate-500">
-                      {loadingProfit || loadingMonthlyTotal
-                        ? "Loading..."
-                        : `Income $${money(monthlyTotal)} • Expenses $${money(totalExpenses)}`}
+                      Income $${money(monthlyTotal)} • Expenses $${money(totalExpenses)}
                     </div>
                   </div>
 
                   <div className="mt-5">
-                    {loadingProfit || loadingMonthlyTotal ? (
-                      <div className="h-28 flex items-center justify-center bg-slate-50 rounded-md text-sm text-slate-500">
-                        Loading expenses...
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                      <div className="mb-4">
+                        <div className="text-xs font-medium text-slate-500 mb-2">Profit (Month-to-Date)</div>
+                        <div className="text-[26px] font-semibold text-slate-900 leading-none">${money(Math.round(animatedProfitThisMonth))}</div>
                       </div>
-                    ) : (
-                      <>
-                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                          <div className="mb-4">
-                            <div className="text-xs font-medium text-slate-500 mb-2">Profit (Month-to-Date)</div>
-                            <div className="text-[26px] font-semibold text-slate-900 leading-none">${money(Math.round(animatedProfitThisMonth))}</div>
-                          </div>
                           
                           <div className="mt-4 h-24 flex items-end gap-5">
                             <div className="flex-1">
@@ -1103,8 +1093,6 @@ export default function Dashboard() {
                             </div>
                           </div>
                         </div>
-                      </>
-                    )}
                   </div>
               </div>
             </div>
