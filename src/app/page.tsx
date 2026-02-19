@@ -1138,24 +1138,24 @@ export default function Dashboard() {
 
             {/* Quick Tables */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+              <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
+                <div className="border-b border-slate-100 px-6 py-5 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Open Invoices</h2>
-                    <p className="text-sm text-slate-600">Unpaid invoices awaiting payment</p>
+                    <h2 className="text-xl font-bold text-slate-900">Open Invoices</h2>
+                    <p className="mt-1 text-sm text-slate-600">Unpaid invoices awaiting payment</p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={handlePrintOpenInvoices}
-                      className="text-sm text-slate-600 hover:text-slate-800"
+                      className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
                     >
-                      {printingOpenInvoices ? "Preparing print…" : "Print"}
+                      {printingOpenInvoices ? "Preparing…" : "Print"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowOpenInvoicesModal(true)}
-                      className="text-sm text-blue-600 hover:text-blue-700"
+                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                     >
                       View all →
                     </button>
@@ -1166,27 +1166,27 @@ export default function Dashboard() {
                 )}
                 <div className="overflow-x-auto">
                   <table className="w-full hidden sm:table">
-                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                      <tr>
-                        <th className="px-6 py-3 text-left font-semibold">Invoice</th>
-                        <th className="px-6 py-3 text-left font-semibold">Customer</th>
-                        <th className="px-6 py-3 text-right font-semibold">Amount Due</th>
-                        <th className="px-6 py-3 text-right font-semibold">Status</th>
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-600 font-semibold">
+                      <tr className="border-b border-slate-100">
+                        <th className="px-6 py-4 text-left font-semibold">Invoice</th>
+                        <th className="px-6 py-4 text-left font-semibold">Customer</th>
+                        <th className="px-6 py-4 text-right font-semibold">Amount Due</th>
+                        <th className="px-6 py-4 text-right font-semibold">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-50">
                       {loadingRecentInvoices ? (
                         <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td></tr>
                       ) : recentInvoices.length === 0 ? (
                         <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">No open invoices</td></tr>
                       ) : (
                         recentInvoices.slice(0, 5).map((inv) => (
-                          <tr key={inv.id} className="hover:bg-slate-50">
-                            <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
-                            <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
-                            <td className="px-6 py-3 text-right text-slate-700">${money(inv.balance)}</td>
-                            <td className="px-6 py-3 text-right">
-                              <span className={`rounded-full px-2 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                          <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 font-mono text-sm text-slate-700">{inv.docNumber}</td>
+                            <td className="px-6 py-4 text-sm text-slate-700">{inv.customerName}</td>
+                            <td className="px-6 py-4 text-right text-sm font-semibold text-slate-900">${money(inv.balance)}</td>
+                            <td className="px-6 py-4 text-right">
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                                 {inv.status}
                               </span>
                             </td>
@@ -1202,15 +1202,15 @@ export default function Dashboard() {
                       <div className="text-sm text-slate-500">No open invoices</div>
                     ) : (
                       recentInvoices.slice(0, 5).map((inv) => (
-                        <div key={inv.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div key={inv.id} className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-semibold text-slate-900">{inv.docNumber}</span>
-                            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                               {inv.status}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-600">{inv.customerName}</p>
-                          <p className="text-sm font-semibold text-slate-900">${money(inv.balance)}</p>
+                          <p className="mt-2 text-sm text-slate-600">{inv.customerName}</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">${money(inv.balance)}</p>
                         </div>
                       ))
                     )}
@@ -1218,47 +1218,47 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+              <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
+                <div className="border-b border-slate-100 px-6 py-5 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
-                    <p className="text-sm text-slate-600">Payments received from customers today</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Total received: <span className="font-semibold text-slate-900">${money(paymentsTotal)}</span>
+                    <h2 className="text-xl font-bold text-slate-900">Customer Payments Today</h2>
+                    <p className="mt-1 text-sm text-slate-600">Payments received today</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                      Total: ${money(paymentsTotal)}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setShowCustomerPaymentsModal(true)}
-                    className="text-sm text-blue-600 hover:text-blue-700"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                   >
                     View all →
                   </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full hidden sm:table">
-                    <thead className="border-b border-slate-200 bg-slate-50">
+                    <thead className="bg-slate-50 border-b border-slate-100">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Applied</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total Amount</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-slate-600">Customer</th>
+                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-slate-600">Applied</th>
+                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-slate-600">Total Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-50">
                       {loadingCustomerPayments ? (
                         <tr>
-                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td>
+                          <td colSpan={3} className="px-6 py-6 text-center text-slate-500">Loading...</td>
                         </tr>
                       ) : customerPaymentsToday.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
+                          <td colSpan={3} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
                         </tr>
                       ) : (
                         customerPaymentsToday.slice(0, 5).map((payment) => (
-                          <tr key={payment.id} className="hover:bg-slate-50">
-                            <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
-                            <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
-                            <td className="px-6 py-3 text-right text-slate-600">${money(payment.totalAmount)}</td>
+                          <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 font-medium text-slate-900">{payment.customerName}</td>
+                            <td className="px-6 py-4 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
+                            <td className="px-6 py-4 text-right text-sm text-slate-600">${money(payment.totalAmount)}</td>
                           </tr>
                         ))
                       )}
@@ -1271,9 +1271,9 @@ export default function Dashboard() {
                       <div className="text-sm text-slate-500">No customer payments received today</div>
                     ) : (
                       customerPaymentsToday.slice(0, 5).map((payment) => (
-                        <div key={payment.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div key={payment.id} className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow">
                           <p className="text-sm font-semibold text-slate-900">{payment.customerName}</p>
-                          <div className="mt-1 flex items-center justify-between text-sm">
+                          <div className="mt-2 flex items-center justify-between text-sm">
                             <span className="text-emerald-700 font-semibold">${money(payment.appliedAmount)}</span>
                             <span className="text-slate-500">${money(payment.totalAmount)}</span>
                           </div>
@@ -1287,37 +1287,37 @@ export default function Dashboard() {
 
             {/* Recent Purchases + Top SKUs */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+              <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
+                <div className="border-b border-slate-100 px-6 py-5 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Recent Purchases</h2>
-                    <p className="text-sm text-slate-600">Latest purchase orders</p>
+                    <h2 className="text-xl font-bold text-slate-900">Recent Purchases</h2>
+                    <p className="mt-1 text-sm text-slate-600">Latest purchase orders</p>
                   </div>
-                  <a href="/admin/purchasing" className="text-sm text-blue-600 hover:text-blue-700">View all →</a>
+                  <a href="/admin/purchasing" className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</a>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                    <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase text-slate-600 font-semibold">
                       <tr>
-                        <th className="px-6 py-3 text-left font-semibold">PO</th>
-                        <th className="px-6 py-3 text-left font-semibold">Vendor</th>
-                        <th className="px-6 py-3 text-right font-semibold">Total</th>
-                        <th className="px-6 py-3 text-right font-semibold">Status</th>
+                        <th className="px-6 py-4 text-left">PO</th>
+                        <th className="px-6 py-4 text-left">Vendor</th>
+                        <th className="px-6 py-4 text-right">Total</th>
+                        <th className="px-6 py-4 text-right">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-50">
                       {loadingRecentPurchases ? (
                         <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td></tr>
                       ) : recentPurchases.length === 0 ? (
                         <tr><td colSpan={4} className="px-6 py-6 text-center text-slate-500">No recent purchases</td></tr>
                       ) : (
                         recentPurchases.map((po) => (
-                          <tr key={po.id} className="hover:bg-slate-50">
-                            <td className="px-6 py-3 font-mono text-slate-700">{po.poNumber}</td>
-                            <td className="px-6 py-3 text-slate-700">{po.vendorName}</td>
-                            <td className="px-6 py-3 text-right text-slate-700">${money(po.totalAmount)}</td>
-                            <td className="px-6 py-3 text-right">
-                              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                          <tr key={po.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 font-mono text-sm text-slate-700">{po.poNumber}</td>
+                            <td className="px-6 py-4 text-sm text-slate-700">{po.vendorName}</td>
+                            <td className="px-6 py-4 text-right text-sm font-semibold text-slate-900">${money(po.totalAmount)}</td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                                 {po.status}
                               </span>
                             </td>
@@ -1329,10 +1329,10 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900">Top SKUs This Month</h2>
-                  <p className="text-sm text-slate-600">Most popular units sold</p>
+              <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
+                <div className="border-b border-slate-100 px-6 py-5">
+                  <h2 className="text-xl font-bold text-slate-900">Top SKUs This Month</h2>
+                  <p className="mt-1 text-sm text-slate-600">Most popular units sold</p>
                 </div>
                 <div className="px-6 py-4 space-y-3 max-h-96 overflow-y-auto">
                   <TopSkuChart compact={true} />
@@ -1342,22 +1342,22 @@ export default function Dashboard() {
 
             {/* Bottom Listed Cards */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-xl bg-white shadow-md ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900">Vendors Paid Today</h2>
-                  <p className="text-sm text-slate-600">Payments our company made today</p>
+              <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
+                <div className="border-b border-slate-100 px-6 py-5">
+                  <h2 className="text-xl font-bold text-slate-900">Vendors Paid Today</h2>
+                  <p className="mt-1 text-sm text-slate-600">Payments our company made today</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="border-b border-slate-200 bg-slate-50">
+                    <thead className="border-b border-slate-100 bg-slate-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Vendor</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Payments</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Amount Paid</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Last Payment</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase text-slate-600">Vendor</th>
+                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-slate-600">Payments</th>
+                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-slate-600">Amount Paid</th>
+                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase text-slate-600">Last Payment</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-50">
                       {loadingVendorPayments ? (
                         <tr>
                           <td colSpan={4} className="px-6 py-6 text-center text-slate-500">Loading...</td>
@@ -1368,11 +1368,11 @@ export default function Dashboard() {
                         </tr>
                       ) : (
                         vendorPaymentsToday.map((payment) => (
-                          <tr key={payment.vendorName} className="hover:bg-slate-50">
-                            <td className="px-6 py-3 font-medium text-slate-900">{payment.vendorName}</td>
-                            <td className="px-6 py-3 text-right text-slate-600">{payment.paymentCount}</td>
-                            <td className="px-6 py-3 text-right font-semibold text-indigo-700">${money(payment.totalPaid)}</td>
-                            <td className="px-6 py-3 text-right text-slate-600">{payment.lastTxnDate}</td>
+                          <tr key={payment.vendorName} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 font-medium text-slate-900">{payment.vendorName}</td>
+                            <td className="px-6 py-4 text-right text-sm text-slate-600">{payment.paymentCount}</td>
+                            <td className="px-6 py-4 text-right text-sm font-semibold text-indigo-700">${money(payment.totalPaid)}</td>
+                            <td className="px-6 py-4 text-right text-sm text-slate-600">{payment.lastTxnDate}</td>
                           </tr>
                         ))
                       )}
@@ -1384,31 +1384,31 @@ export default function Dashboard() {
 
             {showOpenInvoicesModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-                <div className="w-full max-w-4xl rounded-xl bg-white shadow-xl ring-1 ring-slate-200">
-                  <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                <div className="w-full max-w-4xl rounded-lg bg-white shadow-xl ring-1 ring-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900">All Open Invoices</h2>
-                      <p className="text-sm text-slate-600">Full list of unpaid invoices</p>
+                      <h2 className="text-xl font-bold text-slate-900">All Open Invoices</h2>
+                      <p className="mt-1 text-sm text-slate-600">Full list of unpaid invoices</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowOpenInvoicesModal(false)}
-                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                     >
                       Close
                     </button>
                   </div>
                   <div className="max-h-[70vh] overflow-y-auto">
                     <table className="w-full">
-                      <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                      <thead className="bg-slate-50 text-xs uppercase text-slate-600 font-semibold border-b border-slate-100">
                         <tr>
-                          <th className="px-6 py-3 text-left font-semibold">Invoice</th>
-                          <th className="px-6 py-3 text-left font-semibold">Customer</th>
-                          <th className="px-6 py-3 text-right font-semibold">Amount Due</th>
-                          <th className="px-6 py-3 text-right font-semibold">Status</th>
+                          <th className="px-6 py-4 text-left">Invoice</th>
+                          <th className="px-6 py-4 text-left">Customer</th>
+                          <th className="px-6 py-4 text-right">Amount Due</th>
+                          <th className="px-6 py-4 text-right">Status</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-50">
                         {recentInvoices.length === 0 ? (
                           <tr>
                             <td colSpan={4} className="px-6 py-6 text-center text-slate-500">
@@ -1417,12 +1417,12 @@ export default function Dashboard() {
                           </tr>
                         ) : (
                           recentInvoices.map((inv) => (
-                            <tr key={inv.id} className="hover:bg-slate-50">
-                              <td className="px-6 py-3 font-mono text-slate-700">{inv.docNumber}</td>
-                              <td className="px-6 py-3 text-slate-700">{inv.customerName}</td>
-                              <td className="px-6 py-3 text-right text-slate-700">${money(inv.balance)}</td>
-                              <td className="px-6 py-3 text-right">
-                                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                            <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-6 py-4 font-mono text-sm text-slate-700">{inv.docNumber}</td>
+                              <td className="px-6 py-4 text-sm text-slate-700">{inv.customerName}</td>
+                              <td className="px-6 py-4 text-right text-sm font-semibold text-slate-900">${money(inv.balance)}</td>
+                              <td className="px-6 py-4 text-right">
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                                   {inv.status}
                                 </span>
                               </td>
@@ -1438,16 +1438,16 @@ export default function Dashboard() {
 
             {showCustomerPaymentsModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-                <div className="w-full max-w-4xl rounded-xl bg-white shadow-xl ring-1 ring-slate-200">
-                  <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                <div className="w-full max-w-4xl rounded-lg bg-white shadow-xl ring-1 ring-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900">All Customer Payments Today</h2>
-                      <p className="text-sm text-slate-600">Total received: ${money(paymentsTotal)}</p>
+                      <h2 className="text-xl font-bold text-slate-900">All Customer Payments Today</h2>
+                      <p className="mt-1 text-sm text-slate-600">Total received: ${money(paymentsTotal)}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowCustomerPaymentsModal(false)}
-                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                     >
                       Close
                     </button>
