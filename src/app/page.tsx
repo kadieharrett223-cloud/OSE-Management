@@ -98,6 +98,11 @@ const mockReps = [
 
 type LineSeries = Array<number | null>;
 
+const getSeriesMax = (...series: LineSeries[]) => {
+  const values = series.flat().filter((val): val is number => typeof val === "number" && !Number.isNaN(val));
+  return Math.max(...values, 1);
+};
+
 const buildLinePath = (values: LineSeries, maxValue: number, width: number, height: number, padding: number) => {
   const usableWidth = width - padding * 2;
   const usableHeight = height - padding * 2;
@@ -218,9 +223,9 @@ export default function Dashboard() {
   const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
   const [loadingRecentPurchases, setLoadingRecentPurchases] = useState(true);
   const [qboSyncStatus, setQboSyncStatus] = useState<"idle" | "ok" | "error">("idle");
-  const [currentMonthTrend, setCurrentMonthTrend] = useState<number[]>([]);
-  const [lastMonthTrend, setLastMonthTrend] = useState<number[]>([]);
-  const [expenseTrend, setExpenseTrend] = useState<number[]>([]);
+  const [currentMonthTrend, setCurrentMonthTrend] = useState<LineSeries>([]);
+  const [lastMonthTrend, setLastMonthTrend] = useState<LineSeries>([]);
+  const [expenseTrend, setExpenseTrend] = useState<LineSeries>([]);
 
   // Compute derived values first (needed for animated count-ups)
   const totalExpenses = paidExpensesTotal + payrollExpenseTotal;
@@ -286,7 +291,7 @@ export default function Dashboard() {
   const totalCommission = repSalesData.length > 0
     ? repSalesData.reduce((sum, rep) => sum + rep.commission, 0)
     : mockReps.reduce((sum, rep) => sum + rep.commission, 0);
-  const monthlyTrendMax = Math.max(...currentMonthTrend, ...lastMonthTrend, ...expenseTrend, 1);
+  const monthlyTrendMax = getSeriesMax(currentMonthTrend, lastMonthTrend, expenseTrend);
   const topExpenseSeries = topExpenses.map((expense) => expense.total);
   const maxTopExpense = Math.max(...topExpenseSeries, 1);
   const profitVsExpenseMax = Math.max(Math.abs(profitThisMonth), totalExpenses, 1);
@@ -700,6 +705,11 @@ export default function Dashboard() {
       return cumulative;
     };
 
+    const padSeriesToDays = (series: number[], targetDays: number): LineSeries => {
+      if (series.length >= targetDays) return series;
+      return [...series, ...Array.from({ length: targetDays - series.length }, () => null)];
+    };
+
     const fetchMonthlyComparison = async () => {
       try {
         const today = new Date();
@@ -738,7 +748,10 @@ export default function Dashboard() {
         console.log(`[dashboard] Monthly data - current: ${currentPayments.length} payments, last month: ${lastPayments.length} payments`);
 
         const currentSeries = buildCumulativeSeries(currentPayments, daysSoFar, currentMonthStart);
-        const lastSeries = buildCumulativeSeries(lastPayments, compareDays, lastMonthStart);
+        const lastSeries = padSeriesToDays(
+          buildCumulativeSeries(lastPayments, compareDays, lastMonthStart),
+          daysSoFar
+        );
 
         if (isMounted) {
           setCurrentMonthTrend(currentSeries);
@@ -974,12 +987,12 @@ export default function Dashboard() {
                 </div>
                 <div className="mt-6">
                   {currentMonthTrend.length === 0 && lastMonthTrend.length === 0 ? (
-                    <div className="h-32 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
+                    <div className="flex items-center justify-center bg-slate-50 rounded-lg py-8 text-sm text-slate-500">
                       Loading trend data...
                     </div>
                   ) : (
                     <>
-                      <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="h-24 w-full">
+                      <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="w-full">
                         <defs>
                           <linearGradient id="incomeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                             <stop offset="0%" stopColor="#2563eb" stopOpacity="0.2" />
