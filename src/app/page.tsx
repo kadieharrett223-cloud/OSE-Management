@@ -1010,14 +1010,22 @@ export default function Dashboard() {
                           <span>Top Expenses (Paid)</span>
                           <span>Top 5</span>
                         </div>
-                        <div className="mt-2 space-y-2">
+                        <div className="mt-3 space-y-3">
                           {topExpenses.length === 0 ? (
                             <div className="text-sm text-slate-500">No paid expenses yet this month.</div>
                           ) : (
                             topExpenses.map((item) => (
-                              <div key={item.name} className="flex items-center justify-between text-sm">
-                                <span className="text-slate-600">{item.name}</span>
-                                <span className="font-semibold text-slate-900">${money(item.total)}</span>
+                              <div key={item.name}>
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-slate-600">{item.name}</span>
+                                  <span className="font-semibold text-slate-900">${money(item.total)}</span>
+                                </div>
+                                <div className="mt-1 h-2 w-full rounded-full bg-slate-100">
+                                  <div
+                                    className="h-2 rounded-full bg-amber-400"
+                                    style={{ width: `${(item.total / maxTopExpense) * 100}%` }}
+                                  />
+                                </div>
                               </div>
                             ))
                           )}
