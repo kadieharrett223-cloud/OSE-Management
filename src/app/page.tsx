@@ -119,7 +119,6 @@ const buildLinePath = (values: LineSeries, maxValue: number, width: number, heig
 };
 
 export default function Dashboard() {
-  const [monthlyGoal, setMonthlyGoal] = useState<number>(430000);
   const [qboSales, setQboSales] = useState<number | null>(null);
   const [lastYearMonthSales, setLastYearMonthSales] = useState<number | null>(null);
   const [loadingLastYearMonth, setLoadingLastYearMonth] = useState(true);
@@ -149,27 +148,6 @@ export default function Dashboard() {
   const [qboSyncStatus, setQboSyncStatus] = useState<"idle" | "ok" | "error">("idle");
   const [currentMonthTrend, setCurrentMonthTrend] = useState<number[]>([]);
   const [lastMonthTrend, setLastMonthTrend] = useState<number[]>([]);
-
-  // Fetch monthly goal
-  useEffect(() => {
-    let isMounted = true;
-    fetch(`/api/goals/monthly`)
-      .then(async (res) => {
-        if (!res.ok) return null;
-        const payload = await res.json().catch(() => null);
-        return payload?.goal ?? null;
-      })
-      .then((goal) => {
-        if (!isMounted || !goal?.goal_amount) return;
-        const value = Number(goal.goal_amount);
-        setMonthlyGoal(value);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   // Fetch QuickBooks invoice data for current month (calendar month)
   useEffect(() => {
@@ -223,7 +201,6 @@ export default function Dashboard() {
   const totalCommission = repSalesData.length > 0
     ? repSalesData.reduce((sum, rep) => sum + rep.commission, 0)
     : mockReps.reduce((sum, rep) => sum + rep.commission, 0);
-  const percentOfGoal = monthlyGoal > 0 ? Math.round((totalSales / monthlyGoal) * 100) : 0;
   const attentionItems = [
     outstandingCount > 0
       ? `Outstanding invoices: $${money(outstandingTotal)} across ${outstandingCount} open invoices.`
@@ -766,7 +743,7 @@ export default function Dashboard() {
                   {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(monthlyTotal)}`}
                 </div>
                 <div className="mt-1 text-xs text-slate-600">
-                  {(monthlyTotal / monthlyGoal * 100).toFixed(1)}% of goal • paid invoices
+                  {loadingLastMonthTotal ? "Loading last month..." : `${money(lastMonthTotal)} last month • paid invoices`}
                 </div>
               </div>
 
