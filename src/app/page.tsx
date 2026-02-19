@@ -870,15 +870,15 @@ export default function Dashboard() {
                 </div>
                 <div className="mt-6">
                   {currentMonthTrend.length === 0 && lastMonthTrend.length === 0 ? (
-                    <div className="h-40 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
+                    <div className="h-32 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
                       Loading trend data...
                     </div>
                   ) : (
                     <>
-                      <svg viewBox="0 0 320 160" preserveAspectRatio="none" className="h-40 w-full">
+                      <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="h-24 w-full">
                         {lastMonthTrend.length > 0 && (
                           <path
-                            d={buildLinePath(lastMonthTrend, Math.max(...lastMonthTrend.filter(v => v !== null && v !== undefined), 1), 320, 160, 12)}
+                            d={buildLinePath(lastMonthTrend, Math.max(...lastMonthTrend.filter(v => v !== null && v !== undefined), 1), 320, 120, 12)}
                             fill="none"
                             stroke="#94a3b8"
                             strokeWidth="3"
@@ -886,7 +886,7 @@ export default function Dashboard() {
                         )}
                         {currentMonthTrend.length > 0 && (
                           <path
-                            d={buildLinePath(currentMonthTrend, Math.max(...currentMonthTrend.filter(v => v !== null && v !== undefined), 1), 320, 160, 12)}
+                            d={buildLinePath(currentMonthTrend, Math.max(...currentMonthTrend.filter(v => v !== null && v !== undefined), 1), 320, 120, 12)}
                             fill="none"
                             stroke="#2563eb"
                             strokeWidth="3"
@@ -915,8 +915,13 @@ export default function Dashboard() {
                     <p className="text-sm text-slate-600">Largest paid expenses this month</p>
                   </div>
                   <div className="text-right text-xs text-slate-500">
-                    {loadingProfit || loadingMonthlyTotal ? "Loading..." : `Profit $${money(profitThisMonth)}`}
+                    {loadingProfit || loadingMonthlyTotal
+                      ? "Loading..."
+                      : `Income $${money(monthlyTotal)} • Expenses $${money(totalExpenses)}`}
                   </div>
+                </div>
+                <div className="mt-1 text-right text-xs text-slate-500">
+                  {loadingProfit || loadingMonthlyTotal ? "" : `Profit $${money(profitThisMonth)}`}
                 </div>
 
                 <div className="mt-4">
@@ -953,9 +958,6 @@ export default function Dashboard() {
                             </div>
                           </div>
                         )}
-                      </div>
-                      <div className="mt-3 text-xs text-slate-500">
-                        Income ${money(monthlyTotal)} • Expenses ${money(totalExpenses)}
                       </div>
                     </>
                   )}
