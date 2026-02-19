@@ -973,7 +973,7 @@ export default function Dashboard() {
 
             {/* Main Visual + Action Required */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
-              <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-100">
+              <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-100 self-start">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">Monthly Performance</h2>
@@ -992,7 +992,7 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <>
-                      <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="w-full">
+                      <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="block w-full">
                         <defs>
                           <linearGradient id="incomeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                             <stop offset="0%" stopColor="#2563eb" stopOpacity="0.2" />
@@ -1084,7 +1084,7 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <>
-                      <div className="rounded-lg bg-gradient-to-br from-slate-50 to-slate-25 p-6 border border-slate-100">
+                      <div className="rounded-md bg-slate-50 p-6 border border-slate-200">
                         <div className="mb-4">
                           <div className="text-sm font-medium text-slate-600 uppercase tracking-wider">Profit (Month-to-Date)</div>
                           <div className="mt-2 text-4xl font-bold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
@@ -1094,7 +1094,7 @@ export default function Dashboard() {
                           <div className="flex-1">
                             <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Profit</div>
                             <div
-                              className={`w-full rounded-lg ${profitThisMonth >= 0 ? "bg-emerald-500" : "bg-red-500"} transition-all duration-300`}
+                              className={`w-full rounded-sm ${profitThisMonth >= 0 ? "bg-emerald-600" : "bg-red-600"} transition-all duration-300`}
                               style={{ height: `${(Math.abs(profitThisMonth) / profitVsExpenseMax) * 100}%`, minHeight: "20px" }}
                             />
                             <div className="mt-3 text-sm font-semibold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
@@ -1102,7 +1102,7 @@ export default function Dashboard() {
                           <div className="flex-1">
                             <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Expenses</div>
                             <div
-                              className="w-full rounded-lg bg-amber-500 transition-all duration-300"
+                              className="w-full rounded-sm bg-amber-600 transition-all duration-300"
                               style={{ height: `${(totalExpenses / profitVsExpenseMax) * 100}%`, minHeight: "20px" }}
                             />
                             <div className="mt-3 text-sm font-semibold text-slate-900">${money(Math.round(animatedTotalExpenses))}</div>
@@ -1133,9 +1133,9 @@ export default function Dashboard() {
                                   <span className="text-sm font-medium text-slate-700">{item.name}</span>
                                   <span className="text-sm font-bold text-slate-900">${money(item.total)}</span>
                                 </div>
-                                <div className="h-2 w-full rounded-full bg-slate-100">
+                                <div className="h-2 w-full rounded-sm bg-slate-100">
                                   <div
-                                    className="h-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500"
+                                    className="h-2 rounded-sm bg-amber-400 transition-all duration-500"
                                     style={{ width: `${(item.total / maxTopExpense) * 100}%` }}
                                   />
                                 </div>
