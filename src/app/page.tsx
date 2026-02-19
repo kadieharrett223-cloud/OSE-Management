@@ -922,10 +922,51 @@ export default function Dashboard() {
               </div>
             </header>
 
+            {/* Key Metrics */}
+            <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Key Metrics</h2>
+                <span className="text-xs text-slate-400">This month</span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-md border border-slate-100 px-3 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Sales This Month</div>
+                  <div className="mt-2 text-2xl font-semibold text-slate-900">
+                    {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedMonthlyTotal))}`}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {loadingLastMonthTotal ? "Loading last month..." : `${money(lastMonthTotal)} last month • paid invoices`}
+                  </div>
+                </div>
+
+                <div className="rounded-md border border-slate-100 px-3 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">This Month Last Year</div>
+                  <div className="mt-2 text-2xl font-semibold text-slate-900">
+                    {loadingLastYearMonth ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedLastYearSales))}`}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">Same month last year • paid invoices</div>
+                </div>
+
+                <div className="rounded-md border border-slate-100 px-3 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Customer Payments Today</div>
+                  <div className="mt-2 text-2xl font-semibold text-slate-900">${money(Math.round(animatedPaymentsTotal))}</div>
+                  <div className="mt-1 text-xs text-slate-500">Customers paying us today</div>
+                </div>
+
+                <div className="rounded-md border border-slate-100 px-3 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Last Sync Status</div>
+                  <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <span className={`h-2 w-2 rounded-full ${qboSyncStatus === "ok" ? "bg-emerald-500" : qboSyncStatus === "error" ? "bg-red-500" : "bg-slate-300"}`} />
+                    {qboSyncStatus === "ok" ? "QB Sync ✅" : qboSyncStatus === "error" ? "QB Sync ⚠️" : "Checking"}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">Data reliability check</div>
+                </div>
+              </div>
+            </div>
+
             {/* Overview */}
-            <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-              <div className="space-y-6">
-                <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-100">
+            <div className="space-y-6">
+              <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-100">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-xl font-bold text-slate-900">Monthly Performance</h2>
@@ -1025,20 +1066,20 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="mt-6">
+                  <div className="mt-4">
                     {loadingProfit || loadingMonthlyTotal ? (
-                      <div className="h-32 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
+                      <div className="h-28 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
                         Loading expenses...
                       </div>
                     ) : (
                       <>
-                        <div className="rounded-lg bg-gradient-to-br from-slate-50 to-slate-25 p-6 border border-slate-100">
+                        <div className="rounded-lg bg-gradient-to-br from-slate-50 to-slate-25 p-4 border border-slate-100">
                           <div className="mb-4">
                             <div className="text-sm font-medium text-slate-600 uppercase tracking-wider">Profit (Month-to-Date)</div>
-                            <div className="mt-2 text-3xl font-semibold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
+                            <div className="mt-2 text-2xl font-semibold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
                           </div>
                           
-                          <div className="mt-6 h-28 flex items-end gap-6">
+                          <div className="mt-4 h-24 flex items-end gap-5">
                             <div className="flex-1">
                               <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Profit</div>
                               <div
@@ -1057,7 +1098,7 @@ export default function Dashboard() {
                             </div>
                           </div>
                           
-                          <div className="mt-6 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
+                          <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
                             <div>
                               <div className="text-xs font-medium text-slate-600 uppercase tracking-wider">Payroll</div>
                               <div className="mt-1 text-base font-semibold text-slate-900">${money(Math.round(animatedPayrollTotal))}</div>
@@ -1068,78 +1109,9 @@ export default function Dashboard() {
                             </div>
                           </div>
                         </div>
-
-                        <div className="mt-6">
-                          <div className="mb-4 text-sm font-bold text-slate-900 uppercase tracking-wider">Top Paid Expenses</div>
-                          <div className="space-y-4">
-                            {topExpenses.length === 0 ? (
-                              <div className="text-sm text-slate-500 py-4">No paid expenses yet this month.</div>
-                            ) : (
-                              topExpenses.map((item, idx) => (
-                                <div key={item.name}>
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm font-medium text-slate-700">{item.name}</span>
-                                    <span className="text-sm font-bold text-slate-900">${money(item.total)}</span>
-                                  </div>
-                                  <div className="h-2 w-full rounded-full bg-slate-100">
-                                    <div
-                                      className="h-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-500"
-                                      style={{ width: `${(item.total / maxTopExpense) * 100}%` }}
-                                    />
-                                  </div>
-                                  <div className="mt-1 text-xs text-slate-500">{((item.total / totalExpenses) * 100).toFixed(0)}% of expenses</div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
                       </>
                     )}
                   </div>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Key Metrics</h2>
-                    <span className="text-xs text-slate-400">This month</span>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    <div className="rounded-md border border-slate-100 px-3 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Sales This Month</div>
-                      <div className="mt-2 text-2xl font-semibold text-slate-900">
-                        {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedMonthlyTotal))}`}
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        {loadingLastMonthTotal ? "Loading last month..." : `${money(lastMonthTotal)} last month • paid invoices`}
-                      </div>
-                    </div>
-
-                    <div className="rounded-md border border-slate-100 px-3 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">This Month Last Year</div>
-                      <div className="mt-2 text-2xl font-semibold text-slate-900">
-                        {loadingLastYearMonth ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedLastYearSales))}`}
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">Same month last year • paid invoices</div>
-                    </div>
-
-                    <div className="rounded-md border border-slate-100 px-3 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Customer Payments Today</div>
-                      <div className="mt-2 text-2xl font-semibold text-slate-900">${money(Math.round(animatedPaymentsTotal))}</div>
-                      <div className="mt-1 text-xs text-slate-500">Customers paying us today</div>
-                    </div>
-
-                    <div className="rounded-md border border-slate-100 px-3 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Last Sync Status</div>
-                      <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
-                        <span className={`h-2 w-2 rounded-full ${qboSyncStatus === "ok" ? "bg-emerald-500" : qboSyncStatus === "error" ? "bg-red-500" : "bg-slate-300"}`} />
-                        {qboSyncStatus === "ok" ? "QB Sync ✅" : qboSyncStatus === "error" ? "QB Sync ⚠️" : "Checking"}
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">Data reliability check</div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 
