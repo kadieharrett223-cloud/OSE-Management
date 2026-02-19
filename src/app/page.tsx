@@ -121,8 +121,8 @@ const buildLinePath = (values: LineSeries, maxValue: number, width: number, heig
 export default function Dashboard() {
   const [monthlyGoal, setMonthlyGoal] = useState<number>(430000);
   const [qboSales, setQboSales] = useState<number | null>(null);
-  const [ytdSales, setYtdSales] = useState<number | null>(null);
-  const [loadingYtd, setLoadingYtd] = useState(true);
+  const [lastYearMonthSales, setLastYearMonthSales] = useState<number | null>(null);
+  const [loadingLastYearMonth, setLoadingLastYearMonth] = useState(true);
   const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
   const [outstandingTotal, setOutstandingTotal] = useState<number>(0);
   const [outstandingCount, setOutstandingCount] = useState<number>(0);
@@ -279,7 +279,7 @@ export default function Dashboard() {
         const endDate = now.toISOString().slice(0, 10);
 
         const paidInvoicesResponse = await fetch(
-          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`
+          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid&allPages=true&totalsOnly=true`
         );
 
         if (!paidInvoicesResponse.ok) {
@@ -348,31 +348,35 @@ export default function Dashboard() {
     fetchPartialPaidInvoices();
   }, []);
 
-  // Fetch year-to-date paid sales
+  // Fetch same month last year (month-to-date) paid sales
   useEffect(() => {
     let isMounted = true;
-    const fetchYtdSales = async () => {
-      setLoadingYtd(true);
+    const fetchLastYearMonthSales = async () => {
+      setLoadingLastYearMonth(true);
       try {
         const now = new Date();
-        const year = now.getFullYear();
-        const startDate = `${year}-01-01`;
-        const endDate = now.toISOString().slice(0, 10);
-        const res = await fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`);
-        if (!res.ok) throw new Error("Failed to fetch YTD sales");
+        const lastYear = now.getFullYear() - 1;
+        const month = (now.getMonth() + 1).toString().padStart(2, "0");
+        const startDate = `${lastYear}-${month}-01`;
+        const lastDay = new Date(lastYear, now.getMonth() + 1, 0).getDate();
+        const endDate = `${lastYear}-${month}-${String(lastDay).padStart(2, "0")}`;
+        const res = await fetch(
+          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid&allPages=true&totalsOnly=true`
+        );
+        if (!res.ok) throw new Error("Failed to fetch last year month sales");
         const data = await res.json();
         if (isMounted) {
-          setYtdSales(Number(data.totalPaid || 0));
+          setLastYearMonthSales(Number(data.totalPaid || 0));
         }
       } catch (error) {
-        console.error("Failed to fetch YTD sales:", error);
-        if (isMounted) setYtdSales(null);
+        console.error("Failed to fetch last year month sales:", error);
+        if (isMounted) setLastYearMonthSales(null);
       } finally {
-        if (isMounted) setLoadingYtd(false);
+        if (isMounted) setLoadingLastYearMonth(false);
       }
     };
 
-    fetchYtdSales();
+    fetchLastYearMonthSales();
     return () => {
       isMounted = false;
     };
@@ -737,14 +741,6 @@ export default function Dashboard() {
             {/* Business Health Snapshot */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
-                <div className="text-xs uppercase font-semibold text-slate-500">YTD Sales</div>
-                <div className="mt-2 text-2xl font-bold text-emerald-700">
-                  {loadingYtd ? <span className="text-slate-400">Loading...</span> : `$${money(ytdSales ?? 0)}`}
-                </div>
-                <div className="mt-1 text-xs text-slate-600">{percentOfGoal}% of goal pace</div>
-              </div>
-
-              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
                 <div className="text-xs uppercase font-semibold text-slate-500">Sales This Month</div>
                 <div className="mt-2 text-2xl font-bold text-emerald-700">
                   {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(monthlyTotal)}`}
@@ -752,6 +748,14 @@ export default function Dashboard() {
                 <div className="mt-1 text-xs text-slate-600">
                   {(monthlyTotal / monthlyGoal * 100).toFixed(1)}% of goal • paid invoices
                 </div>
+              </div>
+
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">This Month Last Year</div>
+                <div className="mt-2 text-2xl font-bold text-emerald-700">
+                  {loadingLastYearMonth ? <span className="text-slate-400">Loading...</span> : `$${money(lastYearMonthSales ?? 0)}`}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">Same month last year • paid invoices</div>
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">

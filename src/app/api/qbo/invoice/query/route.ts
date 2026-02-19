@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const status = searchParams.get("status"); // "Paid", "Unpaid", etc.
+    const allPages = searchParams.get("allPages") === "true";
+    const totalsOnly = searchParams.get("totalsOnly") === "true";
 
     // Build the QuickBooks query
     let query = "SELECT * FROM Invoice";
@@ -35,24 +37,59 @@ export async function GET(req: NextRequest) {
 
     query += " ORDERBY TxnDate DESC";
 
-    const data = await authorizedQboFetch<any>(
-      `/query?query=${encodeURIComponent(query)}&minorversion=65`,
-      {},
-      userId || undefined
-    );
+    const maxResults = 1000;
+    const invoices: any[] = [];
+    let totalAmount = 0;
+    let totalPaid = 0;
 
-    const invoices = data?.QueryResponse?.Invoice || [];
-    
-    // Calculate totals
-    const totalAmount = invoices.reduce((sum: number, inv: any) => {
-      return sum + (Number(inv.TotalAmt) || 0);
-    }, 0);
+    const accumulateTotals = (pageInvoices: any[]) => {
+      totalAmount += pageInvoices.reduce((sum: number, inv: any) => {
+        return sum + (Number(inv.TotalAmt) || 0);
+      }, 0);
 
-    const totalPaid = invoices.reduce((sum: number, inv: any) => {
-      const balance = Number(inv.Balance) || 0;
-      const total = Number(inv.TotalAmt) || 0;
-      return sum + (total - balance);
-    }, 0);
+      totalPaid += pageInvoices.reduce((sum: number, inv: any) => {
+        const balance = Number(inv.Balance) || 0;
+        const total = Number(inv.TotalAmt) || 0;
+        return sum + (total - balance);
+      }, 0);
+    };
+
+    if (allPages) {
+      let startPosition = 1;
+      while (true) {
+        const pagedQuery = `${query} STARTPOSITION ${startPosition} MAXRESULTS ${maxResults}`;
+        const data = await authorizedQboFetch<any>(
+          `/query?query=${encodeURIComponent(pagedQuery)}&minorversion=65`,
+          {},
+          userId || undefined
+        );
+
+        const pageInvoices = data?.QueryResponse?.Invoice || [];
+        accumulateTotals(pageInvoices);
+
+        if (!totalsOnly) {
+          invoices.push(...pageInvoices);
+        }
+
+        if (pageInvoices.length < maxResults) {
+          break;
+        }
+
+        startPosition += maxResults;
+      }
+    } else {
+      const data = await authorizedQboFetch<any>(
+        `/query?query=${encodeURIComponent(query)}&minorversion=65`,
+        {},
+        userId || undefined
+      );
+
+      const pageInvoices = data?.QueryResponse?.Invoice || [];
+      accumulateTotals(pageInvoices);
+      if (!totalsOnly) {
+        invoices.push(...pageInvoices);
+      }
+    }
 
     return NextResponse.json({
       ok: true,
