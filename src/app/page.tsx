@@ -152,6 +152,7 @@ export default function Dashboard() {
   const [qboSyncStatus, setQboSyncStatus] = useState<"idle" | "ok" | "error">("idle");
   const [currentMonthTrend, setCurrentMonthTrend] = useState<number[]>([]);
   const [lastMonthTrend, setLastMonthTrend] = useState<number[]>([]);
+  const [expenseTrend, setExpenseTrend] = useState<number[]>([]);
 
   // Fetch QuickBooks invoice data for current month (calendar month)
   useEffect(() => {
@@ -207,8 +208,10 @@ export default function Dashboard() {
     : mockReps.reduce((sum, rep) => sum + rep.commission, 0);
   const totalExpenses = paidExpensesTotal + payrollExpenseTotal;
   const profitThisMonth = monthlyTotal - totalExpenses;
+  const monthlyTrendMax = Math.max(...currentMonthTrend, ...lastMonthTrend, ...expenseTrend, 1);
   const topExpenseSeries = topExpenses.map((expense) => expense.total);
   const maxTopExpense = Math.max(...topExpenseSeries, 1);
+  const profitVsExpenseMax = Math.max(Math.abs(profitThisMonth), totalExpenses, 1);
 
   // Fetch unpaid invoices for current month
   useEffect(() => {
@@ -341,6 +344,28 @@ export default function Dashboard() {
           return sum + perPayroll * (daysElapsed / 14);
         }, 0);
 
+        const expenseDaily = Array.from({ length: daysElapsed }, () => 0);
+        const payrollDaily = daysElapsed > 0 ? payrollTotal / daysElapsed : 0;
+        for (let i = 0; i < daysElapsed; i += 1) {
+          expenseDaily[i] = payrollDaily;
+        }
+
+        billPayments.forEach((payment: any) => {
+          if (!payment.TxnDate) return;
+          const paymentDate = new Date(payment.TxnDate);
+          if (paymentDate.getFullYear() !== year || paymentDate.getMonth() !== monthIndex) return;
+          const dayIndex = Math.max(0, Math.min(daysElapsed - 1, paymentDate.getDate() - 1));
+          const total = Number(payment.TotalAmt) || 0;
+          expenseDaily[dayIndex] += total;
+        });
+
+        const expenseSeries: number[] = [];
+        let runningExpense = 0;
+        for (let i = 0; i < expenseDaily.length; i += 1) {
+          runningExpense += expenseDaily[i];
+          expenseSeries.push(runningExpense);
+        }
+
         const vendorTotals = new Map<string, number>();
         billPayments.forEach((payment: any) => {
           const vendorName =
@@ -360,6 +385,7 @@ export default function Dashboard() {
           setPaidExpensesTotal(paidBills);
           setPayrollExpenseTotal(payrollTotal);
           setTopExpenses(topVendors);
+          setExpenseTrend(expenseSeries);
         }
       } catch (error) {
         console.error("Failed to fetch profit data:", error);
@@ -367,6 +393,7 @@ export default function Dashboard() {
           setPaidExpensesTotal(0);
           setPayrollExpenseTotal(0);
           setTopExpenses([]);
+          setExpenseTrend([]);
         }
       } finally {
         if (isMounted) setLoadingProfit(false);
@@ -856,7 +883,7 @@ export default function Dashboard() {
 
             {/* Main Visual + Action Required */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-xl bg-white p-6 shadow-md ring-1 ring-slate-200">
+              <div className="rounded-xl bg-white p-4 shadow-md ring-1 ring-slate-200">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900">Monthly Performance</h2>
@@ -868,7 +895,7 @@ export default function Dashboard() {
                       : `${money(monthlyTotal)} this month • ${money(lastMonthTotal)} last month`}
                   </div>
                 </div>
-                <div className="mt-6">
+                <div className="mt-4">
                   {currentMonthTrend.length === 0 && lastMonthTrend.length === 0 ? (
                     <div className="h-32 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
                       Loading trend data...
@@ -878,7 +905,7 @@ export default function Dashboard() {
                       <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="h-24 w-full">
                         {lastMonthTrend.length > 0 && (
                           <path
-                            d={buildLinePath(lastMonthTrend, Math.max(...lastMonthTrend.filter(v => v !== null && v !== undefined), 1), 320, 120, 12)}
+                            d={buildLinePath(lastMonthTrend, monthlyTrendMax, 320, 120, 12)}
                             fill="none"
                             stroke="#94a3b8"
                             strokeWidth="3"
@@ -886,9 +913,17 @@ export default function Dashboard() {
                         )}
                         {currentMonthTrend.length > 0 && (
                           <path
-                            d={buildLinePath(currentMonthTrend, Math.max(...currentMonthTrend.filter(v => v !== null && v !== undefined), 1), 320, 120, 12)}
+                            d={buildLinePath(currentMonthTrend, monthlyTrendMax, 320, 120, 12)}
                             fill="none"
                             stroke="#2563eb"
+                            strokeWidth="3"
+                          />
+                        )}
+                        {expenseTrend.length > 0 && (
+                          <path
+                            d={buildLinePath(expenseTrend, monthlyTrendMax, 320, 120, 12)}
+                            fill="none"
+                            stroke="#f59e0b"
                             strokeWidth="3"
                           />
                         )}
@@ -900,7 +935,11 @@ export default function Dashboard() {
                         </span>
                         <span className="inline-flex items-center gap-2">
                           <span className="h-2 w-2 rounded-full bg-blue-600" />
-                          This month
+                          Income
+                        </span>
+                        <span className="inline-flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-amber-500" />
+                          Expenses
                         </span>
                       </div>
                     </>
@@ -911,8 +950,8 @@ export default function Dashboard() {
               <div className="rounded-xl bg-white p-4 shadow-md ring-1 ring-slate-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Top Expenses</h2>
-                    <p className="text-sm text-slate-600">Largest paid expenses this month</p>
+                    <h2 className="text-lg font-semibold text-slate-900">Profit vs Expenses</h2>
+                    <p className="text-sm text-slate-600">Month-to-date totals</p>
                   </div>
                   <div className="text-right text-xs text-slate-500">
                     {loadingProfit || loadingMonthlyTotal
@@ -933,31 +972,56 @@ export default function Dashboard() {
                     <>
                       <div className="rounded-lg bg-slate-50 p-4">
                         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          <span>Expenses Trend</span>
+                          <span>Profit vs Expenses</span>
+                          <span>Month-to-date</span>
+                        </div>
+                        <div className="mt-3 h-28 flex items-end gap-6">
+                          <div className="flex-1">
+                            <div
+                              className={`w-full rounded-md ${profitThisMonth >= 0 ? "bg-emerald-500" : "bg-red-500"}`}
+                              style={{ height: `${(Math.abs(profitThisMonth) / profitVsExpenseMax) * 100}%` }}
+                            />
+                            <div className="mt-2 text-xs text-slate-500">Profit</div>
+                            <div className="text-sm font-semibold text-slate-900">${money(profitThisMonth)}</div>
+                          </div>
+                          <div className="flex-1">
+                            <div
+                              className="w-full rounded-md bg-amber-500"
+                              style={{ height: `${(totalExpenses / profitVsExpenseMax) * 100}%` }}
+                            />
+                            <div className="mt-2 text-xs text-slate-500">Expenses</div>
+                            <div className="text-sm font-semibold text-slate-900">${money(totalExpenses)}</div>
+                          </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-slate-500">
+                          <div className="flex items-center justify-between">
+                            <span>Payroll</span>
+                            <span className="font-semibold text-slate-700">${money(payrollExpenseTotal)}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Bills</span>
+                            <span className="font-semibold text-slate-700">${money(paidExpensesTotal)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          <span>Top Expenses (Paid)</span>
                           <span>Top 5</span>
                         </div>
-                        {topExpenseSeries.length === 0 ? (
-                          <div className="mt-4 text-sm text-slate-500">No paid expenses yet this month.</div>
-                        ) : (
-                          <div className="mt-3">
-                            <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="h-24 w-full">
-                              <path
-                                d={buildLinePath(topExpenseSeries, maxTopExpense, 320, 120, 12)}
-                                fill="none"
-                                stroke="#f59e0b"
-                                strokeWidth="3"
-                              />
-                            </svg>
-                            <div className="mt-3 space-y-2">
-                              {topExpenses.map((item) => (
-                                <div key={item.name} className="flex items-center justify-between text-sm">
-                                  <span className="text-slate-600">{item.name}</span>
-                                  <span className="font-semibold text-slate-900">${money(item.total)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                        <div className="mt-2 space-y-2">
+                          {topExpenses.length === 0 ? (
+                            <div className="text-sm text-slate-500">No paid expenses yet this month.</div>
+                          ) : (
+                            topExpenses.map((item) => (
+                              <div key={item.name} className="flex items-center justify-between text-sm">
+                                <span className="text-slate-600">{item.name}</span>
+                                <span className="font-semibold text-slate-900">${money(item.total)}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </>
                   )}
