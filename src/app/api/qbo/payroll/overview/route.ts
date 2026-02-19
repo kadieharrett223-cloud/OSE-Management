@@ -38,8 +38,22 @@ const parseHours = (value: unknown) => {
 };
 
 const ACTIVE_EMPLOYEES = new Set(
-  ["chad", "deacon", "emma", "kadie", "michael", "nick", "paul", "peter", "robert", "shandra", "traci"]
-    .map((name) => name.toLowerCase())
+  [
+    "chad",
+    "deacon",
+    "emma",
+    "kadie",
+    "michael",
+    "nick",
+    "nickolas",
+    "paul",
+    "peter",
+    "robert",
+    "shandra",
+    "stephen",
+    "thomas",
+    "traci",
+  ].map((name) => name.toLowerCase())
 );
 
 type QboEmployee = {
@@ -207,18 +221,20 @@ export async function GET(req: NextRequest) {
       const previousTimeInfo = previousTimeByEmployee.get(employeeKey)
         || previousTimeByEmployee.get(employee.DisplayName || "")
         || { hours: 0, rates: [] };
-      const inferredRate = averageRate(timeInfo.rates) || averageRate(previousTimeInfo.rates);
-      const billRate = toNumber(employee.BillRate) || inferredRate;
+      const currentRateFromTime = averageRate(timeInfo.rates);
+      const previousRateFromTime = averageRate(previousTimeInfo.rates);
+      const billRate = toNumber(employee.BillRate);
       const fallbackRate = getDefaultRateByRole(employee.Title || "", type);
-      const baseRate = billRate > 0 ? billRate : fallbackRate;
+      const currentRate = billRate || currentRateFromTime || previousRateFromTime || fallbackRate;
+      const previousRate = previousRateFromTime || billRate || currentRateFromTime || fallbackRate;
 
       const perPayrollCost = type === "Salary"
-        ? baseRate / 26
-        : (timeInfo.hours > 0 ? timeInfo.hours * baseRate : baseRate * 80);
+        ? currentRate / 26
+        : (timeInfo.hours > 0 ? timeInfo.hours * currentRate : currentRate * 80);
 
       const previousPayrollCost = type === "Salary"
-        ? baseRate / 26
-        : (previousTimeInfo.hours > 0 ? previousTimeInfo.hours * baseRate : baseRate * 80);
+        ? previousRate / 26
+        : (previousTimeInfo.hours > 0 ? previousTimeInfo.hours * previousRate : previousRate * 80);
 
       const payrollChange = perPayrollCost - previousPayrollCost;
 
@@ -230,10 +246,10 @@ export async function GET(req: NextRequest) {
         fullName: displayName || employeeKey,
         role: employee.Title || employee.DepartmentRef?.name || "Team Member",
         type,
-        rate: baseRate,
+        rate: currentRate,
         status: employee.Active === false ? "Inactive" : "Active",
         lastIncreaseDate: lastUpdated,
-        lastIncreaseAmount: baseRate,
+        lastIncreaseAmount: currentRate,
         perPayrollCost,
         previousPayrollCost,
         payrollChange,
