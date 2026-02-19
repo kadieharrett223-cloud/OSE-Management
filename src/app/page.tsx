@@ -972,7 +972,7 @@ export default function Dashboard() {
             </div>
 
             {/* Main Visual + Action Required */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
               <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-100">
                 <div className="flex items-center justify-between">
                   <div>
