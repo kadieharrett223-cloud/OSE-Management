@@ -128,6 +128,8 @@ export default function Dashboard() {
   const [outstandingCount, setOutstandingCount] = useState<number>(0);
   const [monthlyTotal, setMonthlyTotal] = useState<number>(0);
   const [loadingMonthlyTotal, setLoadingMonthlyTotal] = useState(true);
+  const [lastMonthTotal, setLastMonthTotal] = useState<number>(0);
+  const [loadingLastMonthTotal, setLoadingLastMonthTotal] = useState(true);
   const [partialPaidCount, setPartialPaidCount] = useState<number>(0);
   const [partialPaidRemaining, setPartialPaidRemaining] = useState<number>(0);
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
@@ -268,9 +270,11 @@ export default function Dashboard() {
     fetchUnpaidInvoices();
   }, []);
 
-  // Fetch sales for current month (paid invoices only)
+  // Fetch sales for current and previous month (paid invoices only)
   useEffect(() => {
     const fetchMonthlySales = async () => {
+      setLoadingMonthlyTotal(true);
+      setLoadingLastMonthTotal(true);
       try {
         const now = new Date();
         const year = now.getFullYear();
@@ -278,29 +282,45 @@ export default function Dashboard() {
         const startDate = `${year}-${month}-01`;
         const endDate = now.toISOString().slice(0, 10);
 
-        const paidInvoicesResponse = await fetch(
-          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid&allPages=true&totalsOnly=true`
-        );
+        const lastMonthStart = new Date(year, now.getMonth() - 1, 1);
+        const lastMonthEnd = new Date(year, now.getMonth(), 0);
+        const lastMonthStartDate = `${lastMonthStart.getFullYear()}-${String(lastMonthStart.getMonth() + 1).padStart(2, "0")}-01`;
+        const lastMonthEndDate = `${lastMonthEnd.getFullYear()}-${String(lastMonthEnd.getMonth() + 1).padStart(2, "0")}-${String(lastMonthEnd.getDate()).padStart(2, "0")}`;
 
-        if (!paidInvoicesResponse.ok) {
+        const [paidInvoicesResponse, lastMonthResponse] = await Promise.all([
+          fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid&allPages=true&totalsOnly=true`),
+          fetch(`/api/qbo/invoice/query?startDate=${lastMonthStartDate}&endDate=${lastMonthEndDate}&status=paid&allPages=true&totalsOnly=true`),
+        ]);
+
+        if (!paidInvoicesResponse.ok || !lastMonthResponse.ok) {
           throw new Error("Failed to fetch monthly sales");
         }
 
-        const paidInvoicesData = await paidInvoicesResponse.json();
-        const paidInvoicesTotal = Number(paidInvoicesData.totalPaid || 0);
-        const totalSales = paidInvoicesTotal;
+        const [paidInvoicesData, lastMonthData] = await Promise.all([
+          paidInvoicesResponse.json(),
+          lastMonthResponse.json(),
+        ]);
 
-        console.log(`[dashboard] Monthly sales fetched: paid invoices total, Total: $${totalSales}`);
-        setMonthlyTotal(totalSales);
+        const paidInvoicesTotal = Number(paidInvoicesData.totalPaid || 0);
+        const lastMonthTotalPaid = Number(lastMonthData.totalPaid || 0);
+
+        console.log(`[dashboard] Monthly sales fetched: this month $${paidInvoicesTotal}, last month $${lastMonthTotalPaid}`);
+        setMonthlyTotal(paidInvoicesTotal);
+        setLastMonthTotal(lastMonthTotalPaid);
       } catch (error) {
         console.error("Error fetching monthly sales:", error);
         setMonthlyTotal(0);
+        setLastMonthTotal(0);
       } finally {
         setLoadingMonthlyTotal(false);
+        setLoadingLastMonthTotal(false);
       }
     };
 
     fetchMonthlySales();
+    const interval = setInterval(fetchMonthlySales, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch partially paid invoices for current month
@@ -784,7 +804,9 @@ export default function Dashboard() {
                     <p className="text-sm text-slate-600">Last month vs this month (so far)</p>
                   </div>
                   <div className="text-right text-xs text-slate-500">
-                    {money(totalSales)} of {money(monthlyGoal)}
+                    {loadingMonthlyTotal || loadingLastMonthTotal
+                      ? "Loading totals..."
+                      : `${money(monthlyTotal)} this month • ${money(lastMonthTotal)} last month`}
                   </div>
                 </div>
                 <div className="mt-6">
