@@ -204,7 +204,7 @@ export default function PayrollPage() {
                 <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900">Payroll Costs</h2>
-                    <p className="text-xs text-slate-500">First names only • per-payroll estimate</p>
+                    <p className="text-xs text-slate-500">First names only • wage changes this period</p>
                   </div>
                   <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {team.length} team members
@@ -217,9 +217,7 @@ export default function PayrollPage() {
                         <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Member</th>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Role</th>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Type</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">Rate</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">Per Payroll</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">Change</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">Change vs Last Pay</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -248,16 +246,6 @@ export default function PayrollPage() {
                             </td>
                             <td className="px-6 py-4 text-sm text-slate-600">{member.role}</td>
                             <td className="px-6 py-4 text-sm text-slate-600">{member.type}</td>
-                            <td className="px-6 py-4 text-sm text-right text-slate-700">
-                              {member.rate > 0
-                                ? member.type === "Hourly"
-                                  ? `${formatCurrency(member.rate)}/hr`
-                                  : `${formatCurrency(member.rate)}/yr`
-                                : "—"}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-right font-semibold text-slate-900">
-                              {formatCurrency(member.perPayrollCost || 0)}
-                            </td>
                             <td className="px-6 py-4 text-sm text-right font-semibold">
                               {member.payrollChange === 0 ? (
                                 <span className="text-slate-500">—</span>
@@ -290,19 +278,7 @@ export default function PayrollPage() {
                             <span className="text-xs text-slate-500">{member.type}</span>
                           </div>
                           <p className="text-xs text-slate-500">{member.role}</p>
-                          <div className="mt-2 flex items-center justify-between text-sm">
-                            <span className="text-slate-600">
-                              {member.rate > 0
-                                ? member.type === "Hourly"
-                                  ? `${formatCurrency(member.rate)}/hr`
-                                  : `${formatCurrency(member.rate)}/yr`
-                                : "—"}
-                            </span>
-                            <span className="font-semibold text-slate-900">
-                              {formatCurrency(member.perPayrollCost || 0)}
-                            </span>
-                          </div>
-                          <div className="mt-2 text-xs">
+                          <div className="mt-3 text-sm font-semibold">
                             {member.payrollChange === 0 ? (
                               <span className="text-slate-500">No change vs last pay</span>
                             ) : member.payrollChange > 0 ? (
