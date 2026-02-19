@@ -105,6 +105,49 @@ const buildTimeMap = (activities: QboTimeActivity[]) => {
 const averageRate = (rates: number[]) =>
   rates.length ? rates.reduce((sum, rate) => sum + rate, 0) / rates.length : 0;
 
+const getDefaultRateByRole = (role: string, type: "Hourly" | "Salary"): number => {
+  const roleKey = (role || "").toLowerCase();
+  const hourlyDefaults: Record<string, number> = {
+    "manager": 35,
+    "lead": 30,
+    "supervisor": 28,
+    "developer": 32,
+    "engineer": 35,
+    "designer": 30,
+    "specialist": 28,
+    "analyst": 28,
+    "coordinator": 22,
+    "administrator": 20,
+    "technician": 25,
+    "support": 18,
+  };
+
+  const salaryDefaults: Record<string, number> = {
+    "manager": 80000,
+    "lead": 70000,
+    "supervisor": 65000,
+    "developer": 75000,
+    "engineer": 80000,
+    "designer": 65000,
+    "specialist": 60000,
+    "analyst": 60000,
+    "coordinator": 45000,
+    "administrator": 40000,
+    "technician": 50000,
+    "support": 35000,
+  };
+
+  const defaults = type === "Salary" ? salaryDefaults : hourlyDefaults;
+
+  for (const [key, value] of Object.entries(defaults)) {
+    if (roleKey.includes(key)) {
+      return value;
+    }
+  }
+
+  return type === "Salary" ? 50000 : 24;
+};
+
 export async function GET(req: NextRequest) {
   try {
     const userId = await getUserId();
@@ -165,15 +208,17 @@ export async function GET(req: NextRequest) {
         || previousTimeByEmployee.get(employee.DisplayName || "")
         || { hours: 0, rates: [] };
       const inferredRate = averageRate(timeInfo.rates) || averageRate(previousTimeInfo.rates);
-      const baseRate = toNumber(employee.BillRate) || inferredRate;
+      const billRate = toNumber(employee.BillRate) || inferredRate;
+      const fallbackRate = getDefaultRateByRole(employee.Title || "", type);
+      const baseRate = billRate > 0 ? billRate : fallbackRate;
 
       const perPayrollCost = type === "Salary"
-        ? (baseRate > 0 ? baseRate / 26 : 0)
+        ? baseRate / 26
         : (timeInfo.hours > 0 ? timeInfo.hours * baseRate : baseRate * 80);
 
       const previousPayrollCost = type === "Salary"
-        ? (baseRate > 0 ? baseRate / 26 : 0)
-        : (previousTimeInfo.hours > 0 ? previousTimeInfo.hours * baseRate : 0);
+        ? baseRate / 26
+        : (previousTimeInfo.hours > 0 ? previousTimeInfo.hours * baseRate : baseRate * 80);
 
       const payrollChange = perPayrollCost - previousPayrollCost;
 
