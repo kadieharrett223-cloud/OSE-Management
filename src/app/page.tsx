@@ -907,11 +907,11 @@ export default function Dashboard() {
       <div className="flex min-h-screen">
         <Sidebar activePage="Dashboard" />
         {/* Main Content */}
-        <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
+        <main className="flex-1 bg-slate-100 text-slate-900">
           <div className="mx-auto max-w-7xl px-3 md:px-4 py-3 md:py-4 space-y-4 md:space-y-8 sm:px-6 lg:px-8 print-hidden">
             {/* Header */}
             <header className="flex flex-col gap-2 md:gap-3">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-blue-700">Dashboard</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">Dashboard</p>
               <div className="flex flex-col justify-between gap-3 md:gap-4 lg:flex-row lg:items-center">
                 <div className="space-y-1 md:space-y-2">
                   <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">Company Performance</h1>
@@ -923,13 +923,13 @@ export default function Dashboard() {
             </header>
 
             {/* Key Metrics */}
-            <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <div className="rounded-md bg-white p-4 shadow-sm ring-1 ring-slate-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Key Metrics</h2>
                 <span className="text-xs text-slate-400">This month</span>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-md border border-slate-100 px-3 py-3">
+                <div className="rounded-md border border-slate-200 px-3 py-3">
                   <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Sales This Month</div>
                   <div className="mt-2 text-2xl font-semibold text-slate-900">
                     {loadingMonthlyTotal ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedMonthlyTotal))}`}
@@ -939,7 +939,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="rounded-md border border-slate-100 px-3 py-3">
+                <div className="rounded-md border border-slate-200 px-3 py-3">
                   <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">This Month Last Year</div>
                   <div className="mt-2 text-2xl font-semibold text-slate-900">
                     {loadingLastYearMonth ? <span className="text-slate-400">Loading...</span> : `$${money(Math.round(animatedLastYearSales))}`}
@@ -947,17 +947,17 @@ export default function Dashboard() {
                   <div className="mt-1 text-xs text-slate-500">Same month last year • paid invoices</div>
                 </div>
 
-                <div className="rounded-md border border-slate-100 px-3 py-3">
+                <div className="rounded-md border border-slate-200 px-3 py-3">
                   <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Customer Payments Today</div>
                   <div className="mt-2 text-2xl font-semibold text-slate-900">${money(Math.round(animatedPaymentsTotal))}</div>
                   <div className="mt-1 text-xs text-slate-500">Customers paying us today</div>
                 </div>
 
-                <div className="rounded-md border border-slate-100 px-3 py-3">
+                <div className="rounded-md border border-slate-200 px-3 py-3">
                   <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Last Sync Status</div>
                   <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
                     <span className={`h-2 w-2 rounded-full ${qboSyncStatus === "ok" ? "bg-emerald-500" : qboSyncStatus === "error" ? "bg-red-500" : "bg-slate-300"}`} />
-                    {qboSyncStatus === "ok" ? "QB Sync ✅" : qboSyncStatus === "error" ? "QB Sync ⚠️" : "Checking"}
+                    {qboSyncStatus === "ok" ? "QB Sync OK" : qboSyncStatus === "error" ? "QB Sync Error" : "Checking"}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">Data reliability check</div>
                 </div>
@@ -966,7 +966,7 @@ export default function Dashboard() {
 
             {/* Overview */}
             <div className="space-y-6">
-              <div className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <div className="rounded-md bg-white p-5 shadow-sm ring-1 ring-slate-200">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-xl font-bold text-slate-900">Monthly Performance</h2>
@@ -980,7 +980,7 @@ export default function Dashboard() {
                   </div>
                   <div className="mt-6">
                     {currentMonthTrend.length === 0 && lastMonthTrend.length === 0 ? (
-                      <div className="h-32 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
+                      <div className="h-32 flex items-center justify-center bg-slate-50 rounded-md text-sm text-slate-500">
                         Loading trend data...
                       </div>
                     ) : (
@@ -992,7 +992,7 @@ export default function Dashboard() {
                               <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
                             </linearGradient>
                           </defs>
-                          <g stroke="#e2e8f0" strokeWidth="1" strokeOpacity="0.1">
+                          <g stroke="#cbd5e1" strokeWidth="1" strokeOpacity="0.2">
                             <line x1="0" y1="30" x2="320" y2="30" />
                             <line x1="0" y1="60" x2="320" y2="60" />
                             <line x1="0" y1="90" x2="320" y2="90" />
@@ -1053,7 +1053,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-100">
+                <div className="rounded-md bg-white p-5 shadow-sm ring-1 ring-slate-200">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-xl font-bold text-slate-900">Profit vs Expenses</h2>
@@ -1068,12 +1068,12 @@ export default function Dashboard() {
 
                   <div className="mt-4">
                     {loadingProfit || loadingMonthlyTotal ? (
-                      <div className="h-28 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
+                      <div className="h-28 flex items-center justify-center bg-slate-50 rounded-md text-sm text-slate-500">
                         Loading expenses...
                       </div>
                     ) : (
                       <>
-                        <div className="rounded-lg bg-gradient-to-br from-slate-50 to-slate-25 p-4 border border-slate-100">
+                        <div className="rounded-md bg-white p-4 border border-slate-200">
                           <div className="mb-4">
                             <div className="text-sm font-medium text-slate-600 uppercase tracking-wider">Profit (Month-to-Date)</div>
                             <div className="mt-2 text-2xl font-semibold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
@@ -1083,7 +1083,7 @@ export default function Dashboard() {
                             <div className="flex-1">
                               <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Profit</div>
                               <div
-                                className={`w-full rounded-lg ${profitThisMonth >= 0 ? "bg-emerald-500" : "bg-red-500"} transition-all duration-300`}
+                                className={`w-full rounded-md ${profitThisMonth >= 0 ? "bg-emerald-600" : "bg-red-600"} transition-all duration-300`}
                                 style={{ height: `${(Math.abs(profitThisMonth) / profitVsExpenseMax) * 100}%`, minHeight: "20px" }}
                               />
                               <div className="mt-3 text-sm font-semibold text-slate-900">${money(Math.round(animatedProfitThisMonth))}</div>
@@ -1091,7 +1091,7 @@ export default function Dashboard() {
                             <div className="flex-1">
                               <div className="text-xs font-medium text-slate-600 uppercase tracking-wider mb-2">Expenses</div>
                               <div
-                                className="w-full rounded-lg bg-amber-500 transition-all duration-300"
+                                className="w-full rounded-md bg-amber-600 transition-all duration-300"
                                 style={{ height: `${(totalExpenses / profitVsExpenseMax) * 100}%`, minHeight: "20px" }}
                               />
                               <div className="mt-3 text-sm font-semibold text-slate-900">${money(Math.round(animatedTotalExpenses))}</div>
@@ -1117,8 +1117,8 @@ export default function Dashboard() {
 
             {/* Quick Tables */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
-                <div className="border-b border-slate-100 px-6 py-5 flex items-center justify-between">
+              <div className="rounded-md bg-white shadow-sm ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-6 py-5 flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">Open Invoices</h2>
                     <p className="mt-1 text-sm text-slate-600">Unpaid invoices awaiting payment</p>
@@ -1134,7 +1134,7 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => setShowOpenInvoicesModal(true)}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                      className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
                     >
                       View all →
                     </button>
@@ -1197,8 +1197,8 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
-                <div className="border-b border-slate-100 px-6 py-5 flex items-center justify-between">
+              <div className="rounded-md bg-white shadow-sm ring-1 ring-slate-200">
+                <div className="border-b border-slate-200 px-6 py-5 flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">Customer Payments Today</h2>
                     <p className="mt-1 text-sm text-slate-600">Payments received today</p>
@@ -1209,7 +1209,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setShowCustomerPaymentsModal(true)}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                    className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
                   >
                     View all →
                   </button>
