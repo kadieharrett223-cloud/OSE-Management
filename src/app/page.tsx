@@ -129,6 +129,9 @@ export default function Dashboard() {
   const [loadingMonthlyTotal, setLoadingMonthlyTotal] = useState(true);
   const [lastMonthTotal, setLastMonthTotal] = useState<number>(0);
   const [loadingLastMonthTotal, setLoadingLastMonthTotal] = useState(true);
+  const [paidExpensesTotal, setPaidExpensesTotal] = useState<number>(0);
+  const [payrollExpenseTotal, setPayrollExpenseTotal] = useState<number>(0);
+  const [loadingProfit, setLoadingProfit] = useState(true);
   const [partialPaidCount, setPartialPaidCount] = useState<number>(0);
   const [partialPaidRemaining, setPartialPaidRemaining] = useState<number>(0);
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
@@ -201,6 +204,8 @@ export default function Dashboard() {
   const totalCommission = repSalesData.length > 0
     ? repSalesData.reduce((sum, rep) => sum + rep.commission, 0)
     : mockReps.reduce((sum, rep) => sum + rep.commission, 0);
+  const totalExpenses = paidExpensesTotal + payrollExpenseTotal;
+  const profitThisMonth = monthlyTotal - totalExpenses;
   const attentionItems = [
     outstandingCount > 0
       ? `Outstanding invoices: $${money(outstandingTotal)} across ${outstandingCount} open invoices.`
@@ -298,6 +303,69 @@ export default function Dashboard() {
     const interval = setInterval(fetchMonthlySales, 60000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  // Fetch paid expenses + payroll for profit (month-to-date)
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchProfit = async () => {
+      setLoadingProfit(true);
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const monthIndex = now.getMonth();
+        const month = String(monthIndex + 1).padStart(2, "0");
+        const startDate = `${year}-${month}-01`;
+        const endDate = now.toISOString().slice(0, 10);
+        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+        const daysElapsed = now.getDate();
+
+        const [billsRes, payrollRes] = await Promise.all([
+          fetch(`/api/qbo/bill-payment/query?startDate=${startDate}&endDate=${endDate}`),
+          fetch(`/api/qbo/payroll/overview?startDate=${startDate}&endDate=${endDate}`),
+        ]);
+
+        if (!billsRes.ok || !payrollRes.ok) {
+          throw new Error("Failed to fetch profit inputs");
+        }
+
+        const [billsData, payrollData] = await Promise.all([billsRes.json(), payrollRes.json()]);
+        const paidBills = Number(billsData.totalAmount || 0);
+        const team = payrollData.team || [];
+
+        const payrollTotal = team.reduce((sum: number, member: any) => {
+          const rate = Number(member.rate) || 0;
+          if (member.type === "Salary") {
+            const monthlySalary = rate / 12;
+            return sum + monthlySalary * (daysElapsed / daysInMonth);
+          }
+          const hours = Number(member.currentHours ?? member.hours ?? 0);
+          return sum + hours * rate;
+        }, 0);
+
+        if (isMounted) {
+          setPaidExpensesTotal(paidBills);
+          setPayrollExpenseTotal(payrollTotal);
+        }
+      } catch (error) {
+        console.error("Failed to fetch profit data:", error);
+        if (isMounted) {
+          setPaidExpensesTotal(0);
+          setPayrollExpenseTotal(0);
+        }
+      } finally {
+        if (isMounted) setLoadingProfit(false);
+      }
+    };
+
+    fetchProfit();
+    const interval = setInterval(fetchProfit, 60000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // Fetch partially paid invoices for current month
@@ -753,6 +821,16 @@ export default function Dashboard() {
                   {loadingLastYearMonth ? <span className="text-slate-400">Loading...</span> : `$${money(lastYearMonthSales ?? 0)}`}
                 </div>
                 <div className="mt-1 text-xs text-slate-600">Same month last year • paid invoices</div>
+              </div>
+
+              <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">
+                <div className="text-xs uppercase font-semibold text-slate-500">Profit This Month</div>
+                <div className="mt-2 text-2xl font-bold text-emerald-700">
+                  {loadingProfit ? <span className="text-slate-400">Loading...</span> : `$${money(profitThisMonth)}`}
+                </div>
+                <div className="mt-1 text-xs text-slate-600">
+                  {loadingProfit ? "Loading expenses..." : `Income $${money(monthlyTotal)} • Expenses $${money(totalExpenses)}`}
+                </div>
               </div>
 
               <div className="rounded-xl bg-white px-6 py-4 shadow-md ring-1 ring-slate-200">

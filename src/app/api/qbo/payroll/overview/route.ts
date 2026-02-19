@@ -247,6 +247,8 @@ export async function GET(req: NextRequest) {
         role: employee.Title || employee.DepartmentRef?.name || "Team Member",
         type,
         rate: currentRate,
+        currentHours: timeInfo.hours,
+        previousHours: previousTimeInfo.hours,
         status: employee.Active === false ? "Inactive" : "Active",
         lastIncreaseDate: lastUpdated,
         lastIncreaseAmount: currentRate,
