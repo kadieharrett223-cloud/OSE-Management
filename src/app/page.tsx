@@ -153,7 +153,7 @@ const getInitials = (name: string) => {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 };
 
-const useCountUp = (value: number, duration = 600) => {
+const useCountUp = (value: number, duration = 200) => {
   const [displayValue, setDisplayValue] = useState(value);
   const previousValue = useRef(value);
 
