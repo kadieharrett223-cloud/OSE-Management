@@ -207,7 +207,8 @@ export default function Dashboard() {
     : mockReps.reduce((sum, rep) => sum + rep.commission, 0);
   const totalExpenses = paidExpensesTotal + payrollExpenseTotal;
   const profitThisMonth = monthlyTotal - totalExpenses;
-  const maxIncomeExpense = Math.max(monthlyTotal, totalExpenses, 1);
+  const topExpenseSeries = topExpenses.map((expense) => expense.total);
+  const maxTopExpense = Math.max(...topExpenseSeries, 1);
 
   // Fetch unpaid invoices for current month
   useEffect(() => {
@@ -907,11 +908,11 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="rounded-xl bg-white p-6 shadow-md ring-1 ring-slate-200">
+              <div className="rounded-xl bg-white p-4 shadow-md ring-1 ring-slate-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Income vs Expenses</h2>
-                    <p className="text-sm text-slate-600">Month-to-date profit snapshot</p>
+                    <h2 className="text-lg font-semibold text-slate-900">Top Expenses</h2>
+                    <p className="text-sm text-slate-600">Largest paid expenses this month</p>
                   </div>
                   <div className="text-right text-xs text-slate-500">
                     {loadingProfit || loadingMonthlyTotal ? "Loading..." : `Profit $${money(profitThisMonth)}`}
@@ -920,70 +921,41 @@ export default function Dashboard() {
 
                 <div className="mt-4">
                   {loadingProfit || loadingMonthlyTotal ? (
-                    <div className="h-40 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
-                      Loading income and expenses...
+                    <div className="h-32 flex items-center justify-center bg-slate-50 rounded-lg text-sm text-slate-500">
+                      Loading expenses...
                     </div>
                   ) : (
                     <>
                       <div className="rounded-lg bg-slate-50 p-4">
                         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          <span>Income</span>
-                          <span>${money(monthlyTotal)}</span>
+                          <span>Expenses Trend</span>
+                          <span>Top 5</span>
                         </div>
-                        <div className="mt-3 h-28 flex items-end gap-2">
-                          <div className="flex-1">
-                            <div
-                              className="w-full rounded-md bg-emerald-500"
-                              style={{ height: `${(monthlyTotal / maxIncomeExpense) * 100}%` }}
-                            />
+                        {topExpenseSeries.length === 0 ? (
+                          <div className="mt-4 text-sm text-slate-500">No paid expenses yet this month.</div>
+                        ) : (
+                          <div className="mt-3">
+                            <svg viewBox="0 0 320 120" preserveAspectRatio="none" className="h-24 w-full">
+                              <path
+                                d={buildLinePath(topExpenseSeries, maxTopExpense, 320, 120, 12)}
+                                fill="none"
+                                stroke="#f59e0b"
+                                strokeWidth="3"
+                              />
+                            </svg>
+                            <div className="mt-3 space-y-2">
+                              {topExpenses.map((item) => (
+                                <div key={item.name} className="flex items-center justify-between text-sm">
+                                  <span className="text-slate-600">{item.name}</span>
+                                  <span className="font-semibold text-slate-900">${money(item.total)}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <div
-                              className="w-full rounded-md bg-amber-500"
-                              style={{ height: `${(totalExpenses / maxIncomeExpense) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                        <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                          <span>Income</span>
-                          <span>Expenses</span>
-                        </div>
+                        )}
                       </div>
-
-                      <div className="mt-4 rounded-lg bg-slate-50 p-4">
-                        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          <span>Expense Breakdown</span>
-                          <span>${money(totalExpenses)}</span>
-                        </div>
-                        <div className="mt-3 space-y-2 text-sm">
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-500">Payroll</span>
-                            <span className="font-semibold text-slate-900">${money(payrollExpenseTotal)}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-slate-500">Bills</span>
-                            <span className="font-semibold text-slate-900">${money(paidExpensesTotal)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
-                        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          <span>Top Expenses (Paid)</span>
-                          <span>Month-to-date</span>
-                        </div>
-                        <div className="mt-3 space-y-2">
-                          {topExpenses.length === 0 ? (
-                            <div className="text-sm text-slate-500">No paid expenses yet this month.</div>
-                          ) : (
-                            topExpenses.map((item) => (
-                              <div key={item.name} className="flex items-center justify-between text-sm">
-                                <span className="text-slate-600">{item.name}</span>
-                                <span className="font-semibold text-slate-900">${money(item.total)}</span>
-                              </div>
-                            ))
-                          )}
-                        </div>
+                      <div className="mt-3 text-xs text-slate-500">
+                        Income ${money(monthlyTotal)} • Expenses ${money(totalExpenses)}
                       </div>
                     </>
                   )}
