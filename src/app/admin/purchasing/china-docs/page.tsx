@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, Download, X } from "lucide-react";
+import { FileText, Download, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
 import dynamic from "next/dynamic";
 
@@ -23,6 +23,7 @@ interface PurchaseOrder {
   status: string;
   total_amount: number;
   generated_pdf_path: string | null;
+  lines: any[];
 }
 
 interface ChineseFile {
@@ -34,13 +35,64 @@ interface ChineseFile {
   file_path: string;
 }
 
+// Component for thumbnail preview on card
+const PDFThumbnail = ({ pdfUrl, poNumber }: { pdfUrl: string | null; poNumber: string }) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  if (!pdfUrl) {
+    return (
+      <div className="w-full h-48 bg-gray-100 rounded flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
+          <p className="text-xs text-gray-500">Generating PDF...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-48 bg-gray-100 rounded overflow-hidden relative">
+      {loading && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        </div>
+      )}
+      {error ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+          <FileText className="w-12 h-12 text-gray-300" />
+        </div>
+      ) : (
+        <Document
+          file={pdfUrl}
+          onLoadSuccess={() => setLoading(false)}
+          onLoadError={() => {
+            setError(true);
+            setLoading(false);
+          }}
+          className="flex items-center justify-center"
+        >
+          <Page
+            pageNumber={1}
+            width={280}
+            renderTextLayer={false}
+            renderAnnotationLayer={false}
+          />
+        </Document>
+      )}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+        <p className="text-white text-xs font-medium">PO #{poNumber}</p>
+      </div>
+    </div>
+  );
+};
+
 export default function ChinaDocs() {
   const [chinesePOs, setChinesePOs] = useState<PurchaseOrder[]>([]);
   const [poFiles, setPoFiles] = useState<Record<string, ChineseFile[]>>({});
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [pdfWorkerReady, setPdfWorkerReady] = useState(false);
-  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
   
   // PDF Viewer state
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -49,7 +101,7 @@ export default function ChinaDocs() {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<"generated" | "uploads">("generated");
-  const [batchGenerating, setBatchGenerating] = useState(false);
+  const [scrollMode, setScrollMode] = useState(true); // true = scroll all pages, false = single page
 
   // Set up PDF.js worker on client side only
   useEffect(() => {
@@ -73,14 +125,42 @@ export default function ChinaDocs() {
       const data = await res.json();
       setChinesePOs(data.data || []);
 
-      // Fetch files for each PO
+      // Fetch files for each PO and auto-generate PDFs if missing
       for (const po of data.data || []) {
         fetchPOFiles(po.id);
+        
+        // Auto-generate PDF if missing
+        if (!po.generated_pdf_path) {
+          generatePDFInBackground(po.id);
+        }
       }
     } catch (error) {
       console.error("Error fetching Chinese POs:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generatePDFInBackground = async (poId: string) => {
+    try {
+      const res = await fetch(`/api/purchase-orders/${poId}/generate-pdf`, {
+        method: "POST",
+      });
+      
+      if (res.ok) {
+        const result = await res.json();
+        // Update the PO in state with the new PDF path
+        setChinesePOs((prev) =>
+          prev.map((po) =>
+            po.id === poId
+              ? { ...po, generated_pdf_path: result.data.path }
+              : po
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Background PDF generation error:", error);
+      // Silently fail - user won't see errors, PDF will show "generating" state
     }
   };
 
@@ -110,70 +190,6 @@ export default function ChinaDocs() {
     } else {
       setCurrentPdfUrl(null);
       setCurrentPdfName("");
-    }
-  };
-
-  const generatePDF = async (poId: string, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation(); // Prevent card click from opening viewer
-    }
-    
-    try {
-      setGeneratingPdf(poId);
-      const res = await fetch(`/api/purchase-orders/${poId}/generate-pdf`, {
-        method: "POST",
-      });
-      
-      if (!res.ok) {
-        throw new Error("Failed to generate PDF");
-      }
-      
-      const result = await res.json();
-      
-      // Update the PO in state with the new PDF path
-      setChinesePOs((prev) =>
-        prev.map((po) =>
-          po.id === poId
-            ? { ...po, generated_pdf_path: result.data.path }
-            : po
-        )
-      );
-      
-      // Show success feedback (you could add a toast notification here)
-      console.log("PDF generated successfully:", result);
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("Failed to generate PDF. Please try again.");
-    } finally {
-      setGeneratingPdf(null);
-    }
-  };
-
-  const batchGeneratePDFs = async () => {
-    if (!confirm("Generate PDFs for all China POs without PDFs? This may take a moment.")) {
-      return;
-    }
-
-    try {
-      setBatchGenerating(true);
-      const res = await fetch("/api/purchase-orders/batch-generate-pdfs", {
-        method: "POST",
-      });
-
-      if (!res.ok) {
-        throw new Error("Batch generation failed");
-      }
-
-      const result = await res.json();
-      alert(`Success! Generated ${result.data.generated} PDFs. ${result.data.failed} failed.`);
-
-      // Refresh the PO list to show new PDFs
-      fetchChinesePOs();
-    } catch (error) {
-      console.error("Batch generation error:", error);
-      alert("Failed to batch generate PDFs. Please try again.");
-    } finally {
-      setBatchGenerating(false);
     }
   };
 
@@ -226,41 +242,22 @@ export default function ChinaDocs() {
             </p>
 
             {/* Filters */}
-            <div className="flex gap-3 flex-wrap items-center justify-between">
-              <div className="flex gap-3 flex-wrap items-center">
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 bg-white"
-                >
-                  <option value="all">All Status</option>
-                  <option value="DRAFT">Draft</option>
-                  <option value="SUBMITTED">Submitted</option>
-                  <option value="RECEIVED">Received</option>
-                  <option value="PAID">Paid</option>
-                  <option value="SHIPPED">Shipped</option>
-                </select>
-                <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
-                  {filteredPOs.length} Chinese PO{filteredPOs.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              
-              <button
-                onClick={batchGeneratePDFs}
-                disabled={batchGenerating}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            <div className="flex gap-3 flex-wrap items-center">
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 bg-white"
               >
-                {batchGenerating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <span>⚡</span> Generate All PDFs
-                  </>
-                )}
-              </button>
+                <option value="all">All Status</option>
+                <option value="DRAFT">Draft</option>
+                <option value="SUBMITTED">Submitted</option>
+                <option value="RECEIVED">Received</option>
+                <option value="PAID">Paid</option>
+                <option value="SHIPPED">Shipped</option>
+              </select>
+              <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
+                {filteredPOs.length} Chinese PO{filteredPOs.length !== 1 ? "s" : ""}
+              </span>
             </div>
           </div>
 
@@ -274,70 +271,70 @@ export default function ChinaDocs() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredPOs.map((po) => (
-                <div
-                  key={po.id}
-                  className="bg-white border border-gray-300 rounded-lg overflow-hidden hover:shadow-lg transition-all hover:border-blue-400"
-                >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredPOs.map((po) => {
+                const pdfUrl = po.generated_pdf_path
+                  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/generated-po-pdfs/${po.generated_pdf_path}`
+                  : null;
+
+                return (
                   <button
+                    key={po.id}
                     onClick={() => openPOViewer(po)}
-                    className="w-full p-5 text-left group"
+                    className="bg-white border border-gray-300 rounded-lg overflow-hidden hover:shadow-2xl transition-all hover:border-blue-500 hover:scale-[1.02] text-left group"
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600">
-                        PO #{po.po_number}
-                      </h3>
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          po.status === "PAID"
-                            ? "bg-green-100 text-green-800"
-                            : po.status === "SHIPPED"
-                              ? "bg-blue-100 text-blue-800"
-                              : po.status === "SUBMITTED"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {po.status}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">{po.vendor_name}</p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(po.order_date).toLocaleDateString()} •{" "}
-                      ${po.total_amount.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                  </button>
-                  
-                  <div className="px-5 pb-4 pt-0 border-t border-gray-200">
-                    <div className="flex items-center justify-between text-xs">
-                      {po.generated_pdf_path ? (
-                        <span className="text-green-600 font-medium flex items-center gap-1">
-                          <span className="text-green-500">✓</span> PDF Ready
-                        </span>
-                      ) : generatingPdf === po.id ? (
-                        <span className="text-blue-600 font-medium flex items-center gap-2">
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
-                          Generating...
-                        </span>
-                      ) : (
-                        <button
-                          onClick={(e) => generatePDF(po.id, e)}
-                          className="text-orange-600 hover:text-orange-700 font-medium flex items-center gap-1 hover:underline"
+                    {/* PDF Thumbnail Preview */}
+                    {pdfWorkerReady && (
+                      <PDFThumbnail pdfUrl={pdfUrl} poNumber={po.po_number} />
+                    )}
+
+                    {/* PO Info */}
+                    <div className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 mb-1">
+                            {po.vendor_name}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {new Date(po.order_date).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            po.status === "PAID"
+                              ? "bg-green-100 text-green-800"
+                              : po.status === "SHIPPED"
+                                ? "bg-blue-100 text-blue-800"
+                                : po.status === "SUBMITTED"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-gray-100 text-gray-800"
+                          }`}
                         >
-                          <span>⚡</span> Generate PDF
-                        </button>
-                      )}
-                      <span className="text-gray-500">
-                        {(poFiles[po.id] || []).length} file{(poFiles[po.id] || []).length !== 1 ? "s" : ""}
-                      </span>
+                          {po.status}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                        <span className="text-lg font-bold text-gray-900">
+                          ${po.total_amount.toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                        {(poFiles[po.id] || []).length > 0 && (
+                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                            {(poFiles[po.id] || []).length} attachment{(poFiles[po.id] || []).length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -396,47 +393,88 @@ export default function ChinaDocs() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 overflow-auto p-4 bg-gray-50">
               {activeTab === "generated" ? (
                 currentPdfUrl ? (
-                  <div className="flex flex-col items-center">
-                    <div className="mb-4 flex items-center gap-4">
-                      <button
-                        onClick={() => setPageNumber(Math.max(1, pageNumber - 1))}
-                        disabled={pageNumber <= 1}
-                        className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-                      >
-                        Previous
-                      </button>
-                      <span className="text-sm text-gray-700">
-                        Page {pageNumber} of {numPages}
+                  <div className="flex flex-col items-center space-y-4">
+                    {/* Controls */}
+                    <div className="sticky top-0 z-10 bg-white p-3 rounded-lg shadow-md flex items-center gap-4">
+                      <span className="text-sm text-gray-700 font-medium">
+                        {numPages} page{numPages !== 1 ? "s" : ""}
                       </span>
+                      <div className="h-4 w-px bg-gray-300" />
                       <button
-                        onClick={() => setPageNumber(Math.min(numPages, pageNumber + 1))}
-                        disabled={pageNumber >= numPages}
-                        className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+                        onClick={() => setScrollMode(!scrollMode)}
+                        className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                       >
-                        Next
+                        {scrollMode ? "Single Page" : "Scroll All"}
                       </button>
                       <a
                         href={currentPdfUrl}
                         download={currentPdfName}
-                        className="ml-4 flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        className="ml-auto flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
                       >
                         <Download className="w-4 h-4" />
-                        Download
+                        Download PDF
                       </a>
                     </div>
+
+                    {/* PDF Display */}
                     {pdfWorkerReady ? (
-                      <Document
-                        file={currentPdfUrl}
-                        onLoadSuccess={onDocumentLoadSuccess}
-                        className="border border-gray-300 shadow-lg"
-                      >
-                        <Page pageNumber={pageNumber} width={800} />
-                      </Document>
+                      scrollMode ? (
+                        <Document
+                          file={currentPdfUrl}
+                          onLoadSuccess={onDocumentLoadSuccess}
+                          className="flex flex-col items-center space-y-3"
+                        >
+                          {Array.from(new Array(numPages), (el, index) => (
+                            <div key={`page_${index + 1}`} className="shadow-lg bg-white">
+                              <Page
+                                pageNumber={index + 1}
+                                width={Math.min(900, window.innerWidth - 100)}
+                                renderTextLayer={true}
+                                renderAnnotationLayer={true}
+                              />
+                            </div>
+                          ))}
+                        </Document>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <div className="mb-4 flex items-center gap-3">
+                            <button
+                              onClick={() => setPageNumber(Math.max(1, pageNumber - 1))}
+                              disabled={pageNumber <= 1}
+                              className="p-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
+                            >
+                              <ChevronLeft className="w-5 h-5" />
+                            </button>
+                            <span className="text-sm text-gray-700 px-4">
+                              Page {pageNumber} of {numPages}
+                            </span>
+                            <button
+                              onClick={() => setPageNumber(Math.min(numPages, pageNumber + 1))}
+                              disabled={pageNumber >= numPages}
+                              className="p-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
+                            >
+                              <ChevronRight className="w-5 h-5" />
+                            </button>
+                          </div>
+                          <Document
+                            file={currentPdfUrl}
+                            onLoadSuccess={onDocumentLoadSuccess}
+                            className="shadow-lg bg-white"
+                          >
+                            <Page
+                              pageNumber={pageNumber}
+                              width={Math.min(900, window.innerWidth - 100)}
+                              renderTextLayer={true}
+                              renderAnnotationLayer={true}
+                            />
+                          </Document>
+                        </div>
+                      )
                     ) : (
-                      <div className="flex items-center justify-center py-8">
+                      <div className="flex items-center justify-center py-12">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
                         <span className="ml-3 text-gray-600">Loading PDF viewer...</span>
                       </div>
