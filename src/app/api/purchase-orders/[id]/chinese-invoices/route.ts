@@ -81,6 +81,27 @@ export async function POST(req: NextRequest) {
       .update({ is_china_supplier: true, country: "China" })
       .eq("id", poId);
 
+    // Auto-generate PDF for the PO if not already generated
+    try {
+      const { data: existingPO } = await supabase
+        .from("purchase_orders")
+        .select("generated_pdf_path")
+        .eq("id", poId)
+        .single();
+
+      if (!existingPO?.generated_pdf_path) {
+        const generatePdfRes = await fetch(
+          `${req.nextUrl.origin}/api/purchase-orders/${poId}/generate-pdf`,
+          { method: "POST" }
+        );
+        if (!generatePdfRes.ok) {
+          console.error("Failed to auto-generate PDF");
+        }
+      }
+    } catch (pdfError) {
+      console.error("PDF generation error:", pdfError);
+    }
+
     return NextResponse.json(
       {
         ok: true,

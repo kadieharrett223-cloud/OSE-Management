@@ -140,6 +140,22 @@ export async function POST(req: NextRequest) {
     const { error: linesError } = await supabase.from("purchase_order_lines").insert(linesData);
     if (linesError) throw linesError;
 
+    // Auto-generate PDF for China suppliers
+    if (is_china_supplier) {
+      try {
+        const generatePdfRes = await fetch(
+          `${req.nextUrl.origin}/api/purchase-orders/${po.id}/generate-pdf`,
+          { method: "POST" }
+        );
+        if (!generatePdfRes.ok) {
+          console.error("Failed to auto-generate PDF for China PO");
+        }
+      } catch (pdfError) {
+        console.error("PDF generation error:", pdfError);
+        // Don't fail the PO creation if PDF generation fails
+      }
+    }
+
     return NextResponse.json({ ok: true, data: po }, { status: 201 });
   } catch (error: any) {
     console.error("Create purchase order error:", error);
