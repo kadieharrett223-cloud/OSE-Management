@@ -3,12 +3,17 @@
 import { useEffect, useState } from "react";
 import { FileText, Download, X } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
-import { Document, Page, pdfjs } from "react-pdf";
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
+import dynamic from "next/dynamic";
 
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Dynamically import react-pdf to avoid SSR issues
+const Document = dynamic(
+  () => import("react-pdf").then((mod) => mod.Document),
+  { ssr: false }
+);
+const Page = dynamic(
+  () => import("react-pdf").then((mod) => mod.Page),
+  { ssr: false }
+);
 
 interface PurchaseOrder {
   id: string;
@@ -34,6 +39,7 @@ export default function ChinaDocs() {
   const [poFiles, setPoFiles] = useState<Record<string, ChineseFile[]>>({});
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [pdfWorkerReady, setPdfWorkerReady] = useState(false);
   
   // PDF Viewer state
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -42,6 +48,16 @@ export default function ChinaDocs() {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<"generated" | "uploads">("generated");
+
+  // Set up PDF.js worker on client side only
+  useEffect(() => {
+    const setupPdfWorker = async () => {
+      const pdfjs = await import("pdfjs-dist");
+      pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+      setPdfWorkerReady(true);
+    };
+    setupPdfWorker();
+  }, []);
 
   useEffect(() => {
     fetchChinesePOs();
@@ -305,13 +321,20 @@ export default function ChinaDocs() {
                         Download
                       </a>
                     </div>
-                    <Document
-                      file={currentPdfUrl}
-                      onLoadSuccess={onDocumentLoadSuccess}
-                      className="border border-gray-300 shadow-lg"
-                    >
-                      <Page pageNumber={pageNumber} width={800} />
-                    </Document>
+                    {pdfWorkerReady ? (
+                      <Document
+                        file={currentPdfUrl}
+                        onLoadSuccess={onDocumentLoadSuccess}
+                        className="border border-gray-300 shadow-lg"
+                      >
+                        <Page pageNumber={pageNumber} width={800} />
+                      </Document>
+                    ) : (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                        <span className="ml-3 text-gray-600">Loading PDF viewer...</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-16">
