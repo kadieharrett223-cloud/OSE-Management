@@ -561,6 +561,7 @@ export default function PurchasingPage() {
   const tabs = [
     { label: "Purchase Orders", href: "/admin/purchasing" },
     { label: "Shipment Tracking", href: "/admin/purchasing/shipment-tracking" },
+    { label: "China Docs", href: "/admin/purchasing/china-docs" },
     { label: "Suppliers", href: "/admin/suppliers" },
   ];
 

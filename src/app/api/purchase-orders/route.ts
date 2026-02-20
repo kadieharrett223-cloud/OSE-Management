@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
   const supabase = getServerSupabaseClient();
   const params = req.nextUrl.searchParams;
   const status = params.get("status");
+  const china = params.get("china");
 
   try {
     let query = supabase
@@ -21,6 +22,10 @@ export async function GET(req: NextRequest) {
 
     if (status) {
       query = query.eq("status", status);
+    }
+
+    if (china === "true") {
+      query = query.eq("is_china_supplier", true);
     }
 
     const { data, error } = await query;
@@ -58,6 +63,8 @@ export async function POST(req: NextRequest) {
     status,
     notes,
     lines,
+    is_china_supplier,
+    country,
   } = body;
 
   // Normalize dates to avoid empty-string failures when the client sends ""
@@ -105,6 +112,8 @@ export async function POST(req: NextRequest) {
         total_amount,
         status: status || "DRAFT",
         notes,
+        is_china_supplier: is_china_supplier || false,
+        country: country || "USA",
         created_by_user_id: session.user?.id || null,
       })
       .select()
