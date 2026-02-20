@@ -40,6 +40,7 @@ export default function ChinaDocs() {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [pdfWorkerReady, setPdfWorkerReady] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
   
   // PDF Viewer state
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -48,6 +49,7 @@ export default function ChinaDocs() {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<"generated" | "uploads">("generated");
+  const [batchGenerating, setBatchGenerating] = useState(false);
 
   // Set up PDF.js worker on client side only
   useEffect(() => {
@@ -111,6 +113,70 @@ export default function ChinaDocs() {
     }
   };
 
+  const generatePDF = async (poId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // Prevent card click from opening viewer
+    }
+    
+    try {
+      setGeneratingPdf(poId);
+      const res = await fetch(`/api/purchase-orders/${poId}/generate-pdf`, {
+        method: "POST",
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to generate PDF");
+      }
+      
+      const result = await res.json();
+      
+      // Update the PO in state with the new PDF path
+      setChinesePOs((prev) =>
+        prev.map((po) =>
+          po.id === poId
+            ? { ...po, generated_pdf_path: result.data.path }
+            : po
+        )
+      );
+      
+      // Show success feedback (you could add a toast notification here)
+      console.log("PDF generated successfully:", result);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Failed to generate PDF. Please try again.");
+    } finally {
+      setGeneratingPdf(null);
+    }
+  };
+
+  const batchGeneratePDFs = async () => {
+    if (!confirm("Generate PDFs for all China POs without PDFs? This may take a moment.")) {
+      return;
+    }
+
+    try {
+      setBatchGenerating(true);
+      const res = await fetch("/api/purchase-orders/batch-generate-pdfs", {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        throw new Error("Batch generation failed");
+      }
+
+      const result = await res.json();
+      alert(`Success! Generated ${result.data.generated} PDFs. ${result.data.failed} failed.`);
+
+      // Refresh the PO list to show new PDFs
+      fetchChinesePOs();
+    } catch (error) {
+      console.error("Batch generation error:", error);
+      alert("Failed to batch generate PDFs. Please try again.");
+    } finally {
+      setBatchGenerating(false);
+    }
+  };
+
   const closeViewer = () => {
     setSelectedPO(null);
     setCurrentPdfUrl(null);
@@ -160,22 +226,41 @@ export default function ChinaDocs() {
             </p>
 
             {/* Filters */}
-            <div className="flex gap-3 flex-wrap items-center">
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 bg-white"
+            <div className="flex gap-3 flex-wrap items-center justify-between">
+              <div className="flex gap-3 flex-wrap items-center">
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 bg-white"
+                >
+                  <option value="all">All Status</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="SUBMITTED">Submitted</option>
+                  <option value="RECEIVED">Received</option>
+                  <option value="PAID">Paid</option>
+                  <option value="SHIPPED">Shipped</option>
+                </select>
+                <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
+                  {filteredPOs.length} Chinese PO{filteredPOs.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              
+              <button
+                onClick={batchGeneratePDFs}
+                disabled={batchGenerating}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="all">All Status</option>
-                <option value="DRAFT">Draft</option>
-                <option value="SUBMITTED">Submitted</option>
-                <option value="RECEIVED">Received</option>
-                <option value="PAID">Paid</option>
-                <option value="SHIPPED">Shipped</option>
-              </select>
-              <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
-                {filteredPOs.length} Chinese PO{filteredPOs.length !== 1 ? "s" : ""}
-              </span>
+                {batchGenerating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <span>⚡</span> Generate All PDFs
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
@@ -191,46 +276,67 @@ export default function ChinaDocs() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredPOs.map((po) => (
-                <button
+                <div
                   key={po.id}
-                  onClick={() => openPOViewer(po)}
-                  className="bg-white border border-gray-300 rounded-lg p-5 hover:shadow-lg transition-all hover:border-blue-400 text-left group"
+                  className="bg-white border border-gray-300 rounded-lg overflow-hidden hover:shadow-lg transition-all hover:border-blue-400"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600">
-                      PO #{po.po_number}
-                    </h3>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        po.status === "PAID"
-                          ? "bg-green-100 text-green-800"
-                          : po.status === "SHIPPED"
-                            ? "bg-blue-100 text-blue-800"
-                            : po.status === "SUBMITTED"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {po.status}
-                    </span>
+                  <button
+                    onClick={() => openPOViewer(po)}
+                    className="w-full p-5 text-left group"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600">
+                        PO #{po.po_number}
+                      </h3>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          po.status === "PAID"
+                            ? "bg-green-100 text-green-800"
+                            : po.status === "SHIPPED"
+                              ? "bg-blue-100 text-blue-800"
+                              : po.status === "SUBMITTED"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {po.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">{po.vendor_name}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(po.order_date).toLocaleDateString()} •{" "}
+                      ${po.total_amount.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </button>
+                  
+                  <div className="px-5 pb-4 pt-0 border-t border-gray-200">
+                    <div className="flex items-center justify-between text-xs">
+                      {po.generated_pdf_path ? (
+                        <span className="text-green-600 font-medium flex items-center gap-1">
+                          <span className="text-green-500">✓</span> PDF Ready
+                        </span>
+                      ) : generatingPdf === po.id ? (
+                        <span className="text-blue-600 font-medium flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
+                          Generating...
+                        </span>
+                      ) : (
+                        <button
+                          onClick={(e) => generatePDF(po.id, e)}
+                          className="text-orange-600 hover:text-orange-700 font-medium flex items-center gap-1 hover:underline"
+                        >
+                          <span>⚡</span> Generate PDF
+                        </button>
+                      )}
+                      <span className="text-gray-500">
+                        {(poFiles[po.id] || []).length} file{(poFiles[po.id] || []).length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-600 mb-2">{po.vendor_name}</p>
-                  <p className="text-sm text-gray-500">
-                    {new Date(po.order_date).toLocaleDateString()} •{" "}
-                    ${po.total_amount.toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </p>
-                  <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between text-xs">
-                    <span className="text-gray-500">
-                      {po.generated_pdf_path ? "✓ PDF Generated" : "⚠ No PDF"}
-                    </span>
-                    <span className="text-gray-500">
-                      {(poFiles[po.id] || []).length} file{(poFiles[po.id] || []).length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
