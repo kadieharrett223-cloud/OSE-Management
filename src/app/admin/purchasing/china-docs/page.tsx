@@ -138,18 +138,14 @@ export default function ChinaDocs() {
     const setupPdfWorker = async () => {
       const pdfjs = await import("pdfjs-dist");
       
-      // Try multiple CDN sources with correct version
-      const workerUrls = [
-        `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`,
-        `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`,
-        `https://unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.js`
-      ];
+      // Use jsdelivr which has better CORS and CDN support
+      const workerUrl = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
       
-      pdfjs.GlobalWorkerOptions.workerSrc = workerUrls[0];
+      pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
       
-      console.log('PDF worker configured:', pdfjs.GlobalWorkerOptions.workerSrc);
-      console.log('PDF.js version:', pdfjs.version);
-      console.log('Fallback URLs:', workerUrls);
+      console.log('🔧 PDF worker configured:', workerUrl);
+      console.log('📦 PDF.js version:', pdfjs.version);
+      console.log('⏰ Setup time:', new Date().toISOString());
       setPdfWorkerReady(true);
     };
     setupPdfWorker();
