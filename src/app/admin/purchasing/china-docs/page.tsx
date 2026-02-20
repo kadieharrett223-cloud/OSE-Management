@@ -130,12 +130,7 @@ export default function ChinaDocs() {
   
   // PDF Viewer state
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
-  const [currentPdfUrl, setCurrentPdfUrl] = useState<string | null>(null);
-  const [currentPdfName, setCurrentPdfName] = useState<string>("");
   const [numPages, setNumPages] = useState<number>(0);
-  const [pageNumber, setPageNumber] = useState<number>(1);
-  const [activeTab, setActiveTab] = useState<"generated" | "uploads">("generated");
-  const [scrollMode, setScrollMode] = useState(true); // true = scroll all pages, false = single page
 
   // Set up PDF.js worker on client side only
   useEffect(() => {
@@ -214,33 +209,11 @@ export default function ChinaDocs() {
 
   const openPOViewer = (po: PurchaseOrder) => {
     setSelectedPO(po);
-    setActiveTab("generated");
-    setPageNumber(1);
-    
-    if (po.generated_pdf_path) {
-      const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/generated-po-pdfs/${po.generated_pdf_path}`;
-      setCurrentPdfUrl(publicUrl);
-      setCurrentPdfName(`PO-${po.po_number}.pdf`);
-    } else {
-      setCurrentPdfUrl(null);
-      setCurrentPdfName("");
-    }
   };
 
   const closeViewer = () => {
     setSelectedPO(null);
-    setCurrentPdfUrl(null);
-    setCurrentPdfName("");
     setNumPages(0);
-    setPageNumber(1);
-  };
-
-  const switchToUploadedDoc = (file: ChineseFile) => {
-    const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/chinese-po-files/${file.file_path}`;
-    setCurrentPdfUrl(publicUrl);
-    setCurrentPdfName(file.file_name);
-    setActiveTab("uploads");
-    setPageNumber(1);
   };
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
@@ -387,12 +360,12 @@ export default function ChinaDocs() {
         </div>
       </div>
 
-      {/* PDF Viewer Modal */}
+      {/* PDF Viewer Modal - Horizontal Scroll */}
       {selectedPO && (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[95vw] h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white z-10">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">
                   PO #{selectedPO.po_number}
@@ -407,167 +380,107 @@ export default function ChinaDocs() {
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-gray-200 px-4">
-              <button
-                onClick={() => {
-                  setActiveTab("generated");
-                  if (selectedPO.generated_pdf_path) {
-                    const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/generated-po-pdfs/${selectedPO.generated_pdf_path}`;
-                    setCurrentPdfUrl(publicUrl);
-                    setCurrentPdfName(`PO-${selectedPO.po_number}.pdf`);
-                    setPageNumber(1);
-                  }
-                }}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === "generated"
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Generated PO
-              </button>
-              <button
-                onClick={() => setActiveTab("uploads")}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === "uploads"
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Uploaded Docs ({(poFiles[selectedPO.id] || []).length})
-              </button>
+            {/* Document Count */}
+            <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+              <p className="text-sm text-gray-600">
+                Viewing {1 + (poFiles[selectedPO.id] || []).length} document{(1 + (poFiles[selectedPO.id] || []).length) !== 1 ? "s" : ""} • 
+                <span className="font-medium text-gray-900"> Scroll horizontally →</span>
+              </p>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-auto p-4 bg-gray-50">
-              {activeTab === "generated" ? (
-                currentPdfUrl ? (
-                  <div className="flex flex-col items-center space-y-4">
-                    {/* Controls */}
-                    <div className="sticky top-0 z-10 bg-white p-3 rounded-lg shadow-md flex items-center gap-4">
-                      <span className="text-sm text-gray-700 font-medium">
-                        {numPages} page{numPages !== 1 ? "s" : ""}
-                      </span>
-                      <div className="h-4 w-px bg-gray-300" />
-                      <button
-                        onClick={() => setScrollMode(!scrollMode)}
-                        className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                      >
-                        {scrollMode ? "Single Page" : "Scroll All"}
-                      </button>
+            {/* Horizontal Scroll Container */}
+            <div className="flex-1 overflow-x-auto overflow-y-hidden bg-gray-100">
+              <div className="flex h-full gap-6 p-6" style={{ width: 'max-content' }}>
+                
+                {/* Generated PO Document */}
+                <div className="flex-shrink-0 w-[750px] h-full bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+                  <div className="bg-blue-600 text-white px-4 py-2 font-semibold text-sm flex items-center justify-between">
+                    <span>📄 Your Generated PO</span>
+                    {selectedPO.generated_pdf_path && (
                       <a
-                        href={currentPdfUrl}
-                        download={currentPdfName}
-                        className="ml-auto flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                        href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/generated-po-pdfs/${selectedPO.generated_pdf_path}`}
+                        download={`PO-${selectedPO.po_number}.pdf`}
+                        className="px-2 py-1 bg-white text-blue-600 rounded text-xs hover:bg-blue-50 flex items-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <Download className="w-4 h-4" />
-                        Download PDF
+                        <Download className="w-3 h-3" />
+                        Download
                       </a>
-                    </div>
-
-                    {/* PDF Display */}
-                    {pdfWorkerReady ? (
-                      scrollMode ? (
-                        <Document
-                          file={currentPdfUrl}
-                          onLoadSuccess={onDocumentLoadSuccess}
-                          className="flex flex-col items-center space-y-3"
-                        >
-                          {Array.from(new Array(numPages), (el, index) => (
-                            <div key={`page_${index + 1}`} className="shadow-lg bg-white">
-                              <Page
-                                pageNumber={index + 1}
-                                width={Math.min(900, window.innerWidth - 100)}
-                                renderTextLayer={true}
-                                renderAnnotationLayer={true}
-                              />
-                            </div>
-                          ))}
-                        </Document>
-                      ) : (
-                        <div className="flex flex-col items-center">
-                          <div className="mb-4 flex items-center gap-3">
-                            <button
-                              onClick={() => setPageNumber(Math.max(1, pageNumber - 1))}
-                              disabled={pageNumber <= 1}
-                              className="p-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
-                            >
-                              <ChevronLeft className="w-5 h-5" />
-                            </button>
-                            <span className="text-sm text-gray-700 px-4">
-                              Page {pageNumber} of {numPages}
-                            </span>
-                            <button
-                              onClick={() => setPageNumber(Math.min(numPages, pageNumber + 1))}
-                              disabled={pageNumber >= numPages}
-                              className="p-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
-                            >
-                              <ChevronRight className="w-5 h-5" />
-                            </button>
-                          </div>
-                          <Document
-                            file={currentPdfUrl}
-                            onLoadSuccess={onDocumentLoadSuccess}
-                            className="shadow-lg bg-white"
-                          >
+                    )}
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                    {selectedPO.generated_pdf_path && pdfWorkerReady ? (
+                      <Document
+                        file={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/generated-po-pdfs/${selectedPO.generated_pdf_path}`}
+                        onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                        className="flex flex-col items-center space-y-3"
+                      >
+                        {Array.from(new Array(numPages || 1), (el, index) => (
+                          <div key={`gen_page_${index + 1}`} className="shadow-md bg-white">
                             <Page
-                              pageNumber={pageNumber}
-                              width={Math.min(900, window.innerWidth - 100)}
+                              pageNumber={index + 1}
+                              width={700}
                               renderTextLayer={true}
                               renderAnnotationLayer={true}
                             />
-                          </Document>
-                        </div>
-                      )
+                          </div>
+                        ))}
+                      </Document>
                     ) : (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-                        <span className="ml-3 text-gray-600">Loading PDF viewer...</span>
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+                          <p className="text-gray-600">Generating PDF...</p>
+                        </div>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="text-center py-16">
-                    <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-600 text-lg">No PDF generated yet</p>
-                    <p className="text-gray-500 text-sm mt-2">
-                      PDF will be auto-generated when files are uploaded
-                    </p>
-                  </div>
-                )
-              ) : (
-                <div className="space-y-3">
-                  {(poFiles[selectedPO.id] || []).length === 0 ? (
-                    <div className="text-center py-16">
-                      <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-600 text-lg">No uploaded documents</p>
-                    </div>
-                  ) : (
-                    (poFiles[selectedPO.id] || []).map((file) => (
-                      <button
-                        key={file.id}
-                        onClick={() => switchToUploadedDoc(file)}
-                        className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-400 transition-colors text-left"
-                      >
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">{file.file_name}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {(file.file_size / 1024).toFixed(1)} KB •{" "}
-                            {new Date(file.file_uploaded_at).toLocaleDateString()}
-                          </p>
-                          {file.upload_notes && (
-                            <p className="text-xs text-gray-600 mt-1 italic">
-                              {file.upload_notes}
-                            </p>
-                          )}
-                        </div>
-                        <FileText className="w-5 h-5 text-blue-600" />
-                      </button>
-                    ))
-                  )}
                 </div>
-              )}
+
+                {/* Uploaded Chinese Documents */}
+                {(poFiles[selectedPO.id] || []).map((file, fileIndex) => {
+                  const fileUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/chinese-po-files/${file.file_path}`;
+                  return (
+                    <div
+                      key={file.id}
+                      className="flex-shrink-0 w-[750px] h-full bg-white rounded-lg shadow-lg overflow-hidden flex flex-col"
+                    >
+                      <div className="bg-orange-600 text-white px-4 py-2 font-semibold text-sm flex items-center justify-between">
+                        <span>📑 Chinese Doc #{fileIndex + 1}: {file.file_name}</span>
+                        <a
+                          href={fileUrl}
+                          download={file.file_name}
+                          className="px-2 py-1 bg-white text-orange-600 rounded text-xs hover:bg-orange-50 flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Download className="w-3 h-3" />
+                          Download
+                        </a>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+                        {pdfWorkerReady ? (
+                          <ChineseDocViewer
+                            fileUrl={fileUrl}
+                            fileName={file.file_name}
+                            Document={Document}
+                            Page={Page}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600" />
+                          </div>
+                        )}
+                      </div>
+                      {file.upload_notes && (
+                        <div className="px-4 py-2 bg-yellow-50 border-t border-yellow-200 text-xs text-gray-700">
+                          <span className="font-semibold">Note:</span> {file.upload_notes}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+              </div>
             </div>
           </div>
         </div>
@@ -575,3 +488,49 @@ export default function ChinaDocs() {
     </div>
   );
 }
+
+// Helper component for rendering Chinese docs
+const ChineseDocViewer = ({ 
+  fileUrl, 
+  fileName, 
+  Document, 
+  Page 
+}: { 
+  fileUrl: string; 
+  fileName: string; 
+  Document: any; 
+  Page: any;
+}) => {
+  const [numPages, setNumPages] = useState<number>(0);
+  const [error, setError] = useState(false);
+
+  return (
+    <div className="flex flex-col items-center">
+      {error ? (
+        <div className="text-center py-16">
+          <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-600">Unable to preview this document</p>
+          <p className="text-gray-500 text-sm mt-2">File type may not be supported</p>
+        </div>
+      ) : (
+        <Document
+          file={fileUrl}
+          onLoadSuccess={({ numPages }: { numPages: number }) => setNumPages(numPages)}
+          onLoadError={() => setError(true)}
+          className="flex flex-col items-center space-y-3"
+        >
+          {Array.from(new Array(numPages || 1), (el, index) => (
+            <div key={`chinese_page_${index + 1}`} className="shadow-md bg-white">
+              <Page
+                pageNumber={index + 1}
+                width={700}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+              />
+            </div>
+          ))}
+        </Document>
+      )}
+    </div>
+  );
+};
