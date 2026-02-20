@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PDFDocument from "pdfkit";
+import nodemailer from "nodemailer";
 
 interface ChangeReport {
   timestamp: string;
@@ -257,24 +258,42 @@ ${changes.map((change) => `    <li><strong>${change.field}:</strong> "${change.o
 </div>
         `.trim();
 
-        // Build FormData for email with attachment
-        const formData = new FormData();
-        formData.append("to", inventoryTeamEmail);
-        formData.append("subject", `PO #${new_po.po_number} - Change #${changeNumber}`);
-        formData.append("text", emailBody);
-        formData.append("html", emailHtml);
+        // Send email with nodemailer
+        if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+          const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT || "587"),
+            secure: process.env.SMTP_SECURE === "true",
+            auth: {
+              user: process.env.SMTP_USER,
+              pass: process.env.SMTP_PASSWORD,
+            },
+          });
 
-        if (pdfBuffer) {
-          const blob = new Blob([pdfBuffer], { type: "application/pdf" });
-          formData.append("attachment", blob, `PO-${new_po.po_number}.pdf`);
+          const mailOptions: any = {
+            from: process.env.SMTP_FROM || process.env.SMTP_USER,
+            to: inventoryTeamEmail,
+            subject: `PO #${new_po.po_number} - Change #${changeNumber}`,
+            text: emailBody,
+            html: emailHtml,
+          };
+
+          if (pdfBuffer) {
+            mailOptions.attachments = [
+              {
+                filename: `PO-${new_po.po_number}.pdf`,
+                content: pdfBuffer,
+                contentType: "application/pdf",
+              },
+            ];
+          }
+
+          try {
+            await transporter.sendMail(mailOptions);
+          } catch (emailError) {
+            console.error("Failed to send email notification:", emailError);
+          }
         }
-
-        await fetch("/api/send-email", {
-          method: "POST",
-          body: formData,
-        }).catch((err) => {
-          console.error("Failed to send email notification:", err);
-        });
       } catch (error) {
         console.error("Failed to prepare/send email:", error);
       }
