@@ -36,52 +36,86 @@ interface ChineseFile {
 }
 
 // Component for thumbnail preview on card
-const PDFThumbnail = ({ pdfUrl, poNumber }: { pdfUrl: string | null; poNumber: string }) => {
+const PDFThumbnail = ({ 
+  pdfUrl, 
+  poNumber, 
+  Document, 
+  Page 
+}: { 
+  pdfUrl: string | null; 
+  poNumber: string;
+  Document: any;
+  Page: any;
+}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   if (!pdfUrl) {
     return (
-      <div className="w-full h-48 bg-gray-100 rounded flex items-center justify-center">
+      <div 
+        className="w-full h-56 bg-gradient-to-br from-gray-100 to-gray-200 rounded-t-lg flex items-center justify-center relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
-          <p className="text-xs text-gray-500">Generating PDF...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-3" />
+          <p className="text-sm text-gray-600 font-medium">Generating PDF...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-48 bg-gray-100 rounded overflow-hidden relative">
+    <div 
+      className="w-full h-56 bg-gray-50 rounded-t-lg overflow-hidden relative group"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       {loading && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
         </div>
       )}
       {error ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-          <FileText className="w-12 h-12 text-gray-300" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+          <FileText className="w-16 h-16 text-gray-300 mb-2" />
+          <p className="text-xs text-gray-400">Preview unavailable</p>
         </div>
       ) : (
-        <Document
-          file={pdfUrl}
-          onLoadSuccess={() => setLoading(false)}
-          onLoadError={() => {
-            setError(true);
-            setLoading(false);
-          }}
-          className="flex items-center justify-center"
-        >
-          <Page
-            pageNumber={1}
-            width={280}
-            renderTextLayer={false}
-            renderAnnotationLayer={false}
-          />
-        </Document>
+        <div className="flex items-center justify-center h-full bg-white">
+          <Document
+            file={pdfUrl}
+            onLoadSuccess={() => setLoading(false)}
+            onLoadError={() => {
+              setError(true);
+              setLoading(false);
+            }}
+            loading={null}
+          >
+            <Page
+              pageNumber={1}
+              width={320}
+              renderTextLayer={false}
+              renderAnnotationLayer={false}
+              className="shadow-sm"
+            />
+          </Document>
+        </div>
       )}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-        <p className="text-white text-xs font-medium">PO #{poNumber}</p>
+      
+      {/* Hover Overlay - "Click to View" */}
+      {isHovered && !loading && !error && (
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20 transition-all">
+          <div className="bg-white px-6 py-3 rounded-lg shadow-lg">
+            <p className="text-sm font-semibold text-gray-900">Click to View</p>
+          </div>
+        </div>
+      )}
+      
+      {/* PO Number Badge */}
+      <div className="absolute top-3 left-3 bg-blue-600 text-white px-3 py-1 rounded-md shadow-lg z-10">
+        <p className="text-xs font-bold">PO #{poNumber}</p>
       </div>
     </div>
   );
@@ -281,21 +315,33 @@ export default function ChinaDocs() {
                   <button
                     key={po.id}
                     onClick={() => openPOViewer(po)}
-                    className="bg-white border border-gray-300 rounded-lg overflow-hidden hover:shadow-2xl transition-all hover:border-blue-500 hover:scale-[1.02] text-left group"
+                    className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-2xl transition-all hover:border-blue-500 hover:scale-[1.02] text-left"
                   >
                     {/* PDF Thumbnail Preview */}
-                    {pdfWorkerReady && (
-                      <PDFThumbnail pdfUrl={pdfUrl} poNumber={po.po_number} />
+                    {pdfWorkerReady ? (
+                      <PDFThumbnail 
+                        pdfUrl={pdfUrl} 
+                        poNumber={po.po_number}
+                        Document={Document}
+                        Page={Page}
+                      />
+                    ) : (
+                      <div className="w-full h-56 bg-gradient-to-br from-gray-100 to-gray-200 rounded-t-lg flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-3" />
+                          <p className="text-sm text-gray-600 font-medium">Loading viewer...</p>
+                        </div>
+                      </div>
                     )}
 
                     {/* PO Info */}
-                    <div className="p-4">
-                      <div className="flex items-start justify-between mb-2">
+                    <div className="p-5">
+                      <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
-                          <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 mb-1">
+                          <h3 className="text-xl font-bold text-gray-900 mb-1 line-clamp-1">
                             {po.vendor_name}
                           </h3>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-500">
                             {new Date(po.order_date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
@@ -304,30 +350,31 @@ export default function ChinaDocs() {
                           </p>
                         </div>
                         <span
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
                             po.status === "PAID"
-                              ? "bg-green-100 text-green-800"
+                              ? "bg-green-100 text-green-700"
                               : po.status === "SHIPPED"
-                                ? "bg-blue-100 text-blue-800"
+                                ? "bg-blue-100 text-blue-700"
                                 : po.status === "SUBMITTED"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-gray-100 text-gray-800"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-gray-100 text-gray-700"
                           }`}
                         >
                           {po.status}
                         </span>
                       </div>
                       
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                        <span className="text-lg font-bold text-gray-900">
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                        <span className="text-2xl font-bold text-gray-900">
                           ${po.total_amount.toLocaleString("en-US", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </span>
                         {(poFiles[po.id] || []).length > 0 && (
-                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                            {(poFiles[po.id] || []).length} attachment{(poFiles[po.id] || []).length !== 1 ? "s" : ""}
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full">
+                            <FileText className="w-3.5 h-3.5" />
+                            {(poFiles[po.id] || []).length}
                           </span>
                         )}
                       </div>
