@@ -33,6 +33,8 @@ interface ChineseFile {
   file_uploaded_at: string;
   upload_notes: string | null;
   file_path: string;
+  signedUrl?: string | null;
+  signError?: string | null;
 }
 
 // Component for thumbnail preview on card
