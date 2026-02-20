@@ -205,12 +205,24 @@ export default function ChinaDocs() {
 
   const fetchPOFiles = async (poId: string) => {
     try {
-      const res = await fetch(`/api/purchase-orders/${poId}/chinese-po-files`);
-      if (!res.ok) throw new Error("Failed to fetch files");
-      const data = await res.json();
+      // Try to get signed URLs first (for better Supabase compatibility)
+      const signedRes = await fetch(`/api/purchase-orders/${poId}/chinese-po-files/signed-urls`);
+      let files = [];
+      
+      if (signedRes.ok) {
+        const signedData = await signedRes.json();
+        files = signedData.data || [];
+      } else {
+        // Fallback to regular fetch if signed URLs fail
+        const res = await fetch(`/api/purchase-orders/${poId}/chinese-po-files`);
+        if (!res.ok) throw new Error("Failed to fetch files");
+        const data = await res.json();
+        files = data.data || [];
+      }
+      
       setPoFiles((prev) => ({
         ...prev,
-        [poId]: data.data || [],
+        [poId]: files,
       }));
     } catch (error) {
       console.error("Error fetching files for PO:", error);
@@ -408,7 +420,9 @@ export default function ChinaDocs() {
           ...(poFiles[selectedPO.id] || []).map((file, idx) => ({
             type: 'chinese',
             title: `Chinese Doc #${idx + 1}: ${file.file_name}`,
-            url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/chinese-po-files/${file.file_path}`,
+            url: file.signedUrl 
+              ? file.signedUrl
+              : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/chinese-po-files/${file.file_path}`,
             filename: file.file_name,
             headerColor: 'bg-orange-600',
             icon: '📑',
