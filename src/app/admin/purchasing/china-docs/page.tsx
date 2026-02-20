@@ -172,41 +172,44 @@ export default function ChinaDocs() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">China Docs</h1>
-        <p className="text-gray-600">
-          Manage and organize all Chinese supplier purchase orders and documents
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-6xl mx-auto p-6">
+        {/* Header Card */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6 shadow-sm">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">China Docs</h1>
+          <p className="text-gray-600 mb-6">
+            Manage and organize all Chinese supplier purchase orders and documents
+          </p>
 
-      {/* Filters */}
-      <div className="mb-6 flex gap-3 flex-wrap">
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">All Status</option>
-          <option value="DRAFT">Draft</option>
-          <option value="SUBMITTED">Submitted</option>
-          <option value="RECEIVED">Received</option>
-          <option value="PAID">Paid</option>
-          <option value="SHIPPED">Shipped</option>
-        </select>
-        <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium">
-          {filteredPOs.length} Chinese PO{filteredPOs.length !== 1 ? "s" : ""}
-        </span>
-      </div>
-
-      {/* POs List */}
-      {filteredPOs.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-600">No Chinese purchase orders found</p>
+          {/* Filters */}
+          <div className="flex gap-3 flex-wrap items-center">
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 bg-white"
+            >
+              <option value="all">All Status</option>
+              <option value="DRAFT">Draft</option>
+              <option value="SUBMITTED">Submitted</option>
+              <option value="RECEIVED">Received</option>
+              <option value="PAID">Paid</option>
+              <option value="SHIPPED">Shipped</option>
+            </select>
+            <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
+              {filteredPOs.length} Chinese PO{filteredPOs.length !== 1 ? "s" : ""}
+            </span>
+          </div>
         </div>
-      ) : (
-        <div className="space-y-4">
+
+        {/* POs List */}
+        {filteredPOs.length === 0 ? (
+          <div className="text-center py-16">
+            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 text-lg">No Chinese purchase orders found</p>
+            <p className="text-gray-400 text-sm mt-1">Mark POs as "China supplier" to see them here</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
           {filteredPOs.map((po) => (
             <div
               key={po.id}
@@ -255,14 +258,14 @@ export default function ChinaDocs() {
 
               {/* Expanded Content */}
               {expandedPOs.includes(po.id) && (
-                <div className="border-t border-gray-200 bg-gray-50 p-4 space-y-4">
+                <div className="border-t border-gray-200 bg-white p-6 space-y-6">
                   {/* Printable PO Section */}
-                  <div className="bg-white rounded border border-gray-300 p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3">
+                  <div className="border border-gray-200 rounded-lg p-5 bg-gray-50">
+                    <h4 className="font-semibold text-gray-900 text-lg mb-4">
                       Printable PO
                     </h4>
-                    <div className="bg-gray-50 p-3 rounded mb-3 max-h-72 overflow-y-auto text-xs">
-                      <div className="space-y-2 text-gray-700">
+                    <div className="bg-white p-4 rounded border border-gray-200 max-h-72 overflow-y-auto text-xs">
+                      <div className="space-y-2 text-gray-700 font-mono">
                         <p>
                           <strong>PO #:</strong> {po.po_number}
                         </p>
@@ -319,10 +322,10 @@ export default function ChinaDocs() {
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
                       <button
                         onClick={() => handlePrint(po)}
-                        className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
                       >
                         <Printer className="w-4 h-4" />
                         Print PO
@@ -331,22 +334,24 @@ export default function ChinaDocs() {
                   </div>
 
                   {/* Files Section */}
-                  <div className="bg-white rounded border border-gray-300 p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3">
-                      Attached Documents (
-                      {(poFiles[po.id] || []).length})
+                  <div className="border border-gray-200 rounded-lg p-5 bg-gray-50">
+                    <h4 className="font-semibold text-gray-900 text-lg mb-4">
+                      Attached Documents ({(poFiles[po.id] || []).length})
                     </h4>
 
                     {(poFiles[po.id] || []).length === 0 ? (
-                      <p className="text-sm text-gray-500 italic">
-                        No files uploaded yet
-                      </p>
+                      <div className="text-center py-6">
+                        <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-500 text-sm">
+                          No files uploaded yet
+                        </p>
+                      </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-2 bg-white rounded border border-gray-200 p-3">
                         {(poFiles[po.id] || []).map((file) => (
                           <div
                             key={file.id}
-                            className="flex items-start justify-between p-3 bg-gray-50 rounded border border-gray-200"
+                            className="flex items-start justify-between p-3 bg-gray-50 rounded border border-gray-100 hover:bg-blue-50 transition-colors"
                           >
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">
@@ -388,6 +393,7 @@ export default function ChinaDocs() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
