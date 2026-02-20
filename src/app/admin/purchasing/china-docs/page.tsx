@@ -137,7 +137,12 @@ export default function ChinaDocs() {
   useEffect(() => {
     const setupPdfWorker = async () => {
       const pdfjs = await import("pdfjs-dist");
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+      
+      // Use legacy build with .js extension for better Next.js compatibility
+      pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.worker.min.js';
+      
+      console.log('PDF worker configured:', pdfjs.GlobalWorkerOptions.workerSrc);
+      console.log('PDF.js version:', pdfjs.version);
       setPdfWorkerReady(true);
     };
     setupPdfWorker();
@@ -484,6 +489,11 @@ export default function ChinaDocs() {
                       }}
                       onLoadError={(error) => {
                         console.error('PDF load error:', error);
+                      }}
+                      options={{
+                        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/cmaps/',
+                        cMapPacked: true,
+                        standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/standard_fonts/'
                       }}
                       className="flex flex-col items-center space-y-4"
                       loading={
