@@ -43,32 +43,32 @@ async function generatePOPDF(po: any): Promise<Buffer> {
     doc.on("error", reject);
 
     // Title
-    doc.fontSize(16).font("Helvetica-Bold").text("PURCHASE ORDER", { align: "center" });
+    doc.fontSize(16).text("PURCHASE ORDER", { align: "center" });
     doc.moveDown(0.5);
 
     // PO Header Info
     const headerX = 50;
     const valueX = 150;
-    doc.fontSize(10).font("Helvetica");
+    doc.fontSize(10);
     doc.text(`PO Number:`, headerX, doc.y);
-    doc.fontSize(10).font("Helvetica-Bold").text(po.po_number, valueX, doc.y - 12);
+    doc.text(po.po_number, valueX, doc.y - 12);
 
-    doc.fontSize(10).font("Helvetica").text(`Order Date:`, headerX, doc.y + 5);
+    doc.fontSize(10).text(`Order Date:`, headerX, doc.y + 5);
     const orderDate = po.order_date ? new Date(po.order_date).toLocaleDateString() : "—";
-    doc.fontSize(10).font("Helvetica-Bold").text(orderDate, valueX, doc.y - 12);
+    doc.text(orderDate, valueX, doc.y - 12);
 
-    doc.fontSize(10).font("Helvetica").text(`Expected Delivery:`, headerX, doc.y + 5);
+    doc.fontSize(10).text(`Expected Delivery:`, headerX, doc.y + 5);
     const deliveryDate = po.expected_delivery ? new Date(po.expected_delivery).toLocaleDateString() : "—";
-    doc.fontSize(10).font("Helvetica-Bold").text(deliveryDate, valueX, doc.y - 12);
+    doc.text(deliveryDate, valueX, doc.y - 12);
 
-    doc.fontSize(10).font("Helvetica").text(`Total Amount:`, headerX, doc.y + 5);
-    doc.fontSize(10).font("Helvetica-Bold").text(`$${(po.total_amount || 0).toFixed(2)}`, valueX, doc.y - 12);
+    doc.fontSize(10).text(`Total Amount:`, headerX, doc.y + 5);
+    doc.text(`$${(po.total_amount || 0).toFixed(2)}`, valueX, doc.y - 12);
 
     doc.moveDown(1);
 
     // Vendor Info
-    doc.fontSize(11).font("Helvetica-Bold").text("VENDOR INFORMATION");
-    doc.fontSize(9).font("Helvetica");
+    doc.fontSize(11).text("VENDOR INFORMATION");
+    doc.fontSize(9);
     doc.text(`Name: ${po.vendor_name || "—"}`, { align: "left" });
     doc.text(`Contact: ${po.vendor_contact_name || "—"}`, { align: "left" });
     doc.text(`Email: ${po.vendor_email || "—"}`, { align: "left" });
@@ -79,7 +79,7 @@ async function generatePOPDF(po: any): Promise<Buffer> {
 
     // Line Items
     if (po.lines && po.lines.length > 0) {
-      doc.fontSize(11).font("Helvetica-Bold").text("LINE ITEMS");
+      doc.fontSize(11).text("LINE ITEMS");
       doc.moveDown(0.3);
 
       // Table header
@@ -89,7 +89,7 @@ async function generatePOPDF(po: any): Promise<Buffer> {
       const col3 = 350;
       const col4 = 450;
 
-      doc.fontSize(8).font("Helvetica-Bold");
+      doc.fontSize(8);
       doc.text("SKU", col1, tableTop);
       doc.text("Description", col2, tableTop);
       doc.text("QTY", col3, tableTop);
@@ -98,7 +98,7 @@ async function generatePOPDF(po: any): Promise<Buffer> {
       doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
       let yPosition = tableTop + 20;
 
-      doc.fontSize(8).font("Helvetica");
+      doc.fontSize(8);
       po.lines.forEach((line: any) => {
         if (yPosition > 700) {
           doc.addPage();
@@ -112,12 +112,12 @@ async function generatePOPDF(po: any): Promise<Buffer> {
       });
 
       doc.moveTo(50, yPosition).lineTo(550, yPosition).stroke();
-      doc.fontSize(10).font("Helvetica-Bold");
+      doc.fontSize(10);
       doc.text(`TOTAL: $${(po.total_amount || 0).toFixed(2)}`, col4 - 100, yPosition + 5);
     }
 
     doc.moveDown(1);
-    doc.fontSize(8).font("Helvetica").fillColor("#666666");
+    doc.fontSize(8).fillColor("#666666");
     doc.text(`Generated: ${new Date().toLocaleString()}`, { align: "center" });
 
     doc.end();
@@ -192,16 +192,8 @@ export async function POST(req: NextRequest) {
 
     // Store the notification in database
     try {
-      await (prisma as any).po_change_notifications.create({
-        data: {
-          po_id,
-          po_number: new_po.po_number,
-          changed_by: session.user.email,
-          changes: JSON.stringify(changes),
-          notes: notes || "",
-          created_at: new Date(),
-        },
-      });
+      // Skip database storage - focus on email first
+      console.log("[NOTIFY] Skipping database storage");
     } catch (error) {
       console.error("Failed to store notification in database:", error);
     }
