@@ -22,7 +22,9 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch("/api/admin/users");
+      const res = await fetch(`/api/admin/users?ts=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error("Failed to fetch users");
       const data = await res.json();
       setUsers(data.users || []);
@@ -40,8 +42,9 @@ export default function UsersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: true }),
       });
-      if (!res.ok) throw new Error("Failed to approve user");
-      await fetchUsers();
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to approve user");
+      setUsers((prev) => prev.map((user) => (user.id === userId ? { ...user, active: true } : user)));
     } catch (error) {
       alert("Failed to approve user");
     }
@@ -55,8 +58,9 @@ export default function UsersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: false }),
       });
-      if (!res.ok) throw new Error("Failed to deactivate user");
-      await fetchUsers();
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to deactivate user");
+      setUsers((prev) => prev.map((user) => (user.id === userId ? { ...user, active: false } : user)));
     } catch (error) {
       alert("Failed to deactivate user");
     }
