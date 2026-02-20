@@ -201,7 +201,9 @@ export async function POST(req: NextRequest) {
     // Generate PDF
     let pdfBuffer: Buffer | null = null;
     try {
-      pdfBuffer = await generatePOPDF(new_po);
+      // Skip PDF for now due to Vercel serverless font issues
+      // TODO: Implement PDF generation using a cloud service
+      console.log("[NOTIFY] Skipping PDF generation (font issues in serverless)");
     } catch (error) {
       console.error("Failed to generate PDF:", error);
     }
