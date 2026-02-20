@@ -284,7 +284,12 @@ export default function ViewPO() {
 
       const result = await res.json();
       setChangeReport(result.report);
-      alert("Inventory team has been notified of the changes!");
+      if (result?.emailStatus && result.emailStatus.sent !== true) {
+        const errorText = result.emailStatus.error || "Email was not sent.";
+        alert(`Notification created, but email failed: ${errorText}`);
+      } else {
+        alert("Inventory team has been notified of the changes!");
+      }
       setShowNotifyModal(false);
       setNotificationNotes("");
       setOldPOData(null);

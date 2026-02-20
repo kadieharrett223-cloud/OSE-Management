@@ -215,6 +215,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Try to send email notification to inventory team
+    let emailAttempted = false;
+    let emailSent = false;
+    let emailError: string | null = null;
     const inventoryTeamEmail = process.env.INVENTORY_TEAM_EMAIL;
     if (inventoryTeamEmail) {
       try {
@@ -260,6 +263,10 @@ ${changes.map((change) => `    <li><strong>${change.field}:</strong> "${change.o
 
         // Send email with nodemailer
         if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+          emailAttempted = true;
+          console.log("[NOTIFY] SMTP config check passed");
+          console.log(`[NOTIFY] Attempting to send to: ${inventoryTeamEmail}`);
+          
           const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST,
             port: parseInt(process.env.SMTP_PORT || "587"),
@@ -269,6 +276,8 @@ ${changes.map((change) => `    <li><strong>${change.field}:</strong> "${change.o
               pass: process.env.SMTP_PASSWORD,
             },
           });
+
+          console.log(`[NOTIFY] Transporter created for ${process.env.SMTP_USER}`);
 
           const mailOptions: any = {
             from: process.env.SMTP_FROM || process.env.SMTP_USER,
@@ -286,15 +295,27 @@ ${changes.map((change) => `    <li><strong>${change.field}:</strong> "${change.o
                 contentType: "application/pdf",
               },
             ];
+            console.log(`[NOTIFY] PDF attached: ${pdfBuffer.length} bytes`);
           }
 
           try {
-            await transporter.sendMail(mailOptions);
-          } catch (emailError) {
-            console.error("Failed to send email notification:", emailError);
+            console.log("[NOTIFY] Sending mail...");
+            const result = await transporter.sendMail(mailOptions);
+            console.log("[NOTIFY] Mail sent successfully:", result.messageId);
+            emailSent = true;
+          } catch (sendError: any) {
+            emailError = sendError?.message || "Failed to send email notification";
+            console.error("[NOTIFY] Failed to send email:", sendError);
           }
+        } else {
+          console.log("[NOTIFY] Missing SMTP config:");
+          console.log(`  SMTP_HOST: ${process.env.SMTP_HOST ? "✓" : "✗"}`);
+          console.log(`  SMTP_USER: ${process.env.SMTP_USER ? "✓" : "✗"}`);
+          console.log(`  SMTP_PASSWORD: ${process.env.SMTP_PASSWORD ? "✓" : "✗"}`);
+          emailError = "Missing SMTP configuration";
         }
       } catch (error) {
+        emailError = "Failed to prepare email";
         console.error("Failed to prepare/send email:", error);
       }
     }
@@ -304,6 +325,12 @@ ${changes.map((change) => `    <li><strong>${change.field}:</strong> "${change.o
       report: changeReport,
       changeNumber,
       message: "Change notification created successfully",
+      emailStatus: {
+        to: inventoryTeamEmail || null,
+        attempted: emailAttempted,
+        sent: emailSent,
+        error: emailError,
+      },
     });
   } catch (error: any) {
     console.error("Notification error:", error);
