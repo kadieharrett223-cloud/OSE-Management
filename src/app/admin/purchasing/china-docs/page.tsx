@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Printer, Download, FileText } from "lucide-react";
+import { Sidebar } from "@/components/Sidebar";
 
 interface PurchaseOrder {
   id: string;
@@ -172,11 +173,14 @@ export default function ChinaDocs() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto p-6">
-        {/* Header Card */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6 shadow-sm">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">China Docs</h1>
+    <div className="flex h-screen bg-gray-100">
+      <Sidebar activePage="Purchasing" />
+      <div className="flex-1 overflow-auto">
+        <div className="min-h-screen bg-gray-50">
+          <div className="max-w-6xl mx-auto p-6">
+            {/* Header Card */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6 shadow-sm">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">China Docs</h1>
           <p className="text-gray-600 mb-6">
             Manage and organize all Chinese supplier purchase orders and documents
           </p>
@@ -393,6 +397,8 @@ export default function ChinaDocs() {
           ))}
         </div>
       )}
+          </div>
+        </div>
       </div>
     </div>
   );

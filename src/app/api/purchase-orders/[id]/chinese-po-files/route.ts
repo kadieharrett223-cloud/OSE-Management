@@ -71,6 +71,12 @@ export async function POST(
       );
     }
 
+    // Auto-flag the PO as a China supplier
+    await supabase
+      .from("purchase_orders")
+      .update({ is_china_supplier: true, country: "China" })
+      .eq("id", poId);
+
     return NextResponse.json(
       {
         ok: true,
