@@ -28,7 +28,12 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getServerSupabaseClient();
-    const fileName = `${poId}/${invoiceNumber}/${Date.now()}-${file.name}`;
+    // Sanitize filename: replace multiple spaces with single space, trim, replace spaces with dashes
+    const sanitizedFileName = file.name
+      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+      .trim()                 // Remove leading/trailing spaces
+      .replace(/\s/g, '-');   // Replace remaining spaces with dashes
+    const fileName = `${poId}/${invoiceNumber}/${Date.now()}-${sanitizedFileName}`;
     const buffer = await file.arrayBuffer();
 
     // Upload file to storage
