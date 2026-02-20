@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { ChinesePOFiles } from "@/components/ChinesePOFiles";
 
 interface PurchaseOrder {
   id: string;
@@ -735,6 +736,14 @@ export default function ViewPO() {
             <p className="text-sm text-amber-800">{poNotes}</p>
           </div>
         )}
+
+        {/* Chinese PO Files Section */}
+        <div className="mb-4 print:hidden">
+          <ChinesePOFiles 
+            poId={id}
+            poNumber={po?.po_number || ""}
+          />
+        </div>
 
         {/* PO Document */}
         <div className="border border-gray-300 bg-white p-4 print:text-[10px] print:[&_td]:text-[10px] print:[&_th]:text-[9px] print:[&_p]:text-[10px] print:[&_span]:text-[10px]">
