@@ -8,16 +8,13 @@ import { getSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
-    // Require authenticated admin to start QBO connect
+    // Require authenticated user to start QBO connect
     const session: any = await getSession();
     const role = (session?.user?.role ?? "").toString().toLowerCase();
     
     // When AUTH_DISABLED, getSession() always returns an admin session
     if (!session?.user) {
       return NextResponse.json({ error: "Login required" }, { status: 401 });
-    }
-    if (role !== "admin") {
-      return NextResponse.json({ error: "Admin role required" }, { status: 403 });
     }
     const state = "ose-qbo"; // TODO: replace with CSRF-safe state if needed
     const url = buildAuthorizeUrl(state);

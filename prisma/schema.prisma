@@ -105,6 +105,47 @@ model CommissionSnapshot {
   @@unique([repId, year, month])
 }
 
+model PurchaseOrder {
+  id                  String   @id @default(cuid())
+  po_number           String   @unique
+  vendor_name         String
+  vendor_contact_name String?
+  vendor_email        String?
+  vendor_phone        String?
+  ship_to_name        String?
+  ship_to_address     String?
+  ship_to_city_state_zip String?
+  representative      String?
+  authorized_by       String?
+  destination         String?
+  terms               String?
+  payment_method      String?
+  order_date          DateTime @default(now())
+  expected_delivery   DateTime?
+  total_amount        Float    @default(0)
+  status              String   @default("PENDING")
+  notes               String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  changeNotifications POChangeNotification[]
+}
+
+model POChangeNotification {
+  id           String   @id @default(cuid())
+  po_id        String
+  po_number    String
+  changed_by   String?
+  changes      String   // JSON string of changes
+  notes        String?
+  created_at   DateTime @default(now())
+
+  purchaseOrder PurchaseOrder @relation(fields: [po_id], references: [id], onDelete: Cascade)
+
+  @@index([po_id])
+  @@index([created_at])
+}
+
 // NextAuth standard models
 model Session {
   id           String   @id @default(cuid())

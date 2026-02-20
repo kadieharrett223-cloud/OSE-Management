@@ -100,6 +100,11 @@ export default function ViewPO() {
     multiplier: 1,
     weight_lbs: 0,
   });
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [changeReport, setChangeReport] = useState<any>(null);
+  const [notificationNotes, setNotificationNotes] = useState("");
+  const [oldPOData, setOldPOData] = useState<any>(null);
+  const [sendingNotification, setSendingNotification] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -218,6 +223,9 @@ export default function ViewPO() {
     
     setEditingPO(true);
     try {
+      // Save old PO data for comparison
+      setOldPOData(JSON.parse(JSON.stringify(po)));
+      
       // Convert empty date strings to null for database compatibility
       const formData = {
         ...editForm,
@@ -240,11 +248,51 @@ export default function ViewPO() {
       setPO(result.data);
       alert("Purchase order updated successfully");
       setShowEditModal(false);
+      
+      // Show notification modal after successful update
+      setShowNotifyModal(true);
+      setNotificationNotes("");
     } catch (error) {
       console.error("Edit error:", error);
       alert("Failed to update purchase order");
     } finally {
       setEditingPO(false);
+    }
+  };
+
+  const handleNotifyInventoryTeam = async () => {
+    if (!po?.id || !oldPOData) return;
+
+    setSendingNotification(true);
+    try {
+      const res = await fetch("/api/purchase-orders/notify-changes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          po_id: po.id,
+          old_po: oldPOData,
+          new_po: po,
+          notes: notificationNotes,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to send notification");
+        return;
+      }
+
+      const result = await res.json();
+      setChangeReport(result.report);
+      alert("Inventory team has been notified of the changes!");
+      setShowNotifyModal(false);
+      setNotificationNotes("");
+      setOldPOData(null);
+    } catch (error) {
+      console.error("Notification error:", error);
+      alert("Failed to notify inventory team");
+    } finally {
+      setSendingNotification(false);
     }
   };
 
@@ -513,6 +561,9 @@ export default function ViewPO() {
     if (!po?.id) return;
     setSavingLineItem(true);
     try {
+      // Save old PO data for comparison
+      setOldPOData(JSON.parse(JSON.stringify(po)));
+      
       const newTotal = tempLines.reduce((sum, line) => sum + (line.line_total || 0), 0);
       const res = await fetch(`/api/purchase-orders/${po.id}`, {
         method: "PATCH",
@@ -530,6 +581,10 @@ export default function ViewPO() {
       setEditingLineItems(false);
       setTempLines([]);
       alert("Line items saved successfully");
+      
+      // Show notification modal after successful update
+      setShowNotifyModal(true);
+      setNotificationNotes("");
     } catch (error) {
       console.error("Error saving line items:", error);
       alert("Failed to save line items");
@@ -1824,6 +1879,115 @@ export default function ViewPO() {
                 className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {creatingProduct ? "Creating..." : "Create Product"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notify Inventory Team Modal */}
+      {showNotifyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+          <div className="w-full max-w-md sm:max-w-lg rounded-lg bg-white p-4 sm:p-6 shadow-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-slate-900 mb-4">Let Inventory Team Know?</h2>
+            <p className="text-slate-600 mb-4">
+              Would you like to notify the inventory team of the changes made to this PO?
+            </p>
+
+            <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 mb-4 max-h-64 overflow-y-auto">
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">Changes Made:</h3>
+              {oldPOData && po ? (
+                <div className="space-y-2 text-sm">
+                  {po.po_number !== oldPOData.po_number && (
+                    <div className="border-b border-slate-300 pb-2">
+                      <p className="font-medium text-slate-700">PO Number</p>
+                      <p className="text-slate-600">{oldPOData.po_number} → {po.po_number}</p>
+                    </div>
+                  )}
+                  {po.vendor_name !== oldPOData.vendor_name && (
+                    <div className="border-b border-slate-300 pb-2">
+                      <p className="font-medium text-slate-700">Vendor Name</p>
+                      <p className="text-slate-600">{oldPOData.vendor_name} → {po.vendor_name}</p>
+                    </div>
+                  )}
+                  {po.vendor_contact_name !== oldPOData.vendor_contact_name && (
+                    <div className="border-b border-slate-300 pb-2">
+                      <p className="font-medium text-slate-700">Contact Name</p>
+                      <p className="text-slate-600">{oldPOData.vendor_contact_name} → {po.vendor_contact_name}</p>
+                    </div>
+                  )}
+                  {po.vendor_email !== oldPOData.vendor_email && (
+                    <div className="border-b border-slate-300 pb-2">
+                      <p className="font-medium text-slate-700">Email</p>
+                      <p className="text-slate-600">{oldPOData.vendor_email} → {po.vendor_email}</p>
+                    </div>
+                  )}
+                  {po.vendor_phone !== oldPOData.vendor_phone && (
+                    <div className="border-b border-slate-300 pb-2">
+                      <p className="font-medium text-slate-700">Phone</p>
+                      <p className="text-slate-600">{oldPOData.vendor_phone} → {po.vendor_phone}</p>
+                    </div>
+                  )}
+                  {po.terms !== oldPOData.terms && (
+                    <div className="border-b border-slate-300 pb-2">
+                      <p className="font-medium text-slate-700">Terms</p>
+                      <p className="text-slate-600">{oldPOData.terms} → {po.terms}</p>
+                    </div>
+                  )}
+                  {po.expected_delivery !== oldPOData.expected_delivery && (
+                    <div className="border-b border-slate-300 pb-2">
+                      <p className="font-medium text-slate-700">Expected Delivery</p>
+                      <p className="text-slate-600">{oldPOData.expected_delivery || "—"} → {po.expected_delivery || "—"}</p>
+                    </div>
+                  )}
+                  {po.total_amount !== oldPOData.total_amount && (
+                    <div className="border-b border-slate-300 pb-2">
+                      <p className="font-medium text-slate-700">Total Amount</p>
+                      <p className="text-slate-600">${oldPOData.total_amount?.toFixed(2)} → ${po.total_amount?.toFixed(2)}</p>
+                    </div>
+                  )}
+                  {JSON.stringify(po.lines) !== JSON.stringify(oldPOData.lines) && (
+                    <div>
+                      <p className="font-medium text-slate-700">Line Items</p>
+                      <p className="text-slate-600">{oldPOData.lines?.length || 0} items → {po.lines?.length || 0} items</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-slate-500">No changes detected</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Notes for Inventory Team (Optional)</label>
+              <textarea
+                value={notificationNotes}
+                onChange={(e) => setNotificationNotes(e.target.value)}
+                placeholder="Add any additional notes about why these changes were made..."
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNotifyModal(false);
+                  setNotificationNotes("");
+                }}
+                disabled={sendingNotification}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleNotifyInventoryTeam}
+                disabled={sendingNotification}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {sendingNotification ? "Sending..." : "Yes, Notify Team"}
               </button>
             </div>
           </div>

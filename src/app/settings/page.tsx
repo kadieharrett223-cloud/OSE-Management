@@ -20,7 +20,7 @@ export default function SettingsPage() {
   const [shopInput, setShopInput] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmationStep, setConfirmationStep] = useState(1);
-  const [activeTab, setActiveTab] = useState<'integrations' | 'defaults' | 'users' | 'billing'>('integrations');
+  const [activeTab, setActiveTab] = useState<'integrations' | 'defaults' | 'billing'>('integrations');
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -219,7 +219,6 @@ export default function SettingsPage() {
             {[
               { id: 'integrations', label: 'Integrations' },
               { id: 'defaults', label: 'Defaults' },
-              { id: 'users', label: 'Users' },
               { id: 'billing', label: 'Billing' },
             ].map((tab) => (
               <button
@@ -364,34 +363,6 @@ export default function SettingsPage() {
                   Privacy Policy
                 </Link>
               </div>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'users' && (
-          <>
-            <div className="bg-white rounded-lg shadow mb-6 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Account</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <p className="mt-1 text-gray-900">{process.env.ADMIN_EMAIL || 'admin@local'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Role</label>
-                  <p className="mt-1 text-gray-900 capitalize">admin</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Session</h2>
-              <button
-                onClick={handleLogout}
-                className="w-full px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition font-medium"
-              >
-                Sign Out
-              </button>
             </div>
           </>
         )}
