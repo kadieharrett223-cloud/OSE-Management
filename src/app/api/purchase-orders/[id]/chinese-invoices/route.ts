@@ -28,11 +28,17 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getServerSupabaseClient();
-    // Sanitize filename: replace multiple spaces with single space, trim, replace spaces with dashes
-    const sanitizedFileName = file.name
+    // Sanitize filename: handle filename and extension separately
+    const lastDotIndex = file.name.lastIndexOf('.');
+    const baseName = lastDotIndex > 0 ? file.name.substring(0, lastDotIndex) : file.name;
+    const extension = lastDotIndex > 0 ? file.name.substring(lastDotIndex) : '';
+    
+    const sanitizedBaseName = baseName
       .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
       .trim()                 // Remove leading/trailing spaces
       .replace(/\s/g, '-');   // Replace remaining spaces with dashes
+    
+    const sanitizedFileName = sanitizedBaseName + extension;
     const fileName = `${poId}/${invoiceNumber}/${Date.now()}-${sanitizedFileName}`;
     const buffer = await file.arrayBuffer();
 
