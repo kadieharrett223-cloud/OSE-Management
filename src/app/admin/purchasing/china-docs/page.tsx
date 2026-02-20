@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { FileText, Download, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
 import dynamic from "next/dynamic";
+import { pdfjs } from 'react-pdf';
+
+// Configure PDF.js worker at module level BEFORE any components load
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+console.log('🎯 Worker configured at module level:', pdfjs.GlobalWorkerOptions.workerSrc);
 
 // Dynamically import react-pdf to avoid SSR issues
 const Document = dynamic(
@@ -133,22 +139,10 @@ export default function ChinaDocs() {
   const [numPages, setNumPages] = useState<number>(0);
   const [currentDocIndex, setCurrentDocIndex] = useState<number>(0);
 
-  // Set up PDF.js worker on client side only
+  // Mark worker as ready after component mounts (worker configured at module level)
   useEffect(() => {
-    const setupPdfWorker = async () => {
-      const pdfjs = await import("pdfjs-dist");
-      
-      // Use jsdelivr which has better CORS and CDN support
-      const workerUrl = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-      
-      pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-      
-      console.log('🔧 PDF worker configured:', workerUrl);
-      console.log('📦 PDF.js version:', pdfjs.version);
-      console.log('⏰ Setup time:', new Date().toISOString());
-      setPdfWorkerReady(true);
-    };
-    setupPdfWorker();
+    setPdfWorkerReady(true);
+    console.log('✅ PDF viewer ready');
   }, []);
 
   useEffect(() => {
