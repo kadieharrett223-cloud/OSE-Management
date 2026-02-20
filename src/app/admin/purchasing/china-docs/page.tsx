@@ -211,6 +211,8 @@ export default function ChinaDocs() {
   const openPOViewer = (po: PurchaseOrder) => {
     setSelectedPO(po);
     setCurrentDocIndex(0);
+    setNumPages(0);
+    console.log('Opening PO viewer for:', po.po_number, 'PDF path:', po.generated_pdf_path);
   };
 
   const closeViewer = () => {
@@ -222,13 +224,17 @@ export default function ChinaDocs() {
   const goToNextDoc = () => {
     if (selectedPO) {
       const totalDocs = 1 + (poFiles[selectedPO.id] || []).length;
-      setCurrentDocIndex((prev) => Math.min(prev + 1, totalDocs - 1));
+      const nextIndex = Math.min(currentDocIndex + 1, totalDocs - 1);
+      console.log('Going to next doc:', nextIndex);
+      setCurrentDocIndex(nextIndex);
       setNumPages(0);
     }
   };
 
   const goToPrevDoc = () => {
-    setCurrentDocIndex((prev) => Math.max(prev - 1, 0));
+    const prevIndex = Math.max(currentDocIndex - 1, 0);
+    console.log('Going to previous doc:', prevIndex);
+    setCurrentDocIndex(prevIndex);
     setNumPages(0);
   };
 
@@ -472,24 +478,51 @@ export default function ChinaDocs() {
                     {/* PDF Pages */}
                     <Document
                       file={currentDoc.url}
-                      onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                      onLoadSuccess={({ numPages }) => {
+                        console.log('PDF loaded successfully:', numPages, 'pages');
+                        setNumPages(numPages);
+                      }}
+                      onLoadError={(error) => {
+                        console.error('PDF load error:', error);
+                      }}
                       className="flex flex-col items-center space-y-4"
                       loading={
                         <div className="flex items-center justify-center py-16">
                           <div className="text-center">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
                             <p className="text-gray-600">Loading document...</p>
+                            <p className="text-xs text-gray-500 mt-2">{currentDoc.url}</p>
+                          </div>
+                        </div>
+                      }
+                      error={
+                        <div className="flex items-center justify-center py-16">
+                          <div className="text-center">
+                            <FileText className="w-16 h-16 text-red-300 mx-auto mb-4" />
+                            <p className="text-red-600 text-lg font-medium">Failed to load PDF</p>
+                            <p className="text-gray-600 text-sm mt-2">The document may not be ready yet</p>
+                            <button
+                              onClick={() => window.location.reload()}
+                              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                              Refresh Page
+                            </button>
                           </div>
                         </div>
                       }
                     >
-                      {Array.from(new Array(numPages || 1), (el, index) => (
+                      {numPages > 0 && Array.from(new Array(numPages), (el, index) => (
                         <div key={`page_${index + 1}`} className="shadow-lg bg-white rounded-sm overflow-hidden">
                           <Page
                             pageNumber={index + 1}
                             width={Math.min(850, window.innerWidth - 150)}
                             renderTextLayer={true}
                             renderAnnotationLayer={true}
+                            loading={
+                              <div className="flex items-center justify-center h-96 bg-gray-50">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                              </div>
+                            }
                           />
                         </div>
                       ))}
@@ -503,6 +536,13 @@ export default function ChinaDocs() {
                         </p>
                       </div>
                     )}
+                  </div>
+                ) : !pdfWorkerReady ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+                      <p className="text-gray-600 text-lg">Initializing PDF viewer...</p>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-full">
