@@ -138,11 +138,18 @@ export default function ChinaDocs() {
     const setupPdfWorker = async () => {
       const pdfjs = await import("pdfjs-dist");
       
-      // Use legacy build with .js extension for better Next.js compatibility
-      pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.worker.min.js';
+      // Try multiple CDN sources with correct version
+      const workerUrls = [
+        `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`,
+        `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`,
+        `https://unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.js`
+      ];
+      
+      pdfjs.GlobalWorkerOptions.workerSrc = workerUrls[0];
       
       console.log('PDF worker configured:', pdfjs.GlobalWorkerOptions.workerSrc);
       console.log('PDF.js version:', pdfjs.version);
+      console.log('Fallback URLs:', workerUrls);
       setPdfWorkerReady(true);
     };
     setupPdfWorker();
@@ -491,9 +498,9 @@ export default function ChinaDocs() {
                         console.error('PDF load error:', error);
                       }}
                       options={{
-                        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/cmaps/',
+                        cMapUrl: `https://unpkg.com/pdfjs-dist@5.4.624/cmaps/`,
                         cMapPacked: true,
-                        standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/standard_fonts/'
+                        standardFontDataUrl: `https://unpkg.com/pdfjs-dist@5.4.624/standard_fonts/`
                       }}
                       className="flex flex-col items-center space-y-4"
                       loading={
