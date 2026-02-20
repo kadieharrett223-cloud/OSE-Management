@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import PDFDocument from "pdfkit";
 
 interface ChangeReport {
   timestamp: string;
@@ -29,6 +30,97 @@ function generateChangesSummary(changes: ChangeReport["changes"]): string {
         `• ${change.field}: "${change.oldValue}" → "${change.newValue}"`
     )
     .join("\n");
+}
+
+async function generatePOPDF(po: any): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: "A4", margin: 40 });
+    const chunks: Buffer[] = [];
+
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+
+    // Title
+    doc.fontSize(16).font("Helvetica-Bold").text("PURCHASE ORDER", { align: "center" });
+    doc.moveDown(0.5);
+
+    // PO Header Info
+    const headerX = 50;
+    const valueX = 150;
+    doc.fontSize(10).font("Helvetica");
+    doc.text(`PO Number:`, headerX, doc.y);
+    doc.fontSize(10).font("Helvetica-Bold").text(po.po_number, valueX, doc.y - 12);
+
+    doc.fontSize(10).font("Helvetica").text(`Order Date:`, headerX, doc.y + 5);
+    const orderDate = po.order_date ? new Date(po.order_date).toLocaleDateString() : "—";
+    doc.fontSize(10).font("Helvetica-Bold").text(orderDate, valueX, doc.y - 12);
+
+    doc.fontSize(10).font("Helvetica").text(`Expected Delivery:`, headerX, doc.y + 5);
+    const deliveryDate = po.expected_delivery ? new Date(po.expected_delivery).toLocaleDateString() : "—";
+    doc.fontSize(10).font("Helvetica-Bold").text(deliveryDate, valueX, doc.y - 12);
+
+    doc.fontSize(10).font("Helvetica").text(`Total Amount:`, headerX, doc.y + 5);
+    doc.fontSize(10).font("Helvetica-Bold").text(`$${(po.total_amount || 0).toFixed(2)}`, valueX, doc.y - 12);
+
+    doc.moveDown(1);
+
+    // Vendor Info
+    doc.fontSize(11).font("Helvetica-Bold").text("VENDOR INFORMATION");
+    doc.fontSize(9).font("Helvetica");
+    doc.text(`Name: ${po.vendor_name || "—"}`, { align: "left" });
+    doc.text(`Contact: ${po.vendor_contact_name || "—"}`, { align: "left" });
+    doc.text(`Email: ${po.vendor_email || "—"}`, { align: "left" });
+    doc.text(`Phone: ${po.vendor_phone || "—"}`, { align: "left" });
+    doc.text(`Terms: ${po.terms || "—"}`, { align: "left" });
+
+    doc.moveDown(0.5);
+
+    // Line Items
+    if (po.lines && po.lines.length > 0) {
+      doc.fontSize(11).font("Helvetica-Bold").text("LINE ITEMS");
+      doc.moveDown(0.3);
+
+      // Table header
+      const tableTop = doc.y;
+      const col1 = 50;
+      const col2 = 150;
+      const col3 = 350;
+      const col4 = 450;
+
+      doc.fontSize(8).font("Helvetica-Bold");
+      doc.text("SKU", col1, tableTop);
+      doc.text("Description", col2, tableTop);
+      doc.text("QTY", col3, tableTop);
+      doc.text("Unit Price", col4, tableTop);
+
+      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+      let yPosition = tableTop + 20;
+
+      doc.fontSize(8).font("Helvetica");
+      po.lines.forEach((line: any) => {
+        if (yPosition > 700) {
+          doc.addPage();
+          yPosition = 50;
+        }
+        doc.text(line.sku || "—", col1, yPosition);
+        doc.text(line.description || "—", col2, yPosition, { width: 180 });
+        doc.text(String(line.quantity || 0), col3, yPosition);
+        doc.text(`$${(line.unit_price || 0).toFixed(2)}`, col4, yPosition);
+        yPosition += 30;
+      });
+
+      doc.moveTo(50, yPosition).lineTo(550, yPosition).stroke();
+      doc.fontSize(10).font("Helvetica-Bold");
+      doc.text(`TOTAL: $${(po.total_amount || 0).toFixed(2)}`, col4 - 100, yPosition + 5);
+    }
+
+    doc.moveDown(1);
+    doc.fontSize(8).font("Helvetica").fillColor("#666666");
+    doc.text(`Generated: ${new Date().toLocaleString()}`, { align: "center" });
+
+    doc.end();
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -84,6 +176,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Get a change number (timestamp-based)
+    const changeNumber = Math.floor(Date.now() / 1000);
+
     // Create change report
     const changeReport: ChangeReport = {
       timestamp: new Date().toISOString(),
@@ -93,22 +188,6 @@ export async function POST(req: NextRequest) {
       changes,
       notes: notes || "",
     };
-
-    // Build email content
-    const emailBody = `
-PO CHANGE NOTIFICATION
-${new Date(changeReport.timestamp).toLocaleString()}
-
-PO Number: ${changeReport.poNumber}
-Changed By: ${changeReport.changedBy}
-
-CHANGES MADE:
-${generateChangesSummary(changes)}
-
-${notes ? `NOTES:\n${notes}` : ""}
-
-Please review these changes and take any necessary action with the supplier.
-    `.trim();
 
     // Store the notification in database
     try {
@@ -123,36 +202,88 @@ Please review these changes and take any necessary action with the supplier.
         },
       });
     } catch (error) {
-      // Table might not exist yet, log error but don't fail
       console.error("Failed to store notification in database:", error);
     }
 
+    // Generate PDF
+    let pdfBuffer: Buffer | null = null;
+    try {
+      pdfBuffer = await generatePOPDF(new_po);
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+    }
+
     // Try to send email notification to inventory team
-    // This assumes there's an environment variable for the inventory team email
     const inventoryTeamEmail = process.env.INVENTORY_TEAM_EMAIL;
     if (inventoryTeamEmail) {
       try {
+        const emailBody = `
+PURCHASE ORDER CHANGE NOTIFICATION
+
+PO #: ${new_po.po_number}
+Change #: ${changeNumber}
+Changed By: ${changeReport.changedBy}
+Date: ${new Date(changeReport.timestamp).toLocaleString()}
+
+CHANGES MADE:
+${generateChangesSummary(changes)}
+
+${notes ? `NOTES FROM TEAM:\n${notes}` : ""}
+
+Please review the attached current PO and address any necessary changes with the supplier.
+        `.trim();
+
+        const emailHtml = `
+<div style="font-family: Arial, sans-serif; line-height: 1.6;">
+  <h2>Purchase Order Change Notification</h2>
+  
+  <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+    <p><strong>PO #:</strong> ${new_po.po_number}</p>
+    <p><strong>Change #:</strong> ${changeNumber}</p>
+    <p><strong>Changed By:</strong> ${changeReport.changedBy}</p>
+    <p><strong>Date:</strong> ${new Date(changeReport.timestamp).toLocaleString()}</p>
+  </div>
+
+  <h3>Changes Made:</h3>
+  <ul>
+${changes.map((change) => `    <li><strong>${change.field}:</strong> "${change.oldValue}" → "${change.newValue}"</li>`).join("\n")}
+  </ul>
+
+  ${notes ? `<h3>Notes from Team:</h3><p style="background-color: #fffacd; padding: 10px; border-radius: 5px;">${notes.replace(/\n/g, "<br>")}</p>` : ""}
+
+  <p style="margin-top: 20px; color: #666; font-size: 12px;">
+    Please review the attached current PO and address any necessary changes with the supplier.
+  </p>
+</div>
+        `.trim();
+
+        // Build FormData for email with attachment
+        const formData = new FormData();
+        formData.append("to", inventoryTeamEmail);
+        formData.append("subject", `PO #${new_po.po_number} - Change #${changeNumber}`);
+        formData.append("text", emailBody);
+        formData.append("html", emailHtml);
+
+        if (pdfBuffer) {
+          const blob = new Blob([pdfBuffer], { type: "application/pdf" });
+          formData.append("attachment", blob, `PO-${new_po.po_number}.pdf`);
+        }
+
         await fetch("/api/send-email", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: inventoryTeamEmail,
-            subject: `PO Change Notification - ${new_po.po_number}`,
-            text: emailBody,
-            html: `<pre>${emailBody}</pre>`,
-          }),
+          body: formData,
         }).catch((err) => {
           console.error("Failed to send email notification:", err);
-          // Don't fail the API request if email fails
         });
       } catch (error) {
-        console.error("Failed to send email:", error);
+        console.error("Failed to prepare/send email:", error);
       }
     }
 
     return NextResponse.json({
       ok: true,
       report: changeReport,
+      changeNumber,
       message: "Change notification created successfully",
     });
   } catch (error: any) {
