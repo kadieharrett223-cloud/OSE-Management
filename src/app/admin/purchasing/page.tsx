@@ -913,8 +913,6 @@ export default function PurchasingPage() {
                     {formData.lines.map((line, index) => (
                       <div
                         key={index}
-                        draggable
-                        onDragStart={() => setDraggedLineIndex(index)}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={() => {
                           if (draggedLineIndex !== null && draggedLineIndex !== index) {
@@ -922,12 +920,21 @@ export default function PurchasingPage() {
                             setDraggedLineIndex(null);
                           }
                         }}
-                        onDragEnd={() => setDraggedLineIndex(null)}
                         className={`grid grid-cols-12 gap-0 border-b border-slate-200 ${
                           draggedLineIndex === index ? 'bg-blue-100 opacity-70' : 'hover:bg-slate-50'
-                        } cursor-move`}
+                        }`}
                       >
-                        <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center text-slate-400 hover:text-slate-600">⋮</div>
+                        <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center text-slate-400 hover:text-slate-600">
+                          <span
+                            draggable
+                            onDragStart={() => setDraggedLineIndex(index)}
+                            onDragEnd={() => setDraggedLineIndex(null)}
+                            className="cursor-move select-none"
+                            title="Drag to reorder"
+                          >
+                            ⋮
+                          </span>
+                        </div>
                         <div className="col-span-2 border-r border-slate-200 p-2">
                           <div className="flex flex-col gap-1">
                             <input
