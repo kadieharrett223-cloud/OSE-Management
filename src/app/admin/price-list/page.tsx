@@ -179,6 +179,7 @@ export default function AdminPriceListPage() {
   const [showGroupFilters, setShowGroupFilters] = useState(false);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [showSupplierFilters, setShowSupplierFilters] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -381,11 +382,13 @@ export default function AdminPriceListPage() {
   const startEditing = (item: PriceListItem) => {
     setEditingId(item.id);
     setEditingItem({ ...item }); // Create a copy
+    setShowCalculator(false); // Close calculator when starting to edit
   };
 
   const cancelEditing = () => {
     setEditingId(null);
     setEditingItem(null);
+    setShowCalculator(false); // Close calculator when canceling
   };
 
   const handleAddProduct = async () => {
@@ -1054,26 +1057,50 @@ export default function AdminPriceListPage() {
 
                       {/* Price Calculator Panel (when editing) */}
                       {editingId && editingItem && (
-                        <div className="mt-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
-                          <h3 className="font-semibold text-slate-900 mb-3">Price Calculation Tool</h3>
-                          <PriceCalculator
-                            finalCost={editingItem.cost_with_shipping || null}
-                            currentMargin={editingItem.margin}
-                            currentSellPrice={editingItem.sell_price}
-                            itemNo={editingItem.item_no}
-                            isLoading={isLoading}
-                            onSave={async (margin: number, sellPrice: number) => {
-                              // Update margin and recalculate all derived fields
-                              setEditingItem((prev) => {
-                                if (!prev) return prev;
-                                const updated = { ...prev, margin };
-                                const discount = getDiscountForCategoryId(updated.category_id);
-                                return computeDerivedFields(updated, discount);
-                              });
-                              // Show success feedback
-                              setStatus(`✓ Margin updated to ${(margin * 100).toFixed(2)}% (Sell: $${sellPrice.toFixed(2)})`);
-                            }}
-                          />
+                        <div className="mt-4">
+                          <button
+                            onClick={() => setShowCalculator(!showCalculator)}
+                            className="w-full flex items-center justify-between px-4 py-3 bg-blue-100 hover:bg-blue-150 rounded-lg border border-blue-300 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">🧮</span>
+                              <span className="font-semibold text-slate-900">Price Calculator</span>
+                              <span className="text-xs text-slate-600">
+                                (Current: {editingItem.margin ? `${(editingItem.margin * 100).toFixed(2)}%` : '—'})
+                              </span>
+                            </div>
+                            <svg
+                              className={`w-5 h-5 text-slate-600 transition-transform ${showCalculator ? 'rotate-180' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          
+                          {showCalculator && (
+                            <div className="mt-2 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                              <PriceCalculator
+                                finalCost={editingItem.cost_with_shipping || null}
+                                currentMargin={editingItem.margin}
+                                currentSellPrice={editingItem.sell_price}
+                                itemNo={editingItem.item_no}
+                                isLoading={isLoading}
+                                onSave={async (margin: number, sellPrice: number) => {
+                                  // Update margin and recalculate all derived fields
+                                  setEditingItem((prev) => {
+                                    if (!prev) return prev;
+                                    const updated = { ...prev, margin };
+                                    const discount = getDiscountForCategoryId(updated.category_id);
+                                    return computeDerivedFields(updated, discount);
+                                  });
+                                  // Show success feedback
+                                  setStatus(`✓ Margin updated to ${(margin * 100).toFixed(2)}% (Sell: $${sellPrice.toFixed(2)})`);
+                                }}
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
