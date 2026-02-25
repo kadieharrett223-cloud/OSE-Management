@@ -1063,18 +1063,13 @@ export default function AdminPriceListPage() {
                             itemNo={editingItem.item_no}
                             isLoading={isLoading}
                             onSave={async (margin: number, sellPrice: number) => {
-                              // Update the editing item with new margin and sell price
-                              setEditingItem((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      margin,
-                                      sell_price: sellPrice,
-                                      list_price: sellPrice / 0.8,
-                                      profit: sellPrice - (prev.cost_with_shipping || 0),
-                                    }
-                                  : prev
-                              );
+                              // Update margin and recalculate all derived fields
+                              setEditingItem((prev) => {
+                                if (!prev) return prev;
+                                const updated = { ...prev, margin };
+                                const discount = getDiscountForCategoryId(updated.category_id);
+                                return computeDerivedFields(updated, discount);
+                              });
                               // Show success feedback
                               setStatus(`✓ Margin updated to ${(margin * 100).toFixed(2)}% (Sell: $${sellPrice.toFixed(2)})`);
                             }}
