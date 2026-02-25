@@ -222,6 +222,16 @@ export default function AdminPriceListPage() {
     }
   }, []);
 
+  // Recompute items when discount percentage changes
+  useEffect(() => {
+    if (items.length > 0) {
+      const recomputedItems = items.map((item) =>
+        computeDerivedFields(item, getDiscountForCategoryId(item.category_id))
+      );
+      setItems(recomputedItems);
+    }
+  }, [discountPercentage]);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
