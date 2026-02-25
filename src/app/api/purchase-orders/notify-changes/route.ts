@@ -198,15 +198,9 @@ export async function POST(req: NextRequest) {
       console.error("Failed to store notification in database:", error);
     }
 
-    // Generate PDF
-    let pdfBuffer: Buffer | null = null;
-    try {
-      // Skip PDF for now due to Vercel serverless font issues
-      // TODO: Implement PDF generation using a cloud service
-      console.log("[NOTIFY] Skipping PDF generation (font issues in serverless)");
-    } catch (error) {
-      console.error("Failed to generate PDF:", error);
-    }
+    // PDF generation skipped due to Vercel serverless font issues
+    // TODO: Implement PDF generation using a cloud service
+    console.log("[NOTIFY] PDF generation disabled (use cloud service for PDF attachments)");
 
     // Try to send email notification to inventory team
     let emailAttempted = false;
@@ -280,17 +274,6 @@ ${changes.map((change) => `    <li><strong>${change.field}:</strong> "${change.o
             text: emailBody,
             html: emailHtml,
           };
-
-          if (pdfBuffer) {
-            mailOptions.attachments = [
-              {
-                filename: `PO-${new_po.po_number}.pdf`,
-                content: pdfBuffer,
-                contentType: "application/pdf",
-              },
-            ];
-            console.log(`[NOTIFY] PDF attached: ${pdfBuffer.length} bytes`);
-          }
 
           try {
             console.log("[NOTIFY] Sending mail...");
