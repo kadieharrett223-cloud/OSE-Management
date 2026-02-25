@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import React from "react";
 import * as XLSX from "xlsx";
 import { Sidebar } from "@/components/Sidebar";
+import { PriceCalculator } from "@/components/PriceCalculator";
 import { supabase } from "@/lib/supabase";
 import { usePathname } from "next/navigation";
 import { canonicalizeRep } from "@/lib/repAliases";
@@ -22,7 +23,7 @@ type PriceListItem = {
   ocean_frt: number | null;
   importing: number | null;
   zone5_shipping: number | null;
-  multiplier: number | null;
+  margin: number | null; // Margin as decimal (e.g., 0.2296 for 22.96%)
   // Derived fields (computed by DB)
   tariff_105: number | null;
   per_unit: number | null;
@@ -189,7 +190,7 @@ export default function AdminPriceListPage() {
     ocean_frt: null,
     importing: null,
     zone5_shipping: null,
-    multiplier: 1,
+    margin: 0,
   });
 
   // Save discount to localStorage when changed
@@ -297,7 +298,7 @@ export default function AdminPriceListPage() {
           ocean_frt: editingItem.ocean_frt,
           importing: editingItem.importing,
           zone5_shipping: editingItem.zone5_shipping,
-          multiplier: editingItem.multiplier,
+          margin: editingItem.margin,
         })
         .eq("id", editingItem.id);
       
@@ -314,14 +315,14 @@ export default function AdminPriceListPage() {
     }
   };
 
-  // Client-side calculation: Tariff = FOB×2, Ocean/Import per unit from container constants, Cost = Tariff+Ocean+Import, Final = Cost+Shipping, Sell = (Cost×Multiplier)+Shipping
+  // Client-side calculation: Tariff = FOB×2, Ocean/Import per unit from container constants, Cost = Tariff+Ocean+Import, Final = Cost+Shipping, Sell = Final / (1 - Margin)
   const computeDerivedFields = (item: PriceListItem, discountOverride?: number): PriceListItem => {
     const fob_cost = item.fob_cost || 0;
     const quantity = item.quantity || 0;
     const ocean_per_unit = quantity > 0 ? 3000 / quantity : (item.ocean_frt || 0);
     const importing_per_unit = quantity > 0 ? 2100 / quantity : (item.importing || 0);
     const zone5_shipping = item.zone5_shipping || 0;
-    const multiplier = item.multiplier || 1;
+    const margin = item.margin || 0;
 
     // 1) Tariff: FOB × 2
     const tariff_105 = fob_cost * 2;
@@ -332,11 +333,11 @@ export default function AdminPriceListPage() {
     // 3) Final cost with shipping: Per unit + Zone 5
     const cost_with_shipping = per_unit + zone5_shipping;
 
-    // 4) Sell price: (Cost × Multiplier) + Shipping
-    const sell_price = (per_unit * multiplier) + zone5_shipping;
+    // 4) Sell price: Final / (1 - Margin)
+    const sell_price = margin > 0 && margin < 1 ? cost_with_shipping / (1 - margin) : cost_with_shipping;
 
-    // 5) List price: Sell price × 1.2 (20% markup)
-    const list_price = sell_price * 1.2;
+    // 5) List price: Sell price / 0.80 (20% off list = sell price)
+    const list_price = sell_price / 0.8;
 
     // 6) Profit: Sell price - Final cost
     const profit = sell_price - cost_with_shipping;
@@ -408,7 +409,7 @@ export default function AdminPriceListPage() {
           ocean_frt: newProduct.quantity ? null : newProduct.ocean_frt,
           importing: newProduct.quantity ? null : newProduct.importing,
           zone5_shipping: newProduct.zone5_shipping,
-          multiplier: newProduct.multiplier || 1,
+          margin: newProduct.margin || 0,
           is_active: true
         }])
         .select();
@@ -428,7 +429,7 @@ export default function AdminPriceListPage() {
         ocean_frt: null,
         importing: null,
         zone5_shipping: null,
-        multiplier: 1,
+        margin: 0,
       });
       await loadData();
     } catch (error: any) {
@@ -558,7 +559,7 @@ export default function AdminPriceListPage() {
                     <div className="rounded-2xl bg-blue-50 p-6 ring-1 ring-blue-200">
                       <h3 className="font-semibold text-blue-900">Price List Guide</h3>
                       <div className="mt-3 text-sm text-blue-800 space-y-2">
-                        <p><span className="font-semibold">Manual inputs:</span> FOB cost, quantity (container capacity), shipping, multiplier, optional list price.</p>
+                        <p><span className="font-semibold">Manual inputs:</span> FOB cost, quantity (container capacity), shipping, margin %, optional list price.</p>
                         <p><span className="font-semibold">Constants:</span> Tariff rate = 100%, Ocean freight = 3000 per container, Importing = 2100 per container.</p>
                         <div className="rounded-xl bg-white/80 p-4 ring-1 ring-blue-200/70 text-xs text-blue-900 space-y-1">
                           <div>Tariff = FOB × 2</div>
@@ -566,7 +567,8 @@ export default function AdminPriceListPage() {
                           <div>Importing per unit = 2100 ÷ Quantity</div>
                           <div>Cost (no shipping) = Tariff + Ocean + Importing</div>
                           <div>Final cost = Cost + Shipping</div>
-                          <div>Sell price = (Cost × Multiplier) + Shipping</div>
+                          <div>Sell price = Final cost ÷ (1 − Margin %)</div>
+                          <div>List price = Sell price ÷ 0.80 (always 20% off list)</div>
                           <div>Profit = Sell price − Final cost</div>
                         </div>
                         <p className="text-xs text-blue-700">Discount field sets the % off list price (default 20%).</p>
@@ -812,7 +814,7 @@ export default function AdminPriceListPage() {
                             <th className="px-2 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Zone 5</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Per Unit</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost w/Shipping</th>
-                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Multiplier</th>
+                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin %</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell Price</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List Price</th>
                             <th className="px-2 py-2 text-right font-semibold text-emerald-700 whitespace-nowrap">Profit</th>
@@ -963,18 +965,21 @@ export default function AdminPriceListPage() {
                                 <span className="text-slate-600 text-xs font-semibold">${money(displayItem.cost_with_shipping)}</span>
                               </td>
 
-                              {/* Multiplier (INPUT) */}
+                              {/* Margin % (INPUT) */}
                               <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
                                     type="number"
                                     step="0.01"
-                                    value={displayItem.multiplier !== null && displayItem.multiplier !== undefined ? displayItem.multiplier : ""}
-                                    onChange={(e) => updateEditingItem("multiplier", e.target.value === "" ? null : Number(e.target.value))}
+                                    min="0"
+                                    max="99.99"
+                                    value={displayItem.margin !== null && displayItem.margin !== undefined ? (displayItem.margin * 100).toFixed(2) : ""}
+                                    onChange={(e) => updateEditingItem("margin", e.target.value === "" ? null : Number(e.target.value) / 100)}
                                     className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                    placeholder="e.g., 22.96"
                                   />
                                 ) : (
-                                  <span className="text-blue-900">{item.multiplier ?? "—"}</span>
+                                  <span className="text-blue-900">{item.margin !== null && item.margin !== undefined ? `${(item.margin * 100).toFixed(2)}%` : "—"}</span>
                                 )}
                               </td>
 
@@ -1046,6 +1051,36 @@ export default function AdminPriceListPage() {
                           )}
                         </tbody>
                       </table>
+
+                      {/* Price Calculator Panel (when editing) */}
+                      {editingId && editingItem && (
+                        <div className="mt-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                          <h3 className="font-semibold text-slate-900 mb-3">Price Calculation Tool</h3>
+                          <PriceCalculator
+                            finalCost={editingItem.cost_with_shipping || null}
+                            currentMargin={editingItem.margin}
+                            currentSellPrice={editingItem.sell_price}
+                            itemNo={editingItem.item_no}
+                            isLoading={isLoading}
+                            onSave={async (margin: number, sellPrice: number) => {
+                              // Update the editing item with new margin and sell price
+                              setEditingItem((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      margin,
+                                      sell_price: sellPrice,
+                                      list_price: sellPrice / 0.8,
+                                      profit: sellPrice - (prev.cost_with_shipping || 0),
+                                    }
+                                  : prev
+                              );
+                              // Show success feedback
+                              setStatus(`✓ Margin updated to ${(margin * 100).toFixed(2)}% (Sell: $${sellPrice.toFixed(2)})`);
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* Mobile Card View */}
@@ -1271,15 +1306,17 @@ export default function AdminPriceListPage() {
                   />
                 </div>
 
-                {/* Multiplier */}
+                {/* Margin % */}
                 <div>
-                  <label className="block text-sm font-semibold text-blue-700 mb-1">Multiplier</label>
+                  <label className="block text-sm font-semibold text-blue-700 mb-1">Margin %</label>
                   <input
                     type="number"
                     step="0.01"
-                    value={newProduct.multiplier ?? 1}
-                    onChange={(e) => setNewProduct({ ...newProduct, multiplier: e.target.value ? Number(e.target.value) : 1 })}
-                    placeholder="1.0"
+                    min="0"
+                    max="99.99"
+                    value={newProduct.margin !== null && newProduct.margin !== undefined ? (newProduct.margin * 100).toFixed(2) : "0"}
+                    onChange={(e) => setNewProduct({ ...newProduct, margin: e.target.value ? Number(e.target.value) / 100 : 0 })}
+                    placeholder="22.96"
                     className="w-full rounded-lg border border-blue-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                   />
                 </div>

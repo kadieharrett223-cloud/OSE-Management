@@ -5,7 +5,7 @@ export type PricingInput = {
   fobCost: number;
   quantity: number; // Container capacity
   shipping: number; // Zone 5 shipping
-  multiplier: number;
+  margin: number; // Margin % as decimal (e.g., 0.2296 for 22.96%)
   listPrice?: number; // Optional manual list price
   discount?: number; // % off list price (default 20)
 };
@@ -22,6 +22,7 @@ export type PricingResult = PricingInput & {
   appliedListPrice: number; // Manual or calculated
   discountPercent: number;
   discountedPrice: number; // Final sale price
+  formattedMargin?: string; // For display as %
 };
 
 const FIELD_KEYS: Record<keyof PricingInput, string[]> = {
@@ -31,7 +32,7 @@ const FIELD_KEYS: Record<keyof PricingInput, string[]> = {
   fobCost: ["fob cost", "fob", "cost"],
   quantity: ["quantity", "qty", "container capacity"],
   shipping: ["shipping", "zone 5", "zone5"],
-  multiplier: ["multiplier", "mult", "markup"],
+  margin: ["margin", "margin %", "margin percent"],
   listPrice: ["list price", "manual list price", "suggested retail"],
   discount: ["discount", "discount %", "discount percent"],
 };
@@ -60,7 +61,7 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
     fobCost: normalizeNumber(raw.fobCost),
     quantity: normalizeNumber(raw.quantity) || 1,
     shipping: normalizeNumber(raw.shipping),
-    multiplier: normalizeNumber(raw.multiplier) || 1,
+    margin: Math.min(normalizeNumber(raw.margin), 0.9999), // Cap at 99.99%
     listPrice: raw.listPrice !== undefined ? normalizeNumber(raw.listPrice) : undefined,
     discount: raw.discount !== undefined ? normalizeNumber(raw.discount) : 20, // Default 20%
   };
@@ -75,11 +76,13 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
   const importingPerUnit = IMPORTING_PER_CONTAINER / base.quantity;
   const costNoShipping = tariff + oceanPerUnit + importingPerUnit;
   const finalCost = costNoShipping + base.shipping;
-  const sellPrice = costNoShipping * base.multiplier + base.shipping; // (Cost × Multiplier) + Shipping
+  
+  // Sell price based on margin: Sell = Final / (1 - Margin)
+  const sellPrice = base.margin > 0 && base.margin < 1 ? finalCost / (1 - base.margin) : finalCost;
   const profit = sellPrice - finalCost;
   
-  // List price: use manual input if provided, otherwise calculate
-  const calculatedListPrice = sellPrice * (1 + (base.discount || 20) / 100); // Markup based on discount %
+  // List price: always 20% higher than sell price
+  const calculatedListPrice = sellPrice / 0.8; // Sell / 0.80 = List
   const appliedListPrice = base.listPrice !== undefined ? base.listPrice : calculatedListPrice;
   
   // Final discounted price
@@ -99,6 +102,7 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
     appliedListPrice,
     discountPercent,
     discountedPrice,
+    formattedMargin: `${(base.margin * 100).toFixed(2)}%`,
   };
 };
 
@@ -119,6 +123,10 @@ export const mapSheetRowToInput = (raw: Record<string, unknown>): PricingInput |
   const itemNo = normalizeText(pickField("itemNo"));
   if (!itemNo) return null;
 
+  // Margin may be provided as decimal (0.2296) or percentage (22.96) - normalize to decimal
+  let marginValue = normalizeNumber(pickField("margin")) || 0;
+  if (marginValue > 1) marginValue = marginValue / 100; // Convert from percentage to decimal
+
   return {
     itemNo,
     description: normalizeText(pickField("description")),
@@ -126,7 +134,7 @@ export const mapSheetRowToInput = (raw: Record<string, unknown>): PricingInput |
     fobCost: normalizeNumber(pickField("fobCost")),
     quantity: normalizeNumber(pickField("quantity")) || 1,
     shipping: normalizeNumber(pickField("shipping")),
-    multiplier: normalizeNumber(pickField("multiplier")) || 1,
+    margin: marginValue,
     listPrice: pickField("listPrice") !== undefined ? normalizeNumber(pickField("listPrice")) : undefined,
     discount: pickField("discount") !== undefined ? normalizeNumber(pickField("discount")) : 20,
   };
@@ -142,7 +150,7 @@ export const exportRowShape = {
     "FOB Cost",
     "Quantity (Container Capacity)",
     "Shipping",
-    "Multiplier",
+    "Margin %",
     "List Price (Optional)",
     "Discount %",
   ],
@@ -167,7 +175,7 @@ export const toExportRow = (row: PricingResult) => ({
   "FOB Cost": row.fobCost,
   "Quantity (Container Capacity)": row.quantity,
   Shipping: row.shipping,
-  Multiplier: row.multiplier,
+  "Margin %": row.formattedMargin,
   "List Price (Optional)": row.listPrice ?? "",
   "Discount %": row.discount,
   "Tariff (FOB × 2)": row.tariff,
