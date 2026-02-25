@@ -139,7 +139,7 @@ export function PriceCalculator({
       <h3 className="text-sm font-semibold text-slate-900 mb-4">Price Calculator</h3>
 
       {/* Mode Selector */}
-      <div className="flex gaps-2 mb-4">
+      <div className="flex gap-2 mb-4">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="radio"
@@ -249,7 +249,7 @@ export function PriceCalculator({
             isSaving ||
             isLoading ||
             !finalCost ||
-            result.error ||
+            !!result.error ||
             result.margin === null ||
             result.sellPrice === null
           }
