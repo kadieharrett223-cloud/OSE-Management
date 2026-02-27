@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/mobile-notifications",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

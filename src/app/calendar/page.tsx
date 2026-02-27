@@ -78,110 +78,22 @@ export default function CalendarPage() {
     fetchBills();
   }, []);
 
-  // Load notifications from localStorage and add default notifications
+  // Load manual notifications from server so cron can send mobile reminders
   useEffect(() => {
-    const stored = localStorage.getItem("calendar-notifications");
-    if (stored) {
-      const loadedNotifications = JSON.parse(stored);
-      
-      // Check if default notifications exist, if not add them
-      const hasSalesMonthNotif = loadedNotifications.some((n: Notification) => 
-        n.title === "Sales Month Begins" && n.recurring === "monthly"
-      );
-      const hasPaydayNotif = loadedNotifications.some((n: Notification) => 
-        n.title === "Payday" && n.recurring === "biweekly"
-      );
-      const hasHolidays = loadedNotifications.some((n: Notification) => 
-        n.title === "New Year's Day" || n.notes?.includes("Federal Holiday")
-      );
-      
-      if (!hasSalesMonthNotif) {
-        loadedNotifications.push({
-          id: "sales-month-" + Date.now(),
-          title: "Sales Month Begins",
-          date: "2026-01-05", // 5th of month
-          recurring: "monthly",
-          notes: "Commission period starts today (5th to 4th)"
-        });
+    const loadNotifications = async () => {
+      try {
+        const response = await fetch("/api/calendar/notifications", { cache: "no-store" });
+        if (!response.ok) return;
+        const result = await response.json();
+        const loaded = Array.isArray(result?.notifications) ? result.notifications : [];
+        setNotifications(loaded);
+      } catch (error) {
+        console.warn("[calendar] Failed to load server notifications", error);
       }
-      
-      if (!hasPaydayNotif) {
-        loadedNotifications.push({
-          id: "payday-" + Date.now(),
-          title: "Payday",
-          date: "2026-01-10", // Starting Friday, Jan 10, 2026
-          recurring: "biweekly",
-          notes: "Bi-weekly payday"
-        });
-      }
-      
-      // Add US Federal Holidays
-      if (!hasHolidays) {
-        const holidays = [
-          { title: "New Year's Day", date: "2026-01-01", notes: "Federal Holiday" },
-          { title: "Martin Luther King Jr. Day", date: "2026-01-19", notes: "Federal Holiday - 3rd Monday in January" },
-          { title: "Presidents' Day", date: "2026-02-16", notes: "Federal Holiday - 3rd Monday in February" },
-          { title: "Memorial Day", date: "2026-05-25", notes: "Federal Holiday - Last Monday in May" },
-          { title: "Independence Day", date: "2026-07-04", notes: "Federal Holiday" },
-          { title: "Labor Day", date: "2026-09-07", notes: "Federal Holiday - 1st Monday in September" },
-          { title: "Columbus Day", date: "2026-10-12", notes: "Federal Holiday - 2nd Monday in October" },
-          { title: "Veterans Day", date: "2026-11-11", notes: "Federal Holiday" },
-          { title: "Thanksgiving", date: "2026-11-26", notes: "Federal Holiday - 4th Thursday in November" },
-          { title: "Christmas Day", date: "2026-12-25", notes: "Federal Holiday" }
-        ];
-        
-        holidays.forEach((holiday, idx) => {
-          loadedNotifications.push({
-            id: "holiday-" + Date.now() + idx,
-            title: holiday.title,
-            date: holiday.date,
-            recurring: "yearly",
-            notes: holiday.notes
-          });
-        });
-      }
-      
-      setNotifications(loadedNotifications);
-    } else {
-      // First time - create default notifications including holidays
-      const defaultNotifications = [
-        {
-          id: "sales-month-" + Date.now(),
-          title: "Sales Month Begins",
-          date: "2026-01-05",
-          recurring: "monthly",
-          notes: "Commission period starts today (5th to 4th)"
-        },
-        {
-          id: "payday-" + Date.now() + 1,
-          title: "Payday",
-          date: "2026-01-10",
-          recurring: "biweekly",
-          notes: "Bi-weekly payday"
-        },
-        // US Federal Holidays
-        { id: "holiday-1", title: "New Year's Day", date: "2026-01-01", recurring: "yearly", notes: "Federal Holiday" },
-        { id: "holiday-2", title: "Martin Luther King Jr. Day", date: "2026-01-19", recurring: "yearly", notes: "Federal Holiday - 3rd Monday in January" },
-        { id: "holiday-3", title: "Presidents' Day", date: "2026-02-16", recurring: "yearly", notes: "Federal Holiday - 3rd Monday in February" },
-        { id: "holiday-4", title: "Memorial Day", date: "2026-05-25", recurring: "yearly", notes: "Federal Holiday - Last Monday in May" },
-        { id: "holiday-5", title: "Independence Day", date: "2026-07-04", recurring: "yearly", notes: "Federal Holiday" },
-        { id: "holiday-6", title: "Labor Day", date: "2026-09-07", recurring: "yearly", notes: "Federal Holiday - 1st Monday in September" },
-        { id: "holiday-7", title: "Columbus Day", date: "2026-10-12", recurring: "yearly", notes: "Federal Holiday - 2nd Monday in October" },
-        { id: "holiday-8", title: "Veterans Day", date: "2026-11-11", recurring: "yearly", notes: "Federal Holiday" },
-        { id: "holiday-9", title: "Thanksgiving", date: "2026-11-26", recurring: "yearly", notes: "Federal Holiday - 4th Thursday in November" },
-        { id: "holiday-10", title: "Christmas Day", date: "2026-12-25", recurring: "yearly", notes: "Federal Holiday" }
-      ];
-      
-      setNotifications(defaultNotifications as Notification[]);
-    }
-  }, []);
+    };
 
-  // Save notifications to localStorage
-  useEffect(() => {
-    if (notifications.length > 0) {
-      localStorage.setItem("calendar-notifications", JSON.stringify(notifications));
-    }
-  }, [notifications]);
+    loadNotifications();
+  }, []);
 
   // Fetch daily sales data for selected month
   useEffect(() => {
@@ -280,23 +192,76 @@ export default function CalendarPage() {
 
   const calendarDays = generateCalendarDays();
 
-  const handleSaveNotification = () => {
+  const handleSaveNotification = async () => {
     if (!editingNotification) return;
+    if (!editingNotification.title?.trim()) return;
+    if (!editingNotification.date?.trim()) return;
 
-    if (editingNotification.id) {
-      // Update existing
-      setNotifications(notifications.map(n => n.id === editingNotification.id ? editingNotification : n));
-    } else {
-      // Add new
-      setNotifications([...notifications, { ...editingNotification, id: Date.now().toString() }]);
+    const payload = {
+      title: editingNotification.title,
+      date: editingNotification.date,
+      recurring: editingNotification.recurring,
+      notes: editingNotification.notes || "",
+    };
+
+    try {
+      if (editingNotification.id) {
+        const response = await fetch(`/api/calendar/notifications/${editingNotification.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          alert(data?.error || "Failed to update notification");
+          return;
+        }
+
+        const data = await response.json();
+        setNotifications(notifications.map(n => n.id === editingNotification.id ? data.notification : n));
+      } else {
+        const response = await fetch("/api/calendar/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          alert(data?.error || "Failed to create notification");
+          return;
+        }
+
+        const data = await response.json();
+        setNotifications([...notifications, data.notification]);
+      }
+    } catch (error) {
+      console.error("Failed to save notification", error);
+      alert("Failed to save notification");
+      return;
     }
 
     setShowAddModal(false);
     setEditingNotification(null);
   };
 
-  const handleDeleteNotification = (id: string) => {
+  const handleDeleteNotification = async (id: string) => {
     if (confirm("Delete this notification?")) {
+      try {
+        const response = await fetch(`/api/calendar/notifications/${id}`, {
+          method: "DELETE",
+        });
+        if (!response.ok) {
+          const data = await response.json();
+          alert(data?.error || "Failed to delete notification");
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to delete notification", error);
+        alert("Failed to delete notification");
+        return;
+      }
       setNotifications(notifications.filter(n => n.id !== id));
     }
   };

@@ -76,4 +76,8 @@ Next.js App Router app that reproduces the Excel pricing workbook and scaffolds 
 - Set `MOBILE_NOTIFICATION_SMS_TO` in your env as comma-separated carrier gateway addresses.
 - Example: `MOBILE_NOTIFICATION_SMS_TO=5551234567@vtext.com,5551234567@txt.att.net`
 - Common gateways: Verizon `@vtext.com`, AT&T `@txt.att.net`, T-Mobile `@tmomail.net`.
-- PO change notifications will send email + SMS gateway text from the same `/api/purchase-orders/notify-changes` flow.
+- PO change notifications send email + SMS gateway text from `/api/purchase-orders/notify-changes`.
+- Customer payment notifications are sent by cron when new QBO payments are detected (deduped by payment id).
+- Manual calendar notifications send by phone at 8:00 AM local time on the day of the event.
+- Set `MOBILE_NOTIFICATION_TIMEZONE` (default `America/New_York`) and `CRON_SECRET`.
+- Vercel cron is configured at `/api/cron/mobile-notifications` every 5 minutes.
