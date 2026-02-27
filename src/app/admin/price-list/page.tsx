@@ -830,7 +830,9 @@ export default function AdminPriceListPage() {
                             <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin %</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell Price</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List Price</th>
+                            <th className="px-2 py-2 text-right font-semibold text-purple-600 whitespace-nowrap">Customer Price</th>
                             <th className="px-2 py-2 text-right font-semibold text-emerald-700 whitespace-nowrap">Profit</th>
+                            <th className="px-2 py-2 text-right font-semibold text-orange-600 whitespace-nowrap">Weight (lbs)</th>
                             <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap sticky right-0 bg-slate-50 z-10">Action</th>
                           </tr>
                         </thead>
@@ -1006,9 +1008,30 @@ export default function AdminPriceListPage() {
                                 <span className="text-slate-600 text-xs">${money(displayItem.list_price)}</span>
                               </td>
 
+                              {/* Customer Price (DERIVED - after discount) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                <span className="text-purple-700 text-xs font-semibold">${money(displayItem.rounded_sale_price)}</span>
+                              </td>
+
                               {/* Profit (DERIVED) */}
                               <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-emerald-700 text-xs font-bold">${money(displayItem.profit)}</span>
+                              </td>
+
+                              {/* Weight (EDITABLE) */}
+                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editingItem?.weight_lbs || ""}
+                                    onChange={(e) => updateEditingItem("weight_lbs", e.target.value === "" ? null : Number(e.target.value))}
+                                    className="w-24 rounded border border-orange-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                    placeholder="—"
+                                  />
+                                ) : (
+                                  <span className="text-orange-700 text-xs">{displayItem.weight_lbs ? `${displayItem.weight_lbs.toFixed(0)} lbs` : "—"}</span>
+                                )}
                               </td>
 
                               {/* Action */}

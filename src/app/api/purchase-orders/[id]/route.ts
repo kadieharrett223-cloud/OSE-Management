@@ -2,6 +2,64 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
+type ChangeEntry = {
+  field: string;
+  oldValue: string;
+  newValue: string;
+};
+
+const stringifyValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "—";
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+};
+
+const valuesDifferent = (oldValue: unknown, newValue: unknown): boolean => {
+  return stringifyValue(oldValue) !== stringifyValue(newValue);
+};
+
+const buildChangeEntries = (oldPO: any, newPO: any): ChangeEntry[] => {
+  const trackedFields: Array<{ key: string; label: string }> = [
+    { key: "po_number", label: "PO Number" },
+    { key: "vendor_name", label: "Vendor Name" },
+    { key: "vendor_contact_name", label: "Vendor Contact" },
+    { key: "vendor_email", label: "Vendor Email" },
+    { key: "vendor_phone", label: "Vendor Phone" },
+    { key: "terms", label: "Terms" },
+    { key: "status", label: "Status" },
+    { key: "expected_delivery", label: "Expected Delivery" },
+    { key: "total_amount", label: "Total Amount" },
+    { key: "notes", label: "Notes" },
+  ];
+
+  const changes: ChangeEntry[] = [];
+
+  for (const field of trackedFields) {
+    const before = oldPO?.[field.key];
+    const after = newPO?.[field.key];
+    if (valuesDifferent(before, after)) {
+      changes.push({
+        field: field.label,
+        oldValue: stringifyValue(before),
+        newValue: stringifyValue(after),
+      });
+    }
+  }
+
+  const oldLines = oldPO?.lines || [];
+  const newLines = newPO?.lines || [];
+  if (JSON.stringify(oldLines) !== JSON.stringify(newLines)) {
+    changes.push({
+      field: "Line Items",
+      oldValue: `${oldLines.length} item(s)`,
+      newValue: `${newLines.length} item(s)`,
+    });
+  }
+
+  return changes;
+};
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session: any = await getSession();
   if (!session) {
@@ -40,6 +98,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   try {
     const { lines, ...poData } = body;
+
+    const { data: existingPO, error: existingError } = await supabase
+      .from("purchase_orders")
+      .select(`
+        *,
+        lines:purchase_order_lines(*)
+      `)
+      .eq("id", params.id)
+      .single();
+
+    if (existingError) throw existingError;
 
     // Convert empty date strings to null
     if (poData.expected_delivery === "") {
@@ -107,6 +176,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .single();
 
     if (fetchError) throw fetchError;
+
+    const changes = buildChangeEntries(existingPO, updatedPO);
+    if (changes.length > 0) {
+      const changedBy = session?.user?.email || session?.user?.name || "Unknown";
+      const { error: logError } = await supabase
+        .from("purchase_order_change_logs")
+        .insert({
+          purchase_order_id: params.id,
+          po_number: updatedPO.po_number || existingPO?.po_number || "",
+          changed_by: changedBy,
+          event_type: "UPDATED",
+          changes,
+        });
+
+      if (logError) {
+        console.error("Failed to write PO change log:", logError);
+      }
+    }
 
     return NextResponse.json({ ok: true, data: updatedPO });
   } catch (error: any) {

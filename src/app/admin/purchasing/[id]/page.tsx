@@ -26,6 +26,7 @@ interface PurchaseOrder {
   total_amount: number;
   status: string;
   notes?: string;
+  updated_at?: string;
   lines: Array<{
     id: string;
     sku?: string;
@@ -34,6 +35,19 @@ interface PurchaseOrder {
     unit_price: number;
     line_total: number;
     weight_lbs?: number;
+  }>;
+}
+
+interface POChangeLogEntry {
+  id: string;
+  created_at: string;
+  changed_by?: string;
+  event_type?: string;
+  notes?: string;
+  changes: Array<{
+    field: string;
+    oldValue: string;
+    newValue: string;
   }>;
 }
 
@@ -105,6 +119,23 @@ export default function ViewPO() {
   const [notificationNotes, setNotificationNotes] = useState("");
   const [oldPOData, setOldPOData] = useState<any>(null);
   const [sendingNotification, setSendingNotification] = useState(false);
+  const [changeLogs, setChangeLogs] = useState<POChangeLogEntry[]>([]);
+  const [loadingChangeLogs, setLoadingChangeLogs] = useState(false);
+
+  const loadChangeLogs = async (poId: string) => {
+    setLoadingChangeLogs(true);
+    try {
+      const res = await fetch(`/api/purchase-orders/${poId}/change-log`);
+      const result = await res.json();
+      if (result.ok) {
+        setChangeLogs(Array.isArray(result.data) ? result.data : []);
+      }
+    } catch (error) {
+      console.error("Failed to load PO change log:", error);
+    } finally {
+      setLoadingChangeLogs(false);
+    }
+  };
 
   useEffect(() => {
     if (id) {
@@ -129,6 +160,18 @@ export default function ViewPO() {
         .catch(() => setLoading(false));
     }
   }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadChangeLogs(id);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (po?.id && po?.updated_at) {
+      loadChangeLogs(po.id);
+    }
+  }, [po?.id, po?.updated_at]);
 
   // Load price list for autocomplete
   useEffect(() => {
@@ -607,6 +650,11 @@ export default function ViewPO() {
   const remainingWeightLbs = Math.max(containerMaxLbs - totalWeightLbs, 0);
 
   const money = (num: number) => num.toFixed(2);
+  const formatLogDate = (iso: string) => {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return iso;
+    return date.toLocaleString();
+  };
 
   const skuExists = Boolean(
     lineItemForm.sku && priceList.some((item) => (item.sku || item.item_no)?.toLowerCase() === lineItemForm.sku.toLowerCase())
@@ -751,6 +799,34 @@ export default function ViewPO() {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-4">
+          <aside className="print:hidden rounded-lg border border-slate-200 bg-slate-50 p-3 h-fit lg:sticky lg:top-4">
+            <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2">Note Log</h3>
+            {loadingChangeLogs ? (
+              <p className="text-xs text-slate-500">Loading...</p>
+            ) : changeLogs.length === 0 ? (
+              <p className="text-xs text-slate-500">No changes logged yet.</p>
+            ) : (
+              <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+                {changeLogs.map((entry) => (
+                  <div key={entry.id} className="rounded border border-slate-200 bg-white p-2">
+                    <p className="text-[11px] font-semibold text-slate-700">{formatLogDate(entry.created_at)}</p>
+                    <p className="text-[11px] text-slate-500 mb-1">{entry.changed_by || "Unknown"}</p>
+                    <div className="space-y-1">
+                      {entry.changes?.map((change, index) => (
+                        <p key={`${entry.id}-${index}`} className="text-[11px] text-slate-700 leading-tight">
+                          <span className="font-semibold">{change.field}:</span> {change.oldValue} → {change.newValue}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </aside>
+
+          <div>
+
         {/* Notes Section */}
         {editingNotes && (
           <div className="mb-4 print:hidden rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -771,10 +847,16 @@ export default function ViewPO() {
                       method: "PATCH",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ notes: poNotes }),
-                    }).then(() => {
-                      alert("Notes saved!");
-                      setEditingNotes(false);
-                    });
+                    })
+                      .then((res) => res.json())
+                      .then((result) => {
+                        if (result?.ok) {
+                          setPO(result.data);
+                          loadChangeLogs(po.id);
+                        }
+                        alert("Notes saved!");
+                        setEditingNotes(false);
+                      });
                   }
                 }}
                 className="rounded-lg bg-amber-600 px-3 py-1 text-sm font-semibold text-white hover:bg-amber-700"
@@ -1289,6 +1371,9 @@ export default function ViewPO() {
           </div>
         </div>
       </div>
+
+          </div>
+        </div>
 
       <style>{`
         @media print {
