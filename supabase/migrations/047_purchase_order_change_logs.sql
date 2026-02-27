@@ -17,8 +17,10 @@ CREATE INDEX IF NOT EXISTS idx_po_change_logs_created_at ON purchase_order_chang
 
 ALTER TABLE purchase_order_change_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "PO change logs: read for authenticated" ON purchase_order_change_logs;
 CREATE POLICY "PO change logs: read for authenticated" ON purchase_order_change_logs
   FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "PO change logs: insert for authenticated" ON purchase_order_change_logs;
 CREATE POLICY "PO change logs: insert for authenticated" ON purchase_order_change_logs
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');

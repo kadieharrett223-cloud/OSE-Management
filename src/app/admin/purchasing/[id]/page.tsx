@@ -127,8 +127,12 @@ export default function ViewPO() {
     try {
       const res = await fetch(`/api/purchase-orders/${poId}/change-log`);
       const result = await res.json();
+      console.log(`[PO View] Change logs response:`, result);
       if (result.ok) {
         setChangeLogs(Array.isArray(result.data) ? result.data : []);
+        console.log(`[PO View] Loaded ${result.data?.length || 0} change entries`);
+      } else {
+        console.error(`[PO View] API returned error:`, result.error);
       }
     } catch (error) {
       console.error("Failed to load PO change log:", error);
