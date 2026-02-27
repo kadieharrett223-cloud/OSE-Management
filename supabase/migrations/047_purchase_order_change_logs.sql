@@ -24,3 +24,6 @@ CREATE POLICY "PO change logs: read for authenticated" ON purchase_order_change_
 DROP POLICY IF EXISTS "PO change logs: insert for authenticated" ON purchase_order_change_logs;
 CREATE POLICY "PO change logs: insert for authenticated" ON purchase_order_change_logs
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "PO change logs: delete for admin" ON purchase_order_change_logs;
+CREATE POLICY "PO change logs: delete for admin" ON purchase_order_change_logs
+  FOR DELETE USING (auth.role() = 'authenticated');

@@ -24,6 +24,7 @@ const navGroups = [
     items: [
       { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
       { label: "Purchasing", hint: "POs and payments", href: "/admin/purchasing" },
+      { label: "Special Orders", hint: "Factory colors & status", href: "/admin/special-orders" },
     ],
   },
   {

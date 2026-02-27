@@ -796,25 +796,7 @@ export default function AdminPriceListPage() {
 
                     {/* Items Table - Desktop View */}
                     <div className="hidden md:block overflow-x-auto">
-                      <table className="w-full divide-y divide-slate-100 text-xs border-collapse table-fixed">
-                        <colgroup>
-                          <col style={{ width: "75px" }} />
-                          <col style={{ width: "200px" }} />
-                          <col style={{ width: "60px" }} />
-                          <col style={{ width: "60px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "65px" }} />
-                          <col style={{ width: "85px" }} />
-                        </colgroup>
+                      <table className="min-w-[1700px] w-full divide-y divide-slate-100 text-xs border-collapse">
                         <thead className="bg-slate-50">
                           <tr>
                             <th className="pl-3 pr-0.5 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
@@ -831,7 +813,6 @@ export default function AdminPriceListPage() {
                             <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin %</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell Price</th>
                             <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List Price</th>
-                            <th className="px-2 py-2 text-right font-semibold text-purple-600 whitespace-nowrap">Customer Price</th>
                             <th className="px-2 py-2 text-right font-semibold text-emerald-700 whitespace-nowrap">Profit</th>
                             <th className="px-2 py-2 text-right font-semibold text-orange-600 whitespace-nowrap">Weight (lbs)</th>
                             <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap sticky right-0 bg-slate-50 z-10">Action</th>
@@ -1009,11 +990,6 @@ export default function AdminPriceListPage() {
                                 <span className="text-slate-600 text-xs">${money(displayItem.list_price)}</span>
                               </td>
 
-                              {/* Customer Price (DERIVED - after discount) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
-                                <span className="text-purple-700 text-xs font-semibold">${money(displayItem.rounded_sale_price)}</span>
-                              </td>
-
                               {/* Profit (DERIVED) */}
                               <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-emerald-700 text-xs font-bold">${money(displayItem.profit)}</span>
@@ -1081,7 +1057,7 @@ export default function AdminPriceListPage() {
                           );})}
                           {categoryItems.length === 0 && (
                             <tr>
-                              <td colSpan={16} className="px-6 py-4 text-center text-xs text-slate-600">
+                              <td colSpan={17} className="px-6 py-4 text-center text-xs text-slate-600">
                                 No items in this category
                               </td>
                             </tr>
