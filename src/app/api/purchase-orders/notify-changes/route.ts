@@ -33,6 +33,14 @@ function generateChangesSummary(changes: ChangeReport["changes"]): string {
     .join("\n");
 }
 
+function parseRecipientList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 async function generatePOPDF(po: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 40 });
@@ -206,7 +214,11 @@ export async function POST(req: NextRequest) {
     let emailAttempted = false;
     let emailSent = false;
     let emailError: string | null = null;
+    let smsAttempted = false;
+    let smsSent = false;
+    let smsError: string | null = null;
     const inventoryTeamEmail = process.env.INVENTORY_TEAM_EMAIL;
+    const smsRecipients = parseRecipientList(process.env.MOBILE_NOTIFICATION_SMS_TO);
     if (inventoryTeamEmail) {
       try {
         const emailBody = `
@@ -297,6 +309,49 @@ ${changes.map((change) => `    <li><strong>${change.field}:</strong> "${change.o
       }
     }
 
+    // Free mobile notifications via carrier email-to-SMS gateways
+    // Example recipients: 5551234567@vtext.com,5551234567@txt.att.net
+    if (smsRecipients.length > 0) {
+      try {
+        if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+          smsAttempted = true;
+          console.log(`[NOTIFY] Attempting SMS gateway delivery to ${smsRecipients.length} recipient(s)`);
+
+          const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT || "587"),
+            secure: process.env.SMTP_SECURE === "true",
+            auth: {
+              user: process.env.SMTP_USER,
+              pass: process.env.SMTP_PASSWORD,
+            },
+          });
+
+          const smsBody = [
+            `PO ${new_po.po_number} updated`,
+            `By: ${changeReport.changedBy}`,
+            `Changes: ${changes.length}`,
+            `At: ${new Date(changeReport.timestamp).toLocaleString()}`,
+          ].join(" | ");
+
+          await transporter.sendMail({
+            from: process.env.SMTP_FROM || process.env.SMTP_USER,
+            to: smsRecipients.join(","),
+            subject: `PO ${new_po.po_number} updated`,
+            text: smsBody,
+          });
+
+          smsSent = true;
+          console.log("[NOTIFY] SMS gateway message sent successfully");
+        } else {
+          smsError = "Missing SMTP configuration for SMS gateway";
+        }
+      } catch (sendSmsError: any) {
+        smsError = sendSmsError?.message || "Failed to send SMS gateway notification";
+        console.error("[NOTIFY] Failed to send SMS gateway notification:", sendSmsError);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       report: changeReport,
@@ -307,6 +362,12 @@ ${changes.map((change) => `    <li><strong>${change.field}:</strong> "${change.o
         attempted: emailAttempted,
         sent: emailSent,
         error: emailError,
+      },
+      smsStatus: {
+        to: smsRecipients,
+        attempted: smsAttempted,
+        sent: smsSent,
+        error: smsError,
       },
     });
   } catch (error: any) {

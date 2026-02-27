@@ -71,3 +71,9 @@ Next.js App Router app that reproduces the Excel pricing workbook and scaffolds 
 - Outputs are formatted to two decimals; export retains raw numbers
 - Rep names aliased automatically (e.g., "WL" and "Wholesale Lifts" treated as same rep)
 - Shipping deduction uses fuzzy matching (Levenshtein distance <= 2) if exact SKU match fails
+
+### Free mobile notifications (no paid provider)
+- Set `MOBILE_NOTIFICATION_SMS_TO` in your env as comma-separated carrier gateway addresses.
+- Example: `MOBILE_NOTIFICATION_SMS_TO=5551234567@vtext.com,5551234567@txt.att.net`
+- Common gateways: Verizon `@vtext.com`, AT&T `@txt.att.net`, T-Mobile `@tmomail.net`.
+- PO change notifications will send email + SMS gateway text from the same `/api/purchase-orders/notify-changes` flow.
