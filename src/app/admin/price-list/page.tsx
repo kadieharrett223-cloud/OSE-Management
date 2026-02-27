@@ -17,6 +17,7 @@ type PriceListItem = {
   item_no: string;
   description: string | null;
   supplier: string | null;
+  weight_lbs: number | null;
   // Input fields
   fob_cost: number | null;
   quantity: number | null;
