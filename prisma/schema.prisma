@@ -43,6 +43,7 @@ model PriceListItem {
   description                 String?
   currentSalePricePerUnit     Float
   shippingIncludedPerUnit     Float
+  weight_lbs                  Float?
 
   invoiceLines                InvoiceLine[]
 }
