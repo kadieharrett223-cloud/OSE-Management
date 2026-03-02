@@ -47,6 +47,12 @@ type Category = {
   display_order: number;
 };
 
+type ShopifySyncPreviewItem = {
+  item_no: string;
+  base_price: number | null;
+  compare_at_price: number | null;
+};
+
 const money = (v: number | null) => {
   if (v === null || v === undefined) return "—";
   return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -181,6 +187,10 @@ export default function AdminPriceListPage() {
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [showSupplierFilters, setShowSupplierFilters] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
+  const [isShopifySyncing, setIsShopifySyncing] = useState(false);
+  const [isShopifyPreviewLoading, setIsShopifyPreviewLoading] = useState(false);
+  const [showShopifyPreviewModal, setShowShopifyPreviewModal] = useState(false);
+  const [shopifyPreviewItems, setShopifyPreviewItems] = useState<ShopifySyncPreviewItem[]>([]);
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -475,6 +485,48 @@ export default function AdminPriceListPage() {
     }
   };
 
+  const handleOpenShopifyPreview = async () => {
+    setIsShopifyPreviewLoading(true);
+    setStatus(null);
+
+    try {
+      const response = await fetch("/api/shopify/sync", { method: "GET" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to load Shopify preview");
+      }
+
+      setShopifyPreviewItems((data?.preview || []) as ShopifySyncPreviewItem[]);
+      setShowShopifyPreviewModal(true);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed to load Shopify preview");
+    } finally {
+      setIsShopifyPreviewLoading(false);
+    }
+  };
+
+  const handleConfirmShopifyPush = async () => {
+    setIsShopifySyncing(true);
+    setStatus(null);
+
+    try {
+      const response = await fetch("/api/shopify/sync", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to sync Shopify prices");
+      }
+
+      setStatus(`✓ Shopify sync complete. Updated: ${data.success ?? 0}, Failed: ${data.failed ?? 0}, Skipped: ${data.skipped ?? 0}`);
+      setShowShopifyPreviewModal(false);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed to sync Shopify prices");
+    } finally {
+      setIsShopifySyncing(false);
+    }
+  };
+
   // Filter items by search query and supplier
   const filteredItems = items.filter((item) => {
     const matchesSearch = !searchQuery || (
@@ -743,6 +795,14 @@ export default function AdminPriceListPage() {
 
               {/* Actions */}
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleOpenShopifyPreview}
+                  disabled={isShopifySyncing || isShopifyPreviewLoading}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-colors"
+                  type="button"
+                >
+                  {isShopifyPreviewLoading ? "Loading Preview..." : isShopifySyncing ? "Pushing to Shopify..." : "Push Mapped to Shopify"}
+                </button>
                 <button
                   onClick={() => setShowGuide(true)}
                   className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-50"
@@ -1380,6 +1440,75 @@ export default function AdminPriceListPage() {
                 type="button"
               >
                 {isLoading ? "Adding..." : "Add Product"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showShopifyPreviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Shopify Price Push Preview</h2>
+                <p className="text-xs text-slate-600 mt-1">
+                  {shopifyPreviewItems.length} mapped product(s) will be updated: base = Sell, compare-at = List.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowShopifyPreviewModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+                type="button"
+                disabled={isShopifySyncing}
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
+              {shopifyPreviewItems.length === 0 ? (
+                <p className="text-sm text-slate-600">No mapped products found to sync.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-slate-600">
+                      <th className="py-2 pr-4">Item No</th>
+                      <th className="py-2 pr-4 text-right">Base (Sell)</th>
+                      <th className="py-2 text-right">Compare-at (List)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shopifyPreviewItems.map((item) => (
+                      <tr key={item.item_no} className="border-b border-slate-100">
+                        <td className="py-2 pr-4 font-mono text-xs text-slate-800">{item.item_no}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums text-slate-800">${money(item.base_price)}</td>
+                        <td className="py-2 text-right tabular-nums text-slate-800">${money(item.compare_at_price)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 rounded-b-2xl">
+              <button
+                onClick={() => setShowShopifyPreviewModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                type="button"
+                disabled={isShopifySyncing}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmShopifyPush}
+                className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                disabled={isShopifySyncing || shopifyPreviewItems.length === 0}
+              >
+                {isShopifySyncing ? "Pushing..." : "Confirm Push to Shopify"}
               </button>
             </div>
           </div>

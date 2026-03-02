@@ -266,7 +266,7 @@ export async function syncPricesToShopify(): Promise<{
     // Get price list items with Shopify mappings
     const { data: priceListItems, error: priceListError } = await supabase
       .from("price_list_items")
-      .select("item_no, list_price, sale_price, compare_at_price, shopify_variant_id")
+      .select("item_no, sell_price, list_price, shopify_variant_id")
       .eq("is_active", true);
 
     if (priceListError || !priceListItems) {
@@ -289,25 +289,21 @@ export async function syncPricesToShopify(): Promise<{
         continue;
       }
 
-      // Determine price to use: sale_price if > 0, otherwise list_price
-      const priceToUse = (item.sale_price && item.sale_price > 0) ? item.sale_price : item.list_price;
-      
-      if (!priceToUse) {
+      const basePrice = item.sell_price;
+      const listPrice = item.list_price;
+
+      if (!basePrice || basePrice <= 0) {
         result.skipped++;
-        console.log(`No valid price for ${item.item_no}`);
+        console.log(`No valid sell_price for ${item.item_no}`);
         continue;
       }
 
       try {
-        // If there's a sale (sale_price > 0), set compare_at_price to list_price
-        // If no sale, clear compare_at_price
-        const compareAt = (item.sale_price && item.sale_price > 0) 
-          ? item.list_price 
-          : null;
+        const compareAt = listPrice && listPrice > 0 ? listPrice : null;
 
-        await updateShopifyPrice(variantId, priceToUse, compareAt);
+        await updateShopifyPrice(variantId, basePrice, compareAt);
         result.success++;
-        console.log(`Updated ${item.item_no}: $${priceToUse}${compareAt ? ` (was $${compareAt})` : ''}`);
+        console.log(`Updated ${item.item_no}: base=$${basePrice}${compareAt ? ` compare_at=$${compareAt}` : ""}`);
       } catch (error: any) {
         result.failed++;
         const errorMsg = `Failed to update ${item.item_no}: ${error.message}`;

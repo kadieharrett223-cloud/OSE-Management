@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     // Get preview of price changes
     const { data: items, error } = await supabase
       .from("price_list_items")
-      .select("item_no, list_price, sale_price, compare_at_price, shopify_variant_id")
+      .select("item_no, sell_price, list_price, shopify_variant_id")
       .not("shopify_variant_id", "is", null);
 
     if (error) {
@@ -30,10 +30,8 @@ export async function GET(req: NextRequest) {
 
     const preview = items?.map((item: any) => ({
       item_no: item.item_no,
-      current_price: item.list_price,
-      new_price: item.sale_price > 0 ? item.sale_price : item.list_price,
-      sale_price: item.sale_price || 0,
-      compare_at_price: item.sale_price > 0 ? item.list_price : null,
+      base_price: item.sell_price,
+      compare_at_price: item.list_price,
     })) || [];
 
     return NextResponse.json({
