@@ -13,6 +13,8 @@ type SpecialOrder = {
   customer_name: string | null;
   special_colors: string | null;
   factory_notes: string | null;
+  internal_notes: string | null;
+  internal_updates: string | null;
   status: StatusValue;
   expected_delivery: string | null;
   qbo_invoice_id: string | null;
@@ -68,6 +70,7 @@ export default function SpecialOrdersPage() {
   const [newCustomerName, setNewCustomerName] = useState("");
   const [invoiceNumberInput, setInvoiceNumberInput] = useState("");
   const [linkingInvoice, setLinkingInvoice] = useState(false);
+  const [autoLinkingInvoice, setAutoLinkingInvoice] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [uploadNotes, setUploadNotes] = useState("");
 
@@ -84,6 +87,20 @@ export default function SpecialOrdersPage() {
     }
     loadDetails(selectedId);
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!details?.id) return;
+    const entered = invoiceNumberInput.trim();
+    const linked = (details.qbo_invoice_number || "").trim();
+
+    if (!entered || entered === linked) return;
+
+    const timeout = setTimeout(() => {
+      void linkInvoiceByNumber(entered, { silent: true });
+    }, 700);
+
+    return () => clearTimeout(timeout);
+  }, [invoiceNumberInput, details?.id, details?.qbo_invoice_number]);
 
   async function loadOrders() {
     setLoading(true);
@@ -155,6 +172,8 @@ export default function SpecialOrdersPage() {
         customer_name: details.customer_name,
         special_colors: details.special_colors,
         factory_notes: details.factory_notes,
+        internal_notes: details.internal_notes,
+        internal_updates: details.internal_updates,
         status: details.status,
         expected_delivery: details.expected_delivery,
       };
@@ -177,29 +196,53 @@ export default function SpecialOrdersPage() {
     }
   }
 
-  async function linkInvoice() {
+  async function linkInvoiceByNumber(invoiceNumber: string, options?: { silent?: boolean }) {
     if (!details) return;
-    if (!invoiceNumberInput.trim()) {
-      alert("Enter a QuickBooks invoice number first.");
+    const cleaned = invoiceNumber.trim();
+    if (!cleaned) {
+      if (!options?.silent) {
+        alert("Enter a QuickBooks invoice number first.");
+      }
       return;
     }
 
-    setLinkingInvoice(true);
+    if (options?.silent) {
+      setAutoLinkingInvoice(true);
+    } else {
+      setLinkingInvoice(true);
+    }
+
     try {
       const res = await fetch(`/api/special-orders/${details.id}/link-invoice`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invoiceNumber: invoiceNumberInput.trim() }),
+        body: JSON.stringify({ invoiceNumber: cleaned }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result?.error || "Failed to link invoice");
+
+      if (!res.ok) {
+        if (options?.silent && res.status === 404) {
+          return;
+        }
+        throw new Error(result?.error || "Failed to link invoice");
+      }
 
       await loadDetails(details.id);
     } catch (error: any) {
-      alert(error?.message || "Failed to link invoice");
+      if (!options?.silent) {
+        alert(error?.message || "Failed to link invoice");
+      }
     } finally {
-      setLinkingInvoice(false);
+      if (options?.silent) {
+        setAutoLinkingInvoice(false);
+      } else {
+        setLinkingInvoice(false);
+      }
     }
+  }
+
+  async function linkInvoice() {
+    await linkInvoiceByNumber(invoiceNumberInput, { silent: false });
   }
 
   async function uploadDocument(file: File) {
@@ -383,6 +426,27 @@ export default function SpecialOrdersPage() {
                       />
                     </label>
 
+                    <label className="block text-sm text-slate-700">
+                      <span className="mb-1 block font-medium">Internal notes</span>
+                      <textarea
+                        value={details.internal_notes || ""}
+                        onChange={(e) => setDetails({ ...details, internal_notes: e.target.value })}
+                        rows={3}
+                        className="w-full rounded border border-slate-300 px-2 py-1.5"
+                      />
+                    </label>
+
+                    <label className="block text-sm text-slate-700">
+                      <span className="mb-1 block font-medium">Internal updates</span>
+                      <textarea
+                        value={details.internal_updates || ""}
+                        onChange={(e) => setDetails({ ...details, internal_updates: e.target.value })}
+                        rows={4}
+                        className="w-full rounded border border-slate-300 px-2 py-1.5"
+                        placeholder="Add timeline updates, progress changes, and internal follow-ups"
+                      />
+                    </label>
+
                     <div className="flex justify-end">
                       <button
                         onClick={saveDetails}
@@ -410,6 +474,7 @@ export default function SpecialOrdersPage() {
                           {linkingInvoice ? "Linking..." : "Link Invoice"}
                         </button>
                       </div>
+                      {autoLinkingInvoice ? <p className="mt-2 text-xs text-slate-500">Auto-linking invoice...</p> : null}
 
                       {details.invoiceSummary ? (
                         <div className="mt-3 rounded bg-slate-50 p-3 text-sm">

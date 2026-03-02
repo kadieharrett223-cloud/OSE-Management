@@ -41,7 +41,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const supabase = getServerSupabaseClient();
     const { data: order, error } = await supabase
       .from("special_orders")
-      .select("id, created_at, updated_at, order_name, customer_name, special_colors, factory_notes, status, expected_delivery, qbo_invoice_id, qbo_invoice_number")
+      .select("id, created_at, updated_at, order_name, customer_name, special_colors, factory_notes, internal_notes, internal_updates, status, expected_delivery, qbo_invoice_id, qbo_invoice_number")
       .eq("id", params.id)
       .single();
 
@@ -101,12 +101,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         customer_name: body?.customer_name || null,
         special_colors: body?.special_colors || null,
         factory_notes: body?.factory_notes || null,
+        internal_notes: body?.internal_notes || null,
+        internal_updates: body?.internal_updates || null,
         status: body?.status,
         expected_delivery: body?.expected_delivery || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", params.id)
-      .select("id, created_at, updated_at, order_name, customer_name, special_colors, factory_notes, status, expected_delivery, qbo_invoice_id, qbo_invoice_number")
+      .select("id, created_at, updated_at, order_name, customer_name, special_colors, factory_notes, internal_notes, internal_updates, status, expected_delivery, qbo_invoice_id, qbo_invoice_number")
       .single();
 
     if (error) throw error;
