@@ -186,14 +186,21 @@ const useCountUp = (value: number, duration = 200) => {
   return displayValue;
 };
 
+const toYmdLocal = (date: Date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export default function Dashboard() {
   const [qboSales, setQboSales] = useState<number | null>(null);
-  const [lastYearMonthSales, setLastYearMonthSales] = useState<number | null>(null);
-  const [loadingLastYearMonth, setLoadingLastYearMonth] = useState(true);
   const [repSalesData, setRepSalesData] = useState<RepData[]>([]);
   const [outstandingTotal, setOutstandingTotal] = useState<number>(0);
   const [outstandingCount, setOutstandingCount] = useState<number>(0);
   const [monthlyTotal, setMonthlyTotal] = useState<number>(0);
+  const [salesTodayTotal, setSalesTodayTotal] = useState<number>(0);
+  const [salesWeekTotal, setSalesWeekTotal] = useState<number>(0);
   const [loadingMonthlyTotal, setLoadingMonthlyTotal] = useState(true);
   const [lastMonthTotal, setLastMonthTotal] = useState<number>(0);
   const [loadingLastMonthTotal, setLoadingLastMonthTotal] = useState(true);
@@ -227,12 +234,20 @@ export default function Dashboard() {
   const profitThisMonth = monthlyTotal - totalExpenses;
 
   // Animated values using count-up hook
+  const animatedSalesTodayTotal = useCountUp(salesTodayTotal);
   const animatedMonthlyTotal = useCountUp(monthlyTotal);
-  const animatedLastYearSales = useCountUp(lastYearMonthSales ?? 0);
-  const animatedPaymentsTotal = useCountUp(paymentsTotal);
-  const animatedProfitThisMonth = useCountUp(Math.max(profitThisMonth, 0));
+  const animatedSalesWeekTotal = useCountUp(salesWeekTotal);
+  const animatedProfitThisMonth = useCountUp(profitThisMonth);
   const animatedTotalExpenses = useCountUp(totalExpenses);
   const animatedPayrollTotal = useCountUp(payrollExpenseTotal);
+
+  const getLocalDateYmd = () => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
 
   // Fetch QuickBooks invoice data for current month (calendar month)
   useEffect(() => {
@@ -335,35 +350,54 @@ export default function Dashboard() {
         const year = now.getFullYear();
         const month = (now.getMonth() + 1).toString().padStart(2, '0');
         const startDate = `${year}-${month}-01`;
-        const endDate = now.toISOString().slice(0, 10);
+        const endDate = toYmdLocal(now);
+        const todayDate = endDate;
+
+        const weekStart = new Date(now);
+        const day = weekStart.getDay(); // Sunday=0
+        const daysSinceMonday = (day + 6) % 7;
+        weekStart.setDate(weekStart.getDate() - daysSinceMonday);
+        const weekStartDate = toYmdLocal(weekStart);
 
         const lastMonthStart = new Date(year, now.getMonth() - 1, 1);
         const lastMonthEnd = new Date(year, now.getMonth(), 0);
         const lastMonthStartDate = `${lastMonthStart.getFullYear()}-${String(lastMonthStart.getMonth() + 1).padStart(2, "0")}-01`;
         const lastMonthEndDate = `${lastMonthEnd.getFullYear()}-${String(lastMonthEnd.getMonth() + 1).padStart(2, "0")}-${String(lastMonthEnd.getDate()).padStart(2, "0")}`;
 
-        const [paidInvoicesResponse, lastMonthResponse] = await Promise.all([
+        const [todaySalesResponse, weekSalesResponse, paidInvoicesResponse, lastMonthResponse] = await Promise.all([
+          fetch(`/api/qbo/invoice/query?startDate=${todayDate}&endDate=${todayDate}&status=paid&allPages=true&totalsOnly=true`),
+          fetch(`/api/qbo/invoice/query?startDate=${weekStartDate}&endDate=${endDate}&status=paid&allPages=true&totalsOnly=true`),
           fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid&allPages=true&totalsOnly=true`),
           fetch(`/api/qbo/invoice/query?startDate=${lastMonthStartDate}&endDate=${lastMonthEndDate}&status=paid&allPages=true&totalsOnly=true`),
         ]);
 
-        if (!paidInvoicesResponse.ok || !lastMonthResponse.ok) {
+        if (!todaySalesResponse.ok || !weekSalesResponse.ok || !paidInvoicesResponse.ok || !lastMonthResponse.ok) {
           throw new Error("Failed to fetch monthly sales");
         }
 
-        const [paidInvoicesData, lastMonthData] = await Promise.all([
+        const [todaySalesData, weekSalesData, paidInvoicesData, lastMonthData] = await Promise.all([
+          todaySalesResponse.json(),
+          weekSalesResponse.json(),
           paidInvoicesResponse.json(),
           lastMonthResponse.json(),
         ]);
 
+        const todayTotalPaid = Number(todaySalesData.totalPaid || 0);
+        const weekTotalPaid = Number(weekSalesData.totalPaid || 0);
         const paidInvoicesTotal = Number(paidInvoicesData.totalPaid || 0);
         const lastMonthTotalPaid = Number(lastMonthData.totalPaid || 0);
 
-        console.log(`[dashboard] Monthly sales fetched: this month $${paidInvoicesTotal}, last month $${lastMonthTotalPaid}`);
+        console.log(
+          `[dashboard] Sales fetched: today ${todayTotalPaid}, week ${weekTotalPaid}, month ${paidInvoicesTotal}, last month ${lastMonthTotalPaid}`
+        );
+        setSalesTodayTotal(todayTotalPaid);
+        setSalesWeekTotal(weekTotalPaid);
         setMonthlyTotal(paidInvoicesTotal);
         setLastMonthTotal(lastMonthTotalPaid);
       } catch (error) {
         console.error("Error fetching monthly sales:", error);
+        setSalesTodayTotal(0);
+        setSalesWeekTotal(0);
         setMonthlyTotal(0);
         setLastMonthTotal(0);
       } finally {
@@ -530,40 +564,6 @@ export default function Dashboard() {
     };
 
     fetchPartialPaidInvoices();
-  }, []);
-
-  // Fetch same month last year (month-to-date) paid sales
-  useEffect(() => {
-    let isMounted = true;
-    const fetchLastYearMonthSales = async () => {
-      setLoadingLastYearMonth(true);
-      try {
-        const now = new Date();
-        const lastYear = now.getFullYear() - 1;
-        const month = (now.getMonth() + 1).toString().padStart(2, "0");
-        const startDate = `${lastYear}-${month}-01`;
-        const lastDay = new Date(lastYear, now.getMonth() + 1, 0).getDate();
-        const endDate = `${lastYear}-${month}-${String(lastDay).padStart(2, "0")}`;
-        const res = await fetch(
-          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid&allPages=true&totalsOnly=true`
-        );
-        if (!res.ok) throw new Error("Failed to fetch last year month sales");
-        const data = await res.json();
-        if (isMounted) {
-          setLastYearMonthSales(Number(data.totalPaid || 0));
-        }
-      } catch (error) {
-        console.error("Failed to fetch last year month sales:", error);
-        if (isMounted) setLastYearMonthSales(null);
-      } finally {
-        if (isMounted) setLoadingLastYearMonth(false);
-      }
-    };
-
-    fetchLastYearMonthSales();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   // QuickBooks connectivity status check
@@ -769,30 +769,88 @@ export default function Dashboard() {
     const fetchPaymentsToday = async () => {
       setLoadingCustomerPayments(true);
       try {
-        const today = new Date().toLocaleDateString("en-CA");
-        const res = await fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
-        if (!res.ok) throw new Error("Failed to fetch payments");
-        const data = await res.json();
-        const payments = data.payments || [];
+        const today = getLocalDateYmd();
+        const [invoiceRes, paymentRes] = await Promise.all([
+          fetch(`/api/qbo/invoice/query?startDate=${today}&endDate=${today}&status=paid&allPages=true&_=${Date.now()}`),
+          fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`),
+        ]);
 
-        let totalApplied = 0;
         const itemizedPayments: CustomerPayment[] = [];
+        const paidByInvoiceId = new Map<string, number>();
 
-        payments.forEach((payment: any) => {
-          const total = Number(payment.TotalAmt) || 0;
-          const unapplied = Number(payment.UnappliedAmt) || 0;
-          const applied = Math.max(total - unapplied, 0);
-          if (applied <= 0) return;
-          totalApplied += applied;
-          const customerName = payment.CustomerRef?.name || payment.CustomerRef?.value || 'Unknown';
-          itemizedPayments.push({
-            id: payment.Id,
-            customerName: customerName,
-            appliedAmount: applied,
-            totalAmount: total,
-            txnDate: payment.TxnDate || today,
+        if (invoiceRes.ok) {
+          const invoiceData = await invoiceRes.json();
+          const invoices = invoiceData?.invoices || [];
+          invoices.forEach((inv: any) => {
+            const invoiceId = String(inv?.Id || "");
+            if (!invoiceId) return;
+
+            const total = Number(inv?.TotalAmt) || 0;
+            const balance = Number(inv?.Balance) || 0;
+            const paid = Math.max(total - balance, 0);
+            if (paid <= 0) return;
+
+            paidByInvoiceId.set(invoiceId, paid);
+            itemizedPayments.push({
+              id: `inv-${invoiceId}`,
+              customerName: inv?.CustomerRef?.name || inv?.CustomerRef?.value || "Unknown",
+              appliedAmount: paid,
+              totalAmount: total,
+              txnDate: inv?.TxnDate || today,
+            });
           });
-        });
+        }
+
+        if (paymentRes.ok) {
+          const paymentData = await paymentRes.json();
+          const payments = paymentData?.payments || [];
+
+          payments.forEach((payment: any) => {
+            const total = Number(payment?.TotalAmt) || 0;
+            const unapplied = Number(payment?.UnappliedAmt) || 0;
+            const applied = Math.max(total - unapplied, 0);
+            if (applied <= 0) return;
+
+            let linkedAmount = 0;
+            const lines = Array.isArray(payment?.Line) ? payment.Line : [];
+            lines.forEach((line: any) => {
+              const lineAmount = Number(line?.Amount) || 0;
+              const linked = Array.isArray(line?.LinkedTxn) ? line.LinkedTxn : [];
+              const invoiceLinks = linked.filter((txn: any) => txn?.TxnType === "Invoice" && txn?.TxnId);
+              if (invoiceLinks.length === 0) return;
+
+              linkedAmount += lineAmount;
+              invoiceLinks.forEach((txn: any) => {
+                const invoiceId = String(txn.TxnId || "");
+                if (!invoiceId) return;
+                if (!paidByInvoiceId.has(invoiceId) && lineAmount > 0) {
+                  paidByInvoiceId.set(invoiceId, lineAmount);
+                  itemizedPayments.push({
+                    id: `pay-link-${payment?.Id || "unknown"}-${invoiceId}`,
+                    customerName: payment?.CustomerRef?.name || payment?.CustomerRef?.value || "Unknown",
+                    appliedAmount: lineAmount,
+                    totalAmount: lineAmount,
+                    txnDate: payment?.TxnDate || today,
+                  });
+                }
+              });
+            });
+
+            const unlinkedApplied = Math.max(applied - linkedAmount, 0);
+            if (unlinkedApplied > 0) {
+              itemizedPayments.push({
+                id: `pay-${payment?.Id || Math.random().toString(36).slice(2)}`,
+                customerName: payment?.CustomerRef?.name || payment?.CustomerRef?.value || "Unknown",
+                appliedAmount: unlinkedApplied,
+                totalAmount: total,
+                txnDate: payment?.TxnDate || today,
+              });
+            }
+          });
+        }
+
+        const totalApplied = itemizedPayments.reduce((sum, row) => sum + (Number(row.appliedAmount) || 0), 0);
+        itemizedPayments.sort((a, b) => b.appliedAmount - a.appliedAmount);
 
         if (isMounted) {
           setPaymentsTotal(totalApplied);
@@ -925,27 +983,27 @@ export default function Dashboard() {
             {/* Key Metrics */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="bg-white border border-slate-200 rounded-lg p-4">
+                <div className="text-xs font-medium text-slate-500 mb-3">Sales Today</div>
+                <div className="text-[26px] font-semibold text-slate-900 leading-none">
+                  ${money(Math.round(animatedSalesTodayTotal))}
+                </div>
+                <div className="mt-2 text-xs text-slate-600 leading-relaxed">
+                  Paid invoices today
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-lg p-4">
                 <div className="text-xs font-medium text-slate-500 mb-3">Sales This Month</div>
                 <div className="text-[26px] font-semibold text-slate-900 leading-none">
                   ${money(Math.round(animatedMonthlyTotal))}
                 </div>
-                <div className="mt-2 text-xs text-slate-600 leading-relaxed">
-                  ${money(lastMonthTotal)} last month
-                </div>
+                <div className="mt-2 text-xs text-slate-600 leading-relaxed">${money(lastMonthTotal)} last month</div>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-lg p-4">
-                <div className="text-xs font-medium text-slate-500 mb-3">This Month Last Year</div>
-                <div className="text-[26px] font-semibold text-slate-900 leading-none">
-                  ${money(Math.round(animatedLastYearSales))}
-                </div>
-                <div className="mt-2 text-xs text-slate-600 leading-relaxed">Same month 2025</div>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-lg p-4">
-                <div className="text-xs font-medium text-slate-500 mb-3">Payments Today</div>
-                <div className="text-[26px] font-semibold text-slate-900 leading-none">${money(Math.round(animatedPaymentsTotal))}</div>
-                <div className="mt-2 text-xs text-slate-600 leading-relaxed">Received from customers</div>
+                <div className="text-xs font-medium text-slate-500 mb-3">Sales This Week</div>
+                <div className="text-[26px] font-semibold text-slate-900 leading-none">${money(Math.round(animatedSalesWeekTotal))}</div>
+                <div className="mt-2 text-xs text-slate-600 leading-relaxed">Mon to today (paid invoices)</div>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-lg p-4">
@@ -1052,7 +1110,7 @@ export default function Dashboard() {
                       <p className="mt-0.5 text-sm text-slate-600">Month-to-date breakdown</p>
                     </div>
                     <div className="text-right text-xs text-slate-500">
-                      Income $${money(monthlyTotal)} • Expenses $${money(totalExpenses)}
+                      Income ${money(monthlyTotal)} - Expenses ${money(totalExpenses)}
                     </div>
                   </div>
 
@@ -1183,7 +1241,7 @@ export default function Dashboard() {
                 <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
-                    <p className="mt-0.5 text-sm text-slate-600">Payments received today</p>
+                    <p className="mt-0.5 text-sm text-slate-600">Payments received and invoices paid today</p>
                     <p className="mt-1 text-sm font-semibold text-slate-900">
                       Total: ${money(paymentsTotal)}
                     </p>
@@ -1403,7 +1461,7 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
                       <h2 className="text-lg font-semibold text-slate-900">All Customer Payments Today</h2>
-                      <p className="mt-0.5 text-sm text-slate-600">Total received: ${money(paymentsTotal)}</p>
+                      <p className="mt-0.5 text-sm text-slate-600">Total received/paid: ${money(paymentsTotal)}</p>
                     </div>
                     <button
                       type="button"
