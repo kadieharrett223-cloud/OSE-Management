@@ -118,7 +118,6 @@ export default function SpecialOrdersPage() {
       if (!res.ok) throw new Error(result?.error || "Failed to load special order");
       const row = result.data as SpecialOrderDetails;
       setDetails(row);
-      setInvoiceNumberInput(row.qbo_invoice_number || "");
     } catch (error: any) {
       alert(error?.message || "Failed to load special order");
     } finally {
