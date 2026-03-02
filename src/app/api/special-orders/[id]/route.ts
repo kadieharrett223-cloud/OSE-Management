@@ -3,6 +3,32 @@ import { getSession } from "@/lib/auth";
 import { authorizedQboFetch } from "@/lib/qbo";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
+function getSalesRep(invoice: any): string | null {
+  if (!invoice) return null;
+
+  if (Array.isArray(invoice.CustomField)) {
+    const repField = invoice.CustomField.find(
+      (f: any) => f?.Name === "Sales Rep" || f?.Name === "SalesRep" || f?.Name === "Rep"
+    );
+    if (repField?.StringValue) {
+      return String(repField.StringValue).trim();
+    }
+  }
+
+  const memo = invoice?.CustomerMemo?.value;
+  if (memo) {
+    const repMatch = String(memo).match(/Rep:\s*([A-Za-z\s/]+)/i);
+    if (repMatch?.[1]) return repMatch[1].trim();
+  }
+
+  return null;
+}
+
+function formatNoteTimestamp(date: Date) {
+  const iso = date.toISOString();
+  return `${iso.slice(0, 16).replace("T", " ")} UTC`;
+}
+
 function mapInvoiceSummary(invoice: any) {
   if (!invoice) return null;
   const total = Number(invoice.TotalAmt) || 0;
@@ -12,7 +38,7 @@ function mapInvoiceSummary(invoice: any) {
   const lineItems = (invoice.Line || [])
     .filter((line: any) => !!line?.SalesItemLineDetail || !!line?.Description)
     .map((line: any) => ({
-      description: line.Description || line?.SalesItemLineDetail?.ItemRef?.name || "—",
+      description: line.Description || line?.SalesItemLineDetail?.ItemRef?.name || "-",
       quantity: Number(line?.SalesItemLineDetail?.Qty) || 0,
       unitPrice: Number(line?.SalesItemLineDetail?.UnitPrice) || 0,
       amount: Number(line?.Amount) || 0,
@@ -26,6 +52,7 @@ function mapInvoiceSummary(invoice: any) {
     total,
     balance,
     paid,
+    salesRep: getSalesRep(invoice),
     customer: invoice?.CustomerRef?.name || null,
     lineItems,
   };
@@ -92,17 +119,34 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const body = await req.json();
+    const noteEntry = String(body?.note_entry || "").trim();
 
     const supabase = getServerSupabaseClient();
+    const { data: existing, error: existingError } = await supabase
+      .from("special_orders")
+      .select("internal_notes")
+      .eq("id", params.id)
+      .single();
+
+    if (existingError) throw existingError;
+
+    const existingNotes = existing?.internal_notes ? String(existing.internal_notes) : "";
+    const stampedNote = noteEntry ? `[${formatNoteTimestamp(new Date())}] ${noteEntry}` : "";
+    const nextNotes = stampedNote ? (existingNotes ? `${stampedNote}\n${existingNotes}` : stampedNote) : existingNotes;
+
+    const updatePayload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+      expected_delivery: body?.expected_delivery || null,
+      internal_notes: nextNotes || null,
+    };
+
+    if (body?.status) {
+      updatePayload.status = body.status;
+    }
+
     const { data, error } = await supabase
       .from("special_orders")
-      .update({
-        status: body?.status,
-        expected_delivery: body?.expected_delivery || null,
-        internal_notes: body?.internal_notes || null,
-        internal_updates: body?.internal_updates || null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", params.id)
       .select("id, created_at, updated_at, order_name, customer_name, special_colors, factory_notes, internal_notes, internal_updates, status, expected_delivery, qbo_invoice_id, qbo_invoice_number")
       .single();

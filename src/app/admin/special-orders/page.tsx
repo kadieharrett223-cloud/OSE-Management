@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
-type StatusValue = "SENT_TO_FACTORY" | "IN_PRODUCTION" | "ON_THE_WAY" | "DELIVERED";
+type StatusValue = "SENT_TO_FACTORY" | "IN_PRODUCTION" | "ON_THE_WAY" | "DELIVERED" | "CANCELLED";
 
 type SpecialOrder = {
   id: string;
@@ -37,6 +37,7 @@ type InvoiceSummary = {
   docNumber: string | null;
   txnDate: string | null;
   dueDate: string | null;
+  salesRep: string | null;
   customer: string | null;
   total: number;
   balance: number;
@@ -54,6 +55,7 @@ const STATUS_OPTIONS: Array<{ value: StatusValue; label: string }> = [
   { value: "IN_PRODUCTION", label: "in production" },
   { value: "ON_THE_WAY", label: "on the way" },
   { value: "DELIVERED", label: "delivered" },
+  { value: "CANCELLED", label: "cancelled" },
 ];
 
 const STATUS_META: Record<StatusValue, { symbol: string; chipClass: string }> = {
@@ -61,6 +63,7 @@ const STATUS_META: Record<StatusValue, { symbol: string; chipClass: string }> = 
   IN_PRODUCTION: { symbol: "P", chipClass: "bg-amber-100 text-amber-700" },
   ON_THE_WAY: { symbol: "T", chipClass: "bg-sky-100 text-sky-700" },
   DELIVERED: { symbol: "D", chipClass: "bg-emerald-100 text-emerald-700" },
+  CANCELLED: { symbol: "X", chipClass: "bg-red-100 text-red-700" },
 };
 
 const money = (value: number) =>
@@ -77,6 +80,7 @@ export default function SpecialOrdersPage() {
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [uploadNotes, setUploadNotes] = useState("");
+  const [noteEntry, setNoteEntry] = useState("");
 
   const selectedOrder = useMemo(() => orders.find((o) => o.id === selectedId) || null, [orders, selectedId]);
 
@@ -118,6 +122,7 @@ export default function SpecialOrdersPage() {
       if (!res.ok) throw new Error(result?.error || "Failed to load special order");
       const row = result.data as SpecialOrderDetails;
       setDetails(row);
+      setNoteEntry("");
     } catch (error: any) {
       alert(error?.message || "Failed to load special order");
     } finally {
@@ -135,7 +140,6 @@ export default function SpecialOrdersPage() {
 
     setCreatingOrder(true);
     try {
-      // Create order with invoice number
       const res = await fetch("/api/special-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -162,8 +166,7 @@ export default function SpecialOrdersPage() {
       const payload = {
         status: details.status,
         expected_delivery: details.expected_delivery,
-        internal_notes: details.internal_notes,
-        internal_updates: details.internal_updates,
+        note_entry: noteEntry,
       };
 
       const res = await fetch(`/api/special-orders/${details.id}`, {
@@ -177,6 +180,7 @@ export default function SpecialOrdersPage() {
       const updated = result.data as SpecialOrder;
       setOrders((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
       setDetails((prev) => (prev ? { ...prev, ...updated } : prev));
+      setNoteEntry("");
     } catch (error: any) {
       alert(error?.message || "Failed to save special order");
     } finally {
@@ -251,14 +255,14 @@ export default function SpecialOrdersPage() {
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
               <section className="rounded-lg border border-slate-200 bg-white p-4">
-              <form onSubmit={createOrder} className="space-y-2 border-b border-slate-200 pb-4">
+                <form onSubmit={createOrder} className="space-y-2 border-b border-slate-200 pb-4">
                   <p className="text-sm font-semibold text-slate-800">Create Special Order</p>
                   <input
                     type="text"
                     value={newInvoiceNumber}
                     onChange={(e) => setNewInvoiceNumber(e.target.value)}
                     placeholder="QuickBooks invoice number"
-                    className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                    className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 placeholder-slate-400"
                     required
                   />
                   <button
@@ -285,7 +289,13 @@ export default function SpecialOrdersPage() {
                           }
                         }}
                         className={`w-full rounded border px-3 py-2 text-left text-sm ${
-                          selectedId === order.id ? "border-blue-400 bg-blue-50" : "border-slate-200 bg-white"
+                          selectedId === order.id
+                            ? order.status === "CANCELLED"
+                              ? "border-red-400 bg-red-50"
+                              : "border-blue-400 bg-blue-50"
+                            : order.status === "CANCELLED"
+                              ? "border-red-200 bg-red-50"
+                              : "border-slate-200 bg-white"
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -295,10 +305,14 @@ export default function SpecialOrdersPage() {
                           >
                             {STATUS_META[order.status].symbol}
                           </span>
-                          <p className="font-semibold text-slate-900">{order.qbo_invoice_number || order.order_name}</p>
+                          <p className={`font-semibold ${order.status === "CANCELLED" ? "text-red-700 line-through" : "text-slate-900"}`}>
+                            {order.qbo_invoice_number || order.order_name}
+                          </p>
                         </div>
-                        <p className="text-xs text-slate-600">{order.customer_name || "No customer"}</p>
-                        <p className="text-xs text-slate-500">{STATUS_OPTIONS.find((s) => s.value === order.status)?.label || order.status}</p>
+                        <p className={`text-xs ${order.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>{order.customer_name || "No customer"}</p>
+                        <p className={`text-xs ${order.status === "CANCELLED" ? "text-red-700 font-medium" : "text-slate-500"}`}>
+                          {STATUS_OPTIONS.find((s) => s.value === order.status)?.label || order.status}
+                        </p>
                       </button>
                     ))
                   )}
@@ -313,17 +327,20 @@ export default function SpecialOrdersPage() {
                 ) : (
                   <div className="space-y-5">
                     {details.invoiceSummary && (
-                      <div className="rounded border border-slate-200 bg-slate-50 p-4">
+                      <div className="rounded border border-slate-200 bg-slate-50 p-4 text-slate-700">
                         <p className="mb-3 text-sm font-semibold text-slate-900">QuickBooks Invoice</p>
-                        <div className="space-y-1 text-sm">
+                        <div className="space-y-1 text-sm text-slate-700">
                           <p>
-                            <span className="font-medium">Invoice:</span> {details.invoiceSummary.docNumber || "—"}
+                            <span className="font-medium text-slate-900">Invoice:</span> {details.invoiceSummary.docNumber || "-"}
                           </p>
                           <p>
-                            <span className="font-medium">Customer:</span> {details.invoiceSummary.customer || "—"}
+                            <span className="font-medium text-slate-900">Customer:</span> {details.invoiceSummary.customer || "-"}
                           </p>
                           <p>
-                            <span className="font-medium">Status:</span>{" "}
+                            <span className="font-medium text-slate-900">Sales rep:</span> {details.invoiceSummary.salesRep || "-"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-900">Status:</span>{" "}
                             {details.invoiceSummary.paid ? (
                               <span className="text-emerald-700">Paid off</span>
                             ) : (
@@ -331,18 +348,18 @@ export default function SpecialOrdersPage() {
                             )}
                           </p>
                           <p>
-                            <span className="font-medium">Total:</span> {money(details.invoiceSummary.total)}
+                            <span className="font-medium text-slate-900">Total:</span> {money(details.invoiceSummary.total)}
                           </p>
                           <p>
-                            <span className="font-medium">Balance:</span> {money(details.invoiceSummary.balance)}
+                            <span className="font-medium text-slate-900">Balance:</span> {money(details.invoiceSummary.balance)}
                           </p>
                         </div>
 
                         {details.invoiceSummary.lineItems.length > 0 && (
                           <div className="mt-3 overflow-x-auto">
-                            <table className="min-w-full text-xs">
+                            <table className="min-w-full text-xs text-slate-700">
                               <thead>
-                                <tr className="border-b border-slate-300 text-left">
+                                <tr className="border-b border-slate-300 text-left text-slate-900">
                                   <th className="px-2 py-1">Description</th>
                                   <th className="px-2 py-1 text-right">Qty</th>
                                   <th className="px-2 py-1 text-right">Unit</th>
@@ -371,7 +388,7 @@ export default function SpecialOrdersPage() {
                         <select
                           value={details.status}
                           onChange={(e) => setDetails({ ...details, status: e.target.value as StatusValue })}
-                          className="w-full rounded border border-slate-300 px-2 py-1.5"
+                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
                         >
                           {STATUS_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -388,7 +405,7 @@ export default function SpecialOrdersPage() {
                           onChange={(e) =>
                             setDetails({ ...details, expected_delivery: e.target.value || null })
                           }
-                          className="w-full rounded border border-slate-300 px-2 py-1.5"
+                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
                         />
                       </label>
                     </div>
@@ -396,27 +413,22 @@ export default function SpecialOrdersPage() {
                     <label className="block text-sm text-slate-700">
                       <span className="mb-1 block font-medium">Internal notes</span>
                       <textarea
-                        value={details.internal_notes || ""}
-                        onChange={(e) =>
-                          setDetails({ ...details, internal_notes: e.target.value })
-                        }
+                        value={noteEntry}
+                        onChange={(e) => setNoteEntry(e.target.value)}
                         rows={3}
-                        className="w-full rounded border border-slate-300 px-2 py-1.5"
+                        className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900 placeholder-slate-400"
+                        placeholder="Add a note (timestamp is added automatically on save)"
                       />
                     </label>
 
-                    <label className="block text-sm text-slate-700">
-                      <span className="mb-1 block font-medium">Internal updates</span>
-                      <textarea
-                        value={details.internal_updates || ""}
-                        onChange={(e) =>
-                          setDetails({ ...details, internal_updates: e.target.value })
-                        }
-                        rows={4}
-                        className="w-full rounded border border-slate-300 px-2 py-1.5"
-                        placeholder="Add timeline updates, progress changes, and internal follow-ups"
-                      />
-                    </label>
+                    <div className="rounded border border-slate-200 bg-slate-50 p-3">
+                      <p className="mb-2 text-sm font-medium text-slate-900">Notes history</p>
+                      {details.internal_notes ? (
+                        <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700">{details.internal_notes}</pre>
+                      ) : (
+                        <p className="text-sm text-slate-500">No notes yet.</p>
+                      )}
+                    </div>
 
                     <div className="flex justify-end">
                       <button
@@ -439,14 +451,14 @@ export default function SpecialOrdersPage() {
                             e.currentTarget.value = "";
                           }}
                           disabled={uploadingDoc}
-                          className="block w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                          className="block w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
                         />
                         <textarea
                           value={uploadNotes}
                           onChange={(e) => setUploadNotes(e.target.value)}
                           rows={2}
                           placeholder="Document notes (optional)"
-                          className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
+                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 placeholder-slate-400"
                         />
                       </div>
 
