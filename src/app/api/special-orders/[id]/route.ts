@@ -97,14 +97,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const { data, error } = await supabase
       .from("special_orders")
       .update({
-        order_name: body?.order_name,
-        customer_name: body?.customer_name || null,
-        special_colors: body?.special_colors || null,
-        factory_notes: body?.factory_notes || null,
-        internal_notes: body?.internal_notes || null,
-        internal_updates: body?.internal_updates || null,
         status: body?.status,
         expected_delivery: body?.expected_delivery || null,
+        internal_notes: body?.internal_notes || null,
+        internal_updates: body?.internal_updates || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", params.id)

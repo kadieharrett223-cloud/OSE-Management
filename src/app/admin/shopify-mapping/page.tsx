@@ -31,6 +31,10 @@ interface PriceListItem {
   shopify_variant_id: string | null;
 }
 
+function truncateTitle(title: string, maxChars = 20) {
+  return title.length > maxChars ? `${title.slice(0, maxChars)}...` : title;
+}
+
 export default function ShopifyMappingPage() {
   const [shopifyProducts, setShopifyProducts] = useState<ShopifyProduct[]>([]);
   const [priceListItems, setPriceListItems] = useState<PriceListItem[]>([]);
@@ -285,8 +289,8 @@ export default function ShopifyMappingPage() {
                     return (
                       <tr key={variant.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900 max-w-md truncate">
-                            {product.title}
+                          <div className="text-sm font-medium text-gray-900 max-w-md truncate" title={product.title}>
+                            {truncateTitle(product.title, 20)}
                           </div>
                         </td>
                         <td className="px-6 py-4">

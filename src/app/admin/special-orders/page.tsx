@@ -56,6 +56,13 @@ const STATUS_OPTIONS: Array<{ value: StatusValue; label: string }> = [
   { value: "DELIVERED", label: "delivered" },
 ];
 
+const STATUS_META: Record<StatusValue, { symbol: string; chipClass: string }> = {
+  SENT_TO_FACTORY: { symbol: "S", chipClass: "bg-slate-200 text-slate-700" },
+  IN_PRODUCTION: { symbol: "P", chipClass: "bg-amber-100 text-amber-700" },
+  ON_THE_WAY: { symbol: "T", chipClass: "bg-sky-100 text-sky-700" },
+  DELIVERED: { symbol: "D", chipClass: "bg-emerald-100 text-emerald-700" },
+};
+
 const money = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
 
@@ -66,11 +73,8 @@ export default function SpecialOrdersPage() {
   const [details, setDetails] = useState<SpecialOrderDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [newOrderName, setNewOrderName] = useState("");
-  const [newCustomerName, setNewCustomerName] = useState("");
-  const [invoiceNumberInput, setInvoiceNumberInput] = useState("");
-  const [linkingInvoice, setLinkingInvoice] = useState(false);
-  const [autoLinkingInvoice, setAutoLinkingInvoice] = useState(false);
+  const [newInvoiceNumber, setNewInvoiceNumber] = useState("");
+  const [creatingOrder, setCreatingOrder] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [uploadNotes, setUploadNotes] = useState("");
 
@@ -87,20 +91,6 @@ export default function SpecialOrdersPage() {
     }
     loadDetails(selectedId);
   }, [selectedId]);
-
-  useEffect(() => {
-    if (!details?.id) return;
-    const entered = invoiceNumberInput.trim();
-    const linked = (details.qbo_invoice_number || "").trim();
-
-    if (!entered || entered === linked) return;
-
-    const timeout = setTimeout(() => {
-      void linkInvoiceByNumber(entered, { silent: true });
-    }, 700);
-
-    return () => clearTimeout(timeout);
-  }, [invoiceNumberInput, details?.id, details?.qbo_invoice_number]);
 
   async function loadOrders() {
     setLoading(true);
@@ -138,17 +128,19 @@ export default function SpecialOrdersPage() {
 
   async function createOrder(e: React.FormEvent) {
     e.preventDefault();
-    if (!newOrderName.trim()) return;
+    const invoiceNumber = newInvoiceNumber.trim();
+    if (!invoiceNumber) {
+      alert("Enter a QuickBooks invoice number.");
+      return;
+    }
 
+    setCreatingOrder(true);
     try {
+      // Create order with invoice number
       const res = await fetch("/api/special-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order_name: newOrderName.trim(),
-          customer_name: newCustomerName.trim() || null,
-          status: "SENT_TO_FACTORY",
-        }),
+        body: JSON.stringify({ invoiceNumber }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result?.error || "Failed to create special order");
@@ -156,10 +148,11 @@ export default function SpecialOrdersPage() {
       const created = result.data as SpecialOrder;
       setOrders((prev) => [created, ...prev]);
       setSelectedId(created.id);
-      setNewOrderName("");
-      setNewCustomerName("");
+      setNewInvoiceNumber("");
     } catch (error: any) {
       alert(error?.message || "Failed to create special order");
+    } finally {
+      setCreatingOrder(false);
     }
   }
 
@@ -168,14 +161,10 @@ export default function SpecialOrdersPage() {
     setSaving(true);
     try {
       const payload = {
-        order_name: details.order_name,
-        customer_name: details.customer_name,
-        special_colors: details.special_colors,
-        factory_notes: details.factory_notes,
-        internal_notes: details.internal_notes,
-        internal_updates: details.internal_updates,
         status: details.status,
         expected_delivery: details.expected_delivery,
+        internal_notes: details.internal_notes,
+        internal_updates: details.internal_updates,
       };
 
       const res = await fetch(`/api/special-orders/${details.id}`, {
@@ -194,55 +183,6 @@ export default function SpecialOrdersPage() {
     } finally {
       setSaving(false);
     }
-  }
-
-  async function linkInvoiceByNumber(invoiceNumber: string, options?: { silent?: boolean }) {
-    if (!details) return;
-    const cleaned = invoiceNumber.trim();
-    if (!cleaned) {
-      if (!options?.silent) {
-        alert("Enter a QuickBooks invoice number first.");
-      }
-      return;
-    }
-
-    if (options?.silent) {
-      setAutoLinkingInvoice(true);
-    } else {
-      setLinkingInvoice(true);
-    }
-
-    try {
-      const res = await fetch(`/api/special-orders/${details.id}/link-invoice`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invoiceNumber: cleaned }),
-      });
-      const result = await res.json();
-
-      if (!res.ok) {
-        if (options?.silent && res.status === 404) {
-          return;
-        }
-        throw new Error(result?.error || "Failed to link invoice");
-      }
-
-      await loadDetails(details.id);
-    } catch (error: any) {
-      if (!options?.silent) {
-        alert(error?.message || "Failed to link invoice");
-      }
-    } finally {
-      if (options?.silent) {
-        setAutoLinkingInvoice(false);
-      } else {
-        setLinkingInvoice(false);
-      }
-    }
-  }
-
-  async function linkInvoice() {
-    await linkInvoiceByNumber(invoiceNumberInput, { silent: false });
   }
 
   async function uploadDocument(file: File) {
@@ -312,25 +252,21 @@ export default function SpecialOrdersPage() {
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
               <section className="rounded-lg border border-slate-200 bg-white p-4">
-                <form onSubmit={createOrder} className="space-y-2 border-b border-slate-200 pb-4">
+              <form onSubmit={createOrder} className="space-y-2 border-b border-slate-200 pb-4">
                   <p className="text-sm font-semibold text-slate-800">Create Special Order</p>
                   <input
                     type="text"
-                    value={newOrderName}
-                    onChange={(e) => setNewOrderName(e.target.value)}
-                    placeholder="Order name"
+                    value={newInvoiceNumber}
+                    onChange={(e) => setNewInvoiceNumber(e.target.value)}
+                    placeholder="QuickBooks invoice number"
                     className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
                     required
                   />
-                  <input
-                    type="text"
-                    value={newCustomerName}
-                    onChange={(e) => setNewCustomerName(e.target.value)}
-                    placeholder="Customer name (optional)"
-                    className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm"
-                  />
-                  <button className="w-full rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
-                    Add Order
+                  <button
+                    disabled={creatingOrder}
+                    className="w-full rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {creatingOrder ? "Creating..." : "Create Order"}
                   </button>
                 </form>
 
@@ -343,12 +279,25 @@ export default function SpecialOrdersPage() {
                     orders.map((order) => (
                       <button
                         key={order.id}
-                        onClick={() => setSelectedId(order.id)}
+                        onClick={() => {
+                          setSelectedId(order.id);
+                          if (selectedId === order.id) {
+                            loadDetails(order.id);
+                          }
+                        }}
                         className={`w-full rounded border px-3 py-2 text-left text-sm ${
                           selectedId === order.id ? "border-blue-400 bg-blue-50" : "border-slate-200 bg-white"
                         }`}
                       >
-                        <p className="font-semibold text-slate-900">{order.order_name}</p>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold ${STATUS_META[order.status].chipClass}`}
+                            title={STATUS_OPTIONS.find((s) => s.value === order.status)?.label || order.status}
+                          >
+                            {STATUS_META[order.status].symbol}
+                          </span>
+                          <p className="font-semibold text-slate-900">{order.qbo_invoice_number || order.order_name}</p>
+                        </div>
                         <p className="text-xs text-slate-600">{order.customer_name || "No customer"}</p>
                         <p className="text-xs text-slate-500">{STATUS_OPTIONS.find((s) => s.value === order.status)?.label || order.status}</p>
                       </button>
@@ -364,23 +313,60 @@ export default function SpecialOrdersPage() {
                   <p className="text-sm text-slate-500">Loading special order details...</p>
                 ) : (
                   <div className="space-y-5">
+                    {details.invoiceSummary && (
+                      <div className="rounded border border-slate-200 bg-slate-50 p-4">
+                        <p className="mb-3 text-sm font-semibold text-slate-900">QuickBooks Invoice</p>
+                        <div className="space-y-1 text-sm">
+                          <p>
+                            <span className="font-medium">Invoice:</span> {details.invoiceSummary.docNumber || "—"}
+                          </p>
+                          <p>
+                            <span className="font-medium">Customer:</span> {details.invoiceSummary.customer || "—"}
+                          </p>
+                          <p>
+                            <span className="font-medium">Status:</span>{" "}
+                            {details.invoiceSummary.paid ? (
+                              <span className="text-emerald-700">Paid off</span>
+                            ) : (
+                              <span className="text-amber-700">Not paid</span>
+                            )}
+                          </p>
+                          <p>
+                            <span className="font-medium">Total:</span> {money(details.invoiceSummary.total)}
+                          </p>
+                          <p>
+                            <span className="font-medium">Balance:</span> {money(details.invoiceSummary.balance)}
+                          </p>
+                        </div>
+
+                        {details.invoiceSummary.lineItems.length > 0 && (
+                          <div className="mt-3 overflow-x-auto">
+                            <table className="min-w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-slate-300 text-left">
+                                  <th className="px-2 py-1">Description</th>
+                                  <th className="px-2 py-1 text-right">Qty</th>
+                                  <th className="px-2 py-1 text-right">Unit</th>
+                                  <th className="px-2 py-1 text-right">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {details.invoiceSummary.lineItems.map((line, idx) => (
+                                  <tr key={`${line.description}-${idx}`} className="border-b border-slate-100">
+                                    <td className="px-2 py-1">{line.description}</td>
+                                    <td className="px-2 py-1 text-right">{line.quantity}</td>
+                                    <td className="px-2 py-1 text-right">{money(line.unitPrice)}</td>
+                                    <td className="px-2 py-1 text-right">{money(line.amount)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <label className="text-sm text-slate-700">
-                        <span className="mb-1 block font-medium">Order name</span>
-                        <input
-                          value={details.order_name}
-                          onChange={(e) => setDetails({ ...details, order_name: e.target.value })}
-                          className="w-full rounded border border-slate-300 px-2 py-1.5"
-                        />
-                      </label>
-                      <label className="text-sm text-slate-700">
-                        <span className="mb-1 block font-medium">Customer</span>
-                        <input
-                          value={details.customer_name || ""}
-                          onChange={(e) => setDetails({ ...details, customer_name: e.target.value })}
-                          className="w-full rounded border border-slate-300 px-2 py-1.5"
-                        />
-                      </label>
                       <label className="text-sm text-slate-700">
                         <span className="mb-1 block font-medium">Status</span>
                         <select
@@ -400,37 +386,21 @@ export default function SpecialOrdersPage() {
                         <input
                           type="date"
                           value={details.expected_delivery || ""}
-                          onChange={(e) => setDetails({ ...details, expected_delivery: e.target.value || null })}
+                          onChange={(e) =>
+                            setDetails({ ...details, expected_delivery: e.target.value || null })
+                          }
                           className="w-full rounded border border-slate-300 px-2 py-1.5"
                         />
                       </label>
                     </div>
 
                     <label className="block text-sm text-slate-700">
-                      <span className="mb-1 block font-medium">Special colors with factory</span>
-                      <textarea
-                        value={details.special_colors || ""}
-                        onChange={(e) => setDetails({ ...details, special_colors: e.target.value })}
-                        rows={3}
-                        className="w-full rounded border border-slate-300 px-2 py-1.5"
-                      />
-                    </label>
-
-                    <label className="block text-sm text-slate-700">
-                      <span className="mb-1 block font-medium">Factory notes</span>
-                      <textarea
-                        value={details.factory_notes || ""}
-                        onChange={(e) => setDetails({ ...details, factory_notes: e.target.value })}
-                        rows={3}
-                        className="w-full rounded border border-slate-300 px-2 py-1.5"
-                      />
-                    </label>
-
-                    <label className="block text-sm text-slate-700">
                       <span className="mb-1 block font-medium">Internal notes</span>
                       <textarea
                         value={details.internal_notes || ""}
-                        onChange={(e) => setDetails({ ...details, internal_notes: e.target.value })}
+                        onChange={(e) =>
+                          setDetails({ ...details, internal_notes: e.target.value })
+                        }
                         rows={3}
                         className="w-full rounded border border-slate-300 px-2 py-1.5"
                       />
@@ -440,7 +410,9 @@ export default function SpecialOrdersPage() {
                       <span className="mb-1 block font-medium">Internal updates</span>
                       <textarea
                         value={details.internal_updates || ""}
-                        onChange={(e) => setDetails({ ...details, internal_updates: e.target.value })}
+                        onChange={(e) =>
+                          setDetails({ ...details, internal_updates: e.target.value })
+                        }
                         rows={4}
                         className="w-full rounded border border-slate-300 px-2 py-1.5"
                         placeholder="Add timeline updates, progress changes, and internal follow-ups"
@@ -455,68 +427,6 @@ export default function SpecialOrdersPage() {
                       >
                         {saving ? "Saving..." : "Save Changes"}
                       </button>
-                    </div>
-
-                    <div className="rounded border border-slate-200 p-3">
-                      <p className="text-sm font-semibold text-slate-900">QuickBooks Invoice</p>
-                      <div className="mt-2 flex flex-col gap-2 md:flex-row">
-                        <input
-                          value={invoiceNumberInput}
-                          onChange={(e) => setInvoiceNumberInput(e.target.value)}
-                          placeholder="Invoice number (DocNumber)"
-                          className="flex-1 rounded border border-slate-300 px-2 py-1.5 text-sm"
-                        />
-                        <button
-                          onClick={linkInvoice}
-                          disabled={linkingInvoice}
-                          className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                          {linkingInvoice ? "Linking..." : "Link Invoice"}
-                        </button>
-                      </div>
-                      {autoLinkingInvoice ? <p className="mt-2 text-xs text-slate-500">Auto-linking invoice...</p> : null}
-
-                      {details.invoiceSummary ? (
-                        <div className="mt-3 rounded bg-slate-50 p-3 text-sm">
-                          <p><span className="font-semibold">Invoice:</span> {details.invoiceSummary.docNumber || "—"}</p>
-                          <p><span className="font-semibold">Customer:</span> {details.invoiceSummary.customer || "—"}</p>
-                          <p>
-                            <span className="font-semibold">Status:</span>{" "}
-                            {details.invoiceSummary.paid ? (
-                              <span className="text-emerald-700">Paid off</span>
-                            ) : (
-                              <span className="text-amber-700">Not paid</span>
-                            )}
-                          </p>
-                          <p><span className="font-semibold">Total:</span> {money(details.invoiceSummary.total)}</p>
-                          <p><span className="font-semibold">Balance:</span> {money(details.invoiceSummary.balance)}</p>
-
-                          <div className="mt-3 overflow-x-auto">
-                            <table className="min-w-full text-xs">
-                              <thead>
-                                <tr className="border-b border-slate-200 text-left">
-                                  <th className="px-2 py-1">Description</th>
-                                  <th className="px-2 py-1 text-right">Qty</th>
-                                  <th className="px-2 py-1 text-right">Unit</th>
-                                  <th className="px-2 py-1 text-right">Amount</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {details.invoiceSummary.lineItems.map((line, idx) => (
-                                  <tr key={`${line.description}-${idx}`} className="border-b border-slate-100">
-                                    <td className="px-2 py-1">{line.description}</td>
-                                    <td className="px-2 py-1 text-right">{line.quantity}</td>
-                                    <td className="px-2 py-1 text-right">{money(line.unitPrice)}</td>
-                                    <td className="px-2 py-1 text-right">{money(line.amount)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-xs text-slate-500">No linked invoice yet.</p>
-                      )}
                     </div>
 
                     <div className="rounded border border-slate-200 p-3">
@@ -546,18 +456,31 @@ export default function SpecialOrdersPage() {
                           <p className="text-xs text-slate-500">No documents uploaded.</p>
                         ) : (
                           details.documents.map((doc) => (
-                            <div key={doc.id} className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm">
+                            <div
+                              key={doc.id}
+                              className="flex items-center justify-between rounded border border-slate-200 p-2 text-sm"
+                            >
                               <div>
                                 <p className="font-medium text-slate-800">{doc.file_name}</p>
-                                {doc.upload_notes ? <p className="text-xs text-slate-500">{doc.upload_notes}</p> : null}
+                                {doc.upload_notes ? (
+                                  <p className="text-xs text-slate-500">{doc.upload_notes}</p>
+                                ) : null}
                               </div>
                               <div className="flex items-center gap-2">
                                 {doc.signedUrl ? (
-                                  <a href={doc.signedUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                                  <a
+                                    href={doc.signedUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-blue-600 hover:underline"
+                                  >
                                     Open
                                   </a>
                                 ) : null}
-                                <button onClick={() => deleteDocument(doc.id)} className="text-red-600 hover:underline">
+                                <button
+                                  onClick={() => deleteDocument(doc.id)}
+                                  className="text-red-600 hover:underline"
+                                >
                                   Delete
                                 </button>
                               </div>
