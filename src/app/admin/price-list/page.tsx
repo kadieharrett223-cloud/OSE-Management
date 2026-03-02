@@ -527,7 +527,7 @@ export default function AdminPriceListPage() {
         <Sidebar activePage="Price List" />
 
         {/* Main Content */}
-        <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
+        <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 hide-scrollbar overflow-x-hidden">
             {/* Chrome-style Tabs */}
             <div className="bg-slate-800 border-b border-slate-700 px-8">
               <div className="flex gap-1">
@@ -795,26 +795,26 @@ export default function AdminPriceListPage() {
                     </div>
 
                     {/* Items Table - Desktop View */}
-                    <div className="hidden md:block overflow-x-auto">
-                      <table className="min-w-[1700px] w-full divide-y divide-slate-100 text-xs border-collapse">
+                    <div className="hidden md:block w-full">
+                      <table className="w-full divide-y divide-slate-100 text-xs border-collapse">
                         <thead className="bg-slate-50">
                           <tr>
-                            <th className="pl-3 pr-0.5 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
-                            <th className="px-2 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">Description</th>
-                            <th className="px-2 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
-                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
-                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Quantity</th>
-                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff +105%</th>
-                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean Frt</th>
-                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Importing</th>
-                            <th className="px-2 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Zone 5</th>
-                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Per Unit</th>
-                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost w/Shipping</th>
-                            <th className="px-2 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin %</th>
-                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell Price</th>
-                            <th className="px-2 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List Price</th>
-                            <th className="px-2 py-2 text-right font-semibold text-emerald-700 whitespace-nowrap">Profit</th>
-                            <th className="px-2 py-2 text-right font-semibold text-orange-600 whitespace-nowrap">Weight (lbs)</th>
+                            <th className="pl-2 pr-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
+                            <th className="px-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap text-xs">Description</th>
+                            <th className="px-1 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Qty</th>
+                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Import</th>
+                            <th className="px-1 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Zone 5</th>
+                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Per Unit</th>
+                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost+Ship</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin</th>
+                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell</th>
+                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List</th>
+                            <th className="px-1 py-2 text-right font-semibold text-emerald-700 whitespace-nowrap">Profit</th>
+                            <th className="px-1 py-2 text-right font-semibold text-orange-600 whitespace-nowrap text-xs">Weight</th>
                             <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap sticky right-0 bg-slate-50 z-10">Action</th>
                           </tr>
                         </thead>
@@ -827,7 +827,7 @@ export default function AdminPriceListPage() {
                             <React.Fragment key={item.id}>
                             <tr className={isEditing ? "bg-blue-50/70 border-l-4 border-l-blue-500" : "hover:bg-slate-50"}>
                               {/* Item No (INPUT) */}
-                              <td className="pl-3 pr-0.5 py-1.5 sticky left-0 bg-inherit z-10">
+                              <td className="pl-2 pr-0.5 py-1 sticky left-0 bg-inherit z-10">
                                 {isEditing ? (
                                   <input
                                     type="text"
@@ -841,7 +841,7 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* Description (INPUT) */}
-                              <td className="px-2 py-1.5 text-left">
+                              <td className="px-1 py-1 text-left">
                                 {isEditing ? (
                                   <input
                                     type="text"
@@ -859,7 +859,7 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* Supplier (INPUT) */}
-                              <td className="px-2 py-1.5 text-left">
+                              <td className="px-1 py-1 text-left">
                                 {isEditing ? (
                                   <input
                                     type="text"
@@ -873,7 +873,7 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* FOB Cost (INPUT) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
                                     type="number"
@@ -888,7 +888,7 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* Quantity (INPUT) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
                                     type="number"
@@ -903,12 +903,12 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* Tariff +105% (DERIVED) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-slate-600 text-xs">${money(displayItem.tariff_105)}</span>
                               </td>
 
                               {/* Ocean Frt (INPUT) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
                                     type="number"
@@ -923,7 +923,7 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* Importing (INPUT) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
                                     type="number"
@@ -938,7 +938,7 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* Zone 5 Shipping (INPUT) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
                                     type="number"
@@ -953,17 +953,17 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* Per Unit (DERIVED) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-slate-600 text-xs">${money(displayItem.per_unit)}</span>
                               </td>
 
                               {/* Cost w/ Shipping (DERIVED) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-slate-600 text-xs font-semibold">${money(displayItem.cost_with_shipping)}</span>
                               </td>
 
                               {/* Margin % (INPUT) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
                                     type="number"
@@ -981,22 +981,22 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* Sell Price (DERIVED) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-slate-600 text-xs">${money(displayItem.sell_price)}</span>
                               </td>
 
                               {/* List Price (DERIVED) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-slate-600 text-xs">${money(displayItem.list_price)}</span>
                               </td>
 
                               {/* Profit (DERIVED) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-emerald-700 text-xs font-bold">${money(displayItem.profit)}</span>
                               </td>
 
                               {/* Weight (EDITABLE) */}
-                              <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
                                     type="number"
@@ -1012,7 +1012,7 @@ export default function AdminPriceListPage() {
                               </td>
 
                               {/* Action */}
-                              <td className="px-1 py-1.5 text-center whitespace-nowrap sticky right-0 bg-inherit z-10">
+                              <td className="px-1 py-1 text-center whitespace-nowrap sticky right-0 bg-inherit z-10">
                                 {isEditing ? (
                                   <div className="flex gap-1 justify-center items-center">
                                     <button
