@@ -166,9 +166,14 @@ export default function SpecialOrdersPage() {
         }),
       });
       const result = await res.json();
-      if (res.status === 409 && result?.requiresSelection && Array.isArray(result?.candidates)) {
-        setInvoiceCandidates(result.candidates as InvoiceCandidate[]);
-        setSelectedCandidateId(result.candidates?.[0]?.id || "");
+      if (res.status === 409) {
+        const candidates = Array.isArray(result?.candidates) ? (result.candidates as InvoiceCandidate[]) : [];
+        if (candidates.length > 0) {
+          setInvoiceCandidates(candidates);
+          setSelectedCandidateId(candidates[0]?.id || "");
+        } else {
+          alert(result?.error || "Multiple invoices found but no selectable options were returned.");
+        }
         return;
       }
       if (!res.ok) throw new Error(result?.error || "Failed to create special order");

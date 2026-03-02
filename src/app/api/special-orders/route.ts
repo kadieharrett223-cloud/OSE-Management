@@ -87,14 +87,17 @@ export async function POST(req: NextRequest) {
     try {
       const query = `SELECT * FROM Invoice WHERE DocNumber = '${escapeQboString(invoiceNumber)}' MAXRESULTS 50`;
       const qboData = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
-      const matches = (qboData?.QueryResponse?.Invoice || []) as any[];
+      const rawInvoices = qboData?.QueryResponse?.Invoice;
+      const matches = Array.isArray(rawInvoices) ? rawInvoices : rawInvoices ? [rawInvoices] : [];
 
       if (matches.length > 1 && !invoiceId) {
+        const candidates = matches.map(mapInvoiceCandidate).filter((c) => c.id);
         return NextResponse.json(
           {
             error: "Multiple invoices found for this invoice number. Please select one.",
             requiresSelection: true,
-            candidates: matches.map(mapInvoiceCandidate),
+            candidates,
+            duplicateCount: candidates.length,
           },
           { status: 409 }
         );
