@@ -1065,32 +1065,40 @@ export default function AdminPriceListPage() {
                         </tbody>
                       </table>
 
-                      {/* Price Calculator Panel (when editing) */}
+                      {/* Price Calculator Button (when editing) */}
                       {editingId && editingItem && (
-                        <div className="mt-4">
-                          <button
-                            onClick={() => setShowCalculator(!showCalculator)}
-                            className="w-full flex items-center justify-between px-4 py-3 bg-blue-100 hover:bg-blue-150 rounded-lg border border-blue-300 transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg">🧮</span>
-                              <span className="font-semibold text-slate-900">Price Calculator</span>
-                              <span className="text-xs text-slate-600">
-                                (Current: {editingItem.margin ? `${(editingItem.margin * 100).toFixed(2)}%` : '—'})
-                              </span>
+                        <button
+                          onClick={() => setShowCalculator(true)}
+                          className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-colors font-semibold text-sm z-50"
+                        >
+                          <span className="text-lg">🧮</span>
+                          Price Calc
+                        </button>
+                      )}
+
+                      {/* Price Calculator Modal */}
+                      {showCalculator && editingItem && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+                            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">🧮</span>
+                                <div>
+                                  <h2 className="text-lg font-semibold text-slate-900">{editingItem.item_no}</h2>
+                                  <p className="text-xs text-slate-600">Margin: {editingItem.margin ? `${(editingItem.margin * 100).toFixed(2)}%` : '—'}</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => setShowCalculator(false)}
+                                className="text-slate-400 hover:text-slate-600"
+                                type="button"
+                              >
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
                             </div>
-                            <svg
-                              className={`w-5 h-5 text-slate-600 transition-transform ${showCalculator ? 'rotate-180' : ''}`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                          
-                          {showCalculator && (
-                            <div className="mt-2 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                            <div className="p-6">
                               <PriceCalculator
                                 finalCost={editingItem.cost_with_shipping || null}
                                 currentMargin={editingItem.margin}
@@ -1107,10 +1115,11 @@ export default function AdminPriceListPage() {
                                   });
                                   // Show success feedback
                                   setStatus(`✓ Margin updated to ${(margin * 100).toFixed(2)}% (Sell: $${sellPrice.toFixed(2)})`);
+                                  setShowCalculator(false);
                                 }}
                               />
                             </div>
-                          )}
+                          </div>
                         </div>
                       )}
                     </div>
