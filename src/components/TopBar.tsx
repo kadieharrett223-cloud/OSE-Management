@@ -73,65 +73,17 @@ export function TopBar() {
       try {
         setLoadingPaymentsToday(true);
         const today = getLocalDateYmd();
-        const [invoiceRes, paymentRes] = await Promise.all([
-          fetch(`/api/qbo/invoice/query?startDate=${today}&endDate=${today}&status=paid&allPages=true&_=${Date.now()}`),
-          fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`),
-        ]);
+        const invoiceRes = await fetch(
+          `/api/qbo/invoice/query?startDate=${today}&endDate=${today}&status=paid&allPages=true&totalsOnly=true&_=${Date.now()}`
+        );
 
-        const paidByInvoiceId = new Map<string, number>();
-        let unlinkedAppliedPayments = 0;
-
-        if (invoiceRes.ok) {
-          const invoiceData = await invoiceRes.json();
-          const invoices = invoiceData?.invoices || [];
-          invoices.forEach((inv: any) => {
-            const id = String(inv?.Id || "");
-            if (!id) return;
-            const total = Number(inv?.TotalAmt) || 0;
-            const balance = Number(inv?.Balance) || 0;
-            const paid = Math.max(total - balance, 0);
-            if (paid > 0) paidByInvoiceId.set(id, paid);
-          });
+        if (!invoiceRes.ok) {
+          throw new Error("Failed to fetch paid invoices total");
         }
 
-        if (paymentRes.ok) {
-          const paymentData = await paymentRes.json();
-          const payments = paymentData?.payments || [];
-
-          payments.forEach((payment: any) => {
-            const total = Number(payment?.TotalAmt) || 0;
-            const unapplied = Number(payment?.UnappliedAmt) || 0;
-            const applied = Math.max(total - unapplied, 0);
-            if (applied <= 0) return;
-
-            let linkedAmount = 0;
-            const lines = Array.isArray(payment?.Line) ? payment.Line : [];
-            lines.forEach((line: any) => {
-              const amount = Number(line?.Amount) || 0;
-              const linked = Array.isArray(line?.LinkedTxn) ? line.LinkedTxn : [];
-              const invoiceLinks = linked.filter((txn: any) => txn?.TxnType === "Invoice" && txn?.TxnId);
-              if (invoiceLinks.length === 0) return;
-
-              linkedAmount += amount;
-              invoiceLinks.forEach((txn: any) => {
-                const invId = String(txn.TxnId);
-                if (!invId) return;
-                const current = paidByInvoiceId.get(invId) || 0;
-                // Prefer the higher known value to avoid undercounting partial link data.
-                paidByInvoiceId.set(invId, Math.max(current, amount));
-              });
-            });
-
-            const remainingApplied = Math.max(applied - linkedAmount, 0);
-            if (remainingApplied > 0) {
-              unlinkedAppliedPayments += remainingApplied;
-            }
-          });
-        }
-
-        const linkedInvoiceTotal = Array.from(paidByInvoiceId.values()).reduce((sum, value) => sum + value, 0);
-        const combinedTotal = linkedInvoiceTotal + unlinkedAppliedPayments;
-        if (isMounted) setPaymentsTodayTotal(combinedTotal);
+        const invoiceData = await invoiceRes.json();
+        const todayTotalPaid = Number(invoiceData?.totalPaid || 0);
+        if (isMounted) setPaymentsTodayTotal(todayTotalPaid);
       } catch (error) {
         if (isMounted) setPaymentsTodayTotal(0);
       } finally {
@@ -173,7 +125,7 @@ export function TopBar() {
             <span className="text-blue-100/70">Checking…</span>
           )}
           <div className="flex items-center gap-1 rounded-full border border-blue-400/30 bg-blue-900/30 px-2 py-1 text-xs font-semibold text-blue-100 sm:ml-2 sm:gap-2 sm:px-3">
-            <span className="hidden sm:inline">Payments Today Total:</span>
+            <span className="hidden sm:inline">Sales Today:</span>
             <span className="sm:hidden">Today:</span>
             <span className="text-xs font-bold text-white sm:text-sm">
               {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
