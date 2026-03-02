@@ -7,6 +7,40 @@ function escapeQboString(value: string) {
   return value.replace(/'/g, "''");
 }
 
+function getSalesRep(invoice: any): string | null {
+  if (!invoice) return null;
+
+  if (Array.isArray(invoice.CustomField)) {
+    const repField = invoice.CustomField.find(
+      (f: any) => f?.Name === "Sales Rep" || f?.Name === "SalesRep" || f?.Name === "Rep"
+    );
+    if (repField?.StringValue) return String(repField.StringValue).trim();
+  }
+
+  const memo = invoice?.CustomerMemo?.value;
+  if (memo) {
+    const repMatch = String(memo).match(/Rep:\s*([A-Za-z\s/]+)/i);
+    if (repMatch?.[1]) return repMatch[1].trim();
+  }
+
+  return null;
+}
+
+function mapInvoiceCandidate(invoice: any) {
+  const total = Number(invoice?.TotalAmt) || 0;
+  const balance = Number(invoice?.Balance) || 0;
+  return {
+    id: String(invoice?.Id || ""),
+    docNumber: String(invoice?.DocNumber || ""),
+    txnDate: invoice?.TxnDate || null,
+    customer: invoice?.CustomerRef?.name || null,
+    total,
+    balance,
+    paid: balance <= 0,
+    salesRep: getSalesRep(invoice),
+  };
+}
+
 export async function GET() {
   try {
     const session: any = await getSession();
@@ -36,6 +70,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const invoiceNumber = (body?.invoiceNumber || "").toString().trim();
+    const invoiceId = (body?.invoiceId || "").toString().trim();
 
     if (!invoiceNumber) {
       return NextResponse.json(
@@ -44,17 +79,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch invoice from QBO to get customer name and other details
+    // Fetch invoice(s) from QBO to get customer name and handle duplicate doc numbers.
     let qboInvoice: any = null;
     let qboInvoiceId: string | null = null;
     let customerName: string | null = null;
 
     try {
-      const query = `SELECT * FROM Invoice WHERE DocNumber = '${escapeQboString(invoiceNumber)}' MAXRESULTS 1`;
+      const query = `SELECT * FROM Invoice WHERE DocNumber = '${escapeQboString(invoiceNumber)}' MAXRESULTS 50`;
       const qboData = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
-      qboInvoice = qboData?.QueryResponse?.Invoice?.[0];
+      const matches = (qboData?.QueryResponse?.Invoice || []) as any[];
+
+      if (matches.length > 1 && !invoiceId) {
+        return NextResponse.json(
+          {
+            error: "Multiple invoices found for this invoice number. Please select one.",
+            requiresSelection: true,
+            candidates: matches.map(mapInvoiceCandidate),
+          },
+          { status: 409 }
+        );
+      }
+
+      if (invoiceId) {
+        qboInvoice = matches.find((inv: any) => String(inv?.Id) === invoiceId) || null;
+        if (!qboInvoice) {
+          return NextResponse.json({ error: "Selected invoice was not found. Please try again." }, { status: 400 });
+        }
+      } else {
+        qboInvoice = matches[0] || null;
+      }
+
       if (qboInvoice?.Id) {
-        qboInvoiceId = qboInvoice.Id;
+        qboInvoiceId = String(qboInvoice.Id);
         customerName = qboInvoice?.CustomerRef?.name || null;
       }
     } catch (err) {

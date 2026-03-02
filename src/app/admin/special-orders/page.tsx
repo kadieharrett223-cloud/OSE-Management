@@ -45,6 +45,17 @@ type InvoiceSummary = {
   lineItems: Array<{ description: string; quantity: number; unitPrice: number; amount: number }>;
 };
 
+type InvoiceCandidate = {
+  id: string;
+  docNumber: string;
+  txnDate: string | null;
+  customer: string | null;
+  total: number;
+  balance: number;
+  paid: boolean;
+  salesRep: string | null;
+};
+
 type SpecialOrderDetails = SpecialOrder & {
   documents: SpecialOrderDocument[];
   invoiceSummary: InvoiceSummary | null;
@@ -81,6 +92,8 @@ export default function SpecialOrdersPage() {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [uploadNotes, setUploadNotes] = useState("");
   const [noteEntry, setNoteEntry] = useState("");
+  const [invoiceCandidates, setInvoiceCandidates] = useState<InvoiceCandidate[]>([]);
+  const [selectedCandidateId, setSelectedCandidateId] = useState("");
 
   const selectedOrder = useMemo(() => orders.find((o) => o.id === selectedId) || null, [orders, selectedId]);
 
@@ -132,6 +145,10 @@ export default function SpecialOrdersPage() {
 
   async function createOrder(e: React.FormEvent) {
     e.preventDefault();
+    await submitCreateOrder();
+  }
+
+  async function submitCreateOrder(selectedInvoiceId?: string) {
     const invoiceNumber = newInvoiceNumber.trim();
     if (!invoiceNumber) {
       alert("Enter a QuickBooks invoice number.");
@@ -143,15 +160,25 @@ export default function SpecialOrdersPage() {
       const res = await fetch("/api/special-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invoiceNumber }),
+        body: JSON.stringify({
+          invoiceNumber,
+          ...(selectedInvoiceId ? { invoiceId: selectedInvoiceId } : {}),
+        }),
       });
       const result = await res.json();
+      if (res.status === 409 && result?.requiresSelection && Array.isArray(result?.candidates)) {
+        setInvoiceCandidates(result.candidates as InvoiceCandidate[]);
+        setSelectedCandidateId(result.candidates?.[0]?.id || "");
+        return;
+      }
       if (!res.ok) throw new Error(result?.error || "Failed to create special order");
 
       const created = result.data as SpecialOrder;
       setOrders((prev) => [created, ...prev]);
       setSelectedId(created.id);
       setNewInvoiceNumber("");
+      setInvoiceCandidates([]);
+      setSelectedCandidateId("");
     } catch (error: any) {
       alert(error?.message || "Failed to create special order");
     } finally {
@@ -260,11 +287,44 @@ export default function SpecialOrdersPage() {
                   <input
                     type="text"
                     value={newInvoiceNumber}
-                    onChange={(e) => setNewInvoiceNumber(e.target.value)}
+                    onChange={(e) => {
+                      setNewInvoiceNumber(e.target.value);
+                      if (invoiceCandidates.length > 0) {
+                        setInvoiceCandidates([]);
+                        setSelectedCandidateId("");
+                      }
+                    }}
                     placeholder="QuickBooks invoice number"
                     className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 placeholder-slate-400"
                     required
                   />
+                  {invoiceCandidates.length > 0 && (
+                    <div className="space-y-2 rounded border border-amber-200 bg-amber-50 p-2">
+                      <p className="text-xs font-medium text-amber-800">
+                        Multiple invoices match this number. Select the exact invoice.
+                      </p>
+                      <select
+                        value={selectedCandidateId}
+                        onChange={(e) => setSelectedCandidateId(e.target.value)}
+                        className="w-full rounded border border-amber-300 bg-white px-2 py-1.5 text-sm text-slate-900"
+                      >
+                        {invoiceCandidates.map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {candidate.docNumber || "-"} | {candidate.customer || "No customer"} |{" "}
+                            {candidate.txnDate || "-"} | {money(candidate.total)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={!selectedCandidateId || creatingOrder}
+                        onClick={() => submitCreateOrder(selectedCandidateId)}
+                        className="w-full rounded bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
+                      >
+                        Use Selected Invoice
+                      </button>
+                    </div>
+                  )}
                   <button
                     disabled={creatingOrder}
                     className="w-full rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
