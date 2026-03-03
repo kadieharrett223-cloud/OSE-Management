@@ -105,10 +105,8 @@ export default function ViewPO() {
   const [categories, setCategories] = useState<any[]>([]);
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
   const [creatingProduct, setCreatingProduct] = useState(false);
-  const [draggedLineId, setDraggedLineId] = useState<string | null>(null);
   const [editingLineItems, setEditingLineItems] = useState(false);
   const [tempLines, setTempLines] = useState<any[]>([]);
-  const [draggedLineIndex, setDraggedLineIndex] = useState<number | null>(null);
   const [newProductForm, setNewProductForm] = useState({
     item_no: "",
     description: "",
@@ -560,18 +558,16 @@ export default function ViewPO() {
     }
   };
 
-  const handleReorderLineItems = async (fromId: string, toId: string) => {
-    if (!po?.id || fromId === toId) return;
+  const moveLineItem = async (currentIndex: number, direction: 'up' | 'down') => {
+    if (!po?.id) return;
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= po.lines.length) return;
 
     try {
       const updatedLines = [...po.lines];
-      const fromIndex = updatedLines.findIndex(l => l.id === fromId);
-      const toIndex = updatedLines.findIndex(l => l.id === toId);
-
-      if (fromIndex < 0 || toIndex < 0) return;
-
-      const [removed] = updatedLines.splice(fromIndex, 1);
-      updatedLines.splice(toIndex, 0, removed);
+      const [removed] = updatedLines.splice(currentIndex, 1);
+      updatedLines.splice(newIndex, 0, removed);
 
       const newTotal = updatedLines.reduce((sum, line) => sum + line.line_total, 0);
 
@@ -588,10 +584,10 @@ export default function ViewPO() {
 
       const result = await res.json();
       setPO(result.data);
-      setDraggedLineId(null);
+      loadChangeLogs(po.id);
     } catch (error) {
       console.error("Error reordering line items:", error);
-      setDraggedLineId(null);
+      alert("Failed to reorder line items");
     }
   };
 
@@ -603,7 +599,6 @@ export default function ViewPO() {
   const cancelInlineEditingLineItems = () => {
     setEditingLineItems(false);
     setTempLines([]);
-    setDraggedLineIndex(null);
   };
 
   const updateTempLine = (index: number, field: string, value: any) => {
@@ -1183,46 +1178,23 @@ export default function ViewPO() {
                   {po.lines.map((line, index) => (
                     <tr
                       key={line.id}
-                      draggable
-                      onDragStart={() => setDraggedLineId(line.id)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => {
-                        if (draggedLineId && draggedLineId !== line.id) {
-                          handleReorderLineItems(draggedLineId, line.id);
-                        }
-                      }}
-                      onDragEnd={() => setDraggedLineId(null)}
-                      className={`border-b border-gray-300 cursor-move ${
-                        draggedLineId === line.id ? 'bg-blue-100 opacity-70' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                      }`}
+                      className={`border-b border-gray-300 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     >
                       <td className="border-r border-gray-300 px-1 py-1.5 text-center text-slate-400 align-top select-none">
                         <div className="flex flex-col items-center gap-0.5 print:hidden">
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (index > 0) {
-                                const prevLine = po.lines[index - 1];
-                                handleReorderLineItems(line.id, prevLine.id);
-                              }
-                            }}
+                            onClick={() => moveLineItem(index, 'up')}
                             disabled={index === 0}
                             className={`text-xs leading-none ${index === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'}`}
                             title="Move up"
                           >
                             ▲
                           </button>
-                          <span className="cursor-move hover:text-slate-600">⋮</span>
+                          <span className="text-slate-400">⋮</span>
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (index < po.lines.length - 1) {
-                                const nextLine = po.lines[index + 1];
-                                handleReorderLineItems(line.id, nextLine.id);
-                              }
-                            }}
+                            onClick={() => moveLineItem(index, 'down')}
                             disabled={index === po.lines.length - 1}
                             className={`text-xs leading-none ${index === po.lines.length - 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'}`}
                             title="Move down"
@@ -1327,40 +1299,22 @@ export default function ViewPO() {
                 {tempLines.map((line, index) => (
                   <div
                     key={line.id || index}
-                    draggable
-                    onDragStart={() => setDraggedLineIndex(index)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => {
-                      if (draggedLineIndex !== null && draggedLineIndex !== index) {
-                        reorderTempLine(draggedLineIndex, index);
-                        setDraggedLineIndex(null);
-                      }
-                    }}
-                    onDragEnd={() => setDraggedLineIndex(null)}
-                    className={`grid grid-cols-12 gap-0 border-b border-slate-200 ${
-                      draggedLineIndex === index ? 'bg-blue-100 opacity-70' : 'hover:bg-slate-50'
-                    } cursor-move`}
+                    className="grid grid-cols-12 gap-0 border-b border-slate-200 hover:bg-slate-50"
                   >
                     <div className="col-span-1 border-r border-slate-200 p-2 flex flex-col items-center justify-center gap-0.5">
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (index > 0) reorderTempLine(index, index - 1);
-                        }}
+                        onClick={() => reorderTempLine(index, index - 1)}
                         disabled={index === 0}
                         className={`text-xs ${index === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'}`}
                         title="Move up"
                       >
                         ▲
                       </button>
-                      <span className="text-slate-400 cursor-move">⋮</span>
+                      <span className="text-slate-400">⋮</span>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (index < tempLines.length - 1) reorderTempLine(index, index + 1);
-                        }}
+                        onClick={() => reorderTempLine(index, index + 1)}
                         disabled={index === tempLines.length - 1}
                         className={`text-xs ${index === tempLines.length - 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'}`}
                         title="Move down"
