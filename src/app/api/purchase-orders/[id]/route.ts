@@ -177,6 +177,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         payments:purchase_order_payments(*)
       `)
       .eq("id", params.id)
+      .order("line_number", { foreignTable: "purchase_order_lines", ascending: true })
       .single();
 
     if (error) throw error;
@@ -273,6 +274,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         payments:purchase_order_payments(*)
       `)
       .eq("id", params.id)
+      .order("line_number", { foreignTable: "purchase_order_lines", ascending: true })
       .single();
 
     if (fetchError) throw fetchError;
