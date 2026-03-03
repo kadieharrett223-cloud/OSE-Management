@@ -1181,28 +1181,7 @@ export default function ViewPO() {
                       className={`border-b border-gray-300 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     >
                       <td className="border-r border-gray-300 px-1 py-1.5 text-center text-slate-400 align-top select-none">
-                        <div className="flex flex-col items-center gap-0.5 print:hidden">
-                          <button
-                            type="button"
-                            onClick={() => moveLineItem(index, 'up')}
-                            disabled={index === 0}
-                            className={`text-xs leading-none ${index === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'}`}
-                            title="Move up"
-                          >
-                            ▲
-                          </button>
-                          <span className="text-slate-400">⋮</span>
-                          <button
-                            type="button"
-                            onClick={() => moveLineItem(index, 'down')}
-                            disabled={index === po.lines.length - 1}
-                            className={`text-xs leading-none ${index === po.lines.length - 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'}`}
-                            title="Move down"
-                          >
-                            ▼
-                          </button>
-                        </div>
-                        <span className="hidden print:inline">⋮</span>
+                        <span>⋮</span>
                       </td>
                       <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-700 align-top">
                         {index + 1}
