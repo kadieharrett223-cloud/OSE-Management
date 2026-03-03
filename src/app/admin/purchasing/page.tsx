@@ -370,8 +370,20 @@ export default function PurchasingPage() {
       });
       const payload = await res.json();
       if (res.ok) {
+        // Refresh the PO list to get updated payment data
         await fetchPOs();
-        setSelectedPO(null);
+        
+        // Find and re-select the updated PO to keep the modal open with fresh data
+        const updatedPOsRes = await fetch("/api/purchase-orders");
+        const updatedPOsPayload = await updatedPOsRes.json();
+        if (updatedPOsPayload.ok) {
+          const updatedPO = updatedPOsPayload.data?.find((po: any) => po.id === poId);
+          if (updatedPO) {
+            setSelectedPO(updatedPO);
+          }
+        }
+        
+        // Reset the form
         setPaymentForm({
           payment_date: new Date().toISOString().split("T")[0],
           amount: 0,
@@ -379,6 +391,9 @@ export default function PurchasingPage() {
           reference_number: "",
           notes: "",
         });
+        
+        // Show success message
+        alert(`Payment of $${paymentForm.amount} added successfully!`);
       } else {
         alert(payload.error || "Failed to add payment");
       }
@@ -1395,11 +1410,43 @@ export default function PurchasingPage() {
 
             {selectedPO && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-                <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl space-y-4">
+                <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl space-y-4">
                   <h2 className="text-xl font-semibold text-slate-900">Add Payment</h2>
                   <p className="text-sm text-slate-600">
-                    PO: {selectedPO.po_number} | Balance: ${money(balance(selectedPO))}
+                    PO: {selectedPO.po_number} | Total: ${money(selectedPO.total_amount || 0)} | Balance: ${money(balance(selectedPO))}
                   </p>
+                  
+                  {/* Existing Payments */}
+                  {selectedPO.payments && selectedPO.payments.length > 0 && (
+                    <div className="border-t border-slate-200 pt-4">
+                      <h3 className="text-sm font-semibold text-slate-700 mb-2">Payment History</h3>
+                      <div className="space-y-2">
+                        {selectedPO.payments.map((payment: any) => (
+                          <div key={payment.id} className="flex justify-between items-start text-xs bg-slate-50 rounded p-2">
+                            <div>
+                              <div className="font-medium text-slate-900">
+                                ${money(payment.amount)} - {payment.payment_method || 'N/A'}
+                              </div>
+                              <div className="text-slate-600">
+                                {new Date(payment.payment_date).toLocaleDateString()}
+                                {payment.reference_number && ` • Ref: ${payment.reference_number}`}
+                              </div>
+                              {payment.notes && (
+                                <div className="text-slate-500 mt-1">{payment.notes}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-2 text-xs font-semibold text-slate-700">
+                        Total Paid: ${money(selectedPO.payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Payment Form */}
+                  <div className="border-t border-slate-200 pt-4 space-y-4">
+                    <h3 className="text-sm font-semibold text-slate-700">New Payment</h3>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Payment Date</label>
                     <input
@@ -1453,6 +1500,8 @@ export default function PurchasingPage() {
                       rows={2}
                     />
                   </div>
+                  </div>
+                  
                   <div className="flex gap-2 pt-4">
                     <button
                       type="button"
