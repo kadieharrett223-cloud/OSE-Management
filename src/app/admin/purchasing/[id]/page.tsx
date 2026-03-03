@@ -27,6 +27,7 @@ interface PurchaseOrder {
   status: string;
   notes?: string;
   updated_at?: string;
+  generated_pdf_path?: string | null;
   lines: Array<{
     id: string;
     sku?: string;
@@ -137,6 +138,7 @@ export default function ViewPO() {
     notes: "",
   });
   const [savingPayment, setSavingPayment] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
 
   const loadChangeLogs = async (poId: string) => {
     setLoadingChangeLogs(true);
@@ -850,6 +852,45 @@ export default function ViewPO() {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!po?.id) return;
+
+    setDownloadingPDF(true);
+    try {
+      // If PDF doesn't exist, generate it first
+      if (!po.generated_pdf_path) {
+        const generateRes = await fetch(`/api/purchase-orders/${po.id}/generate-pdf`, {
+          method: "POST",
+        });
+
+        if (!generateRes.ok) {
+          const data = await generateRes.json();
+          alert(data.error || "Failed to generate PDF");
+          return;
+        }
+
+        const result = await generateRes.json();
+        if (result.ok && result.data?.path) {
+          // Update PO with new path
+          setPO({ ...po, generated_pdf_path: result.data.path });
+          
+          // Download the newly generated PDF
+          const pdfUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/generated-po-pdfs/${result.data.path}`;
+          window.open(pdfUrl, "_blank");
+        }
+      } else {
+        // Download existing PDF
+        const pdfUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/generated-po-pdfs/${po.generated_pdf_path}`;
+        window.open(pdfUrl, "_blank");
+      }
+    } catch (error) {
+      console.error("Download PDF error:", error);
+      alert("Failed to download PDF");
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-6xl mx-auto p-8">
@@ -873,6 +914,13 @@ export default function ViewPO() {
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
             >
               Send Email
+            </button>
+            <button
+              onClick={handleDownloadPDF}
+              disabled={downloadingPDF}
+              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {downloadingPDF ? "Downloading..." : "Download PDF"}
             </button>
             <button
               onClick={handlePrint}
