@@ -173,15 +173,26 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .from("purchase_orders")
       .select(`
         *,
-        lines:purchase_order_lines(*),
-        payments:purchase_order_payments(*)
+        lines:purchase_order_lines(*)
       `)
       .eq("id", params.id)
-      .order("line_number", { foreignTable: "purchase_order_lines", ascending: true })
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ ok: true, data });
+
+    // Fetch payments separately
+    const { data: payments } = await supabase
+      .from("purchase_order_payments")
+      .select("*")
+      .eq("purchase_order_id", params.id)
+      .order("payment_date", { ascending: false });
+
+    // Sort lines by line_number
+    if (data && data.lines) {
+      data.lines.sort((a: any, b: any) => (a.line_number || 0) - (b.line_number || 0));
+    }
+
+    return NextResponse.json({ ok: true, data: { ...data, payments: payments || [] } });
   } catch (error: any) {
     console.error("Fetch purchase order error:", error);
     return NextResponse.json({ error: error.message || "Not found" }, { status: 404 });
@@ -270,14 +281,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .from("purchase_orders")
       .select(`
         *,
-        lines:purchase_order_lines(*),
-        payments:purchase_order_payments(*)
+        lines:purchase_order_lines(*)
       `)
       .eq("id", params.id)
-      .order("line_number", { foreignTable: "purchase_order_lines", ascending: true })
       .single();
 
     if (fetchError) throw fetchError;
+
+    // Fetch payments
+    const { data: updatedPayments } = await supabase
+      .from("purchase_order_payments")
+      .select("*")
+      .eq("purchase_order_id", params.id)
+      .order("payment_date", { ascending: false });
+
+    // Sort lines by line_number
+    if (updatedPO && updatedPO.lines) {
+      updatedPO.lines.sort((a: any, b: any) => (a.line_number || 0) - (b.line_number || 0));
+    }
+
+    const finalPO = { ...updatedPO, payments: updatedPayments || [] };
 
     const changes = buildChangeEntries(existingPO, updatedPO, Array.isArray(lines) ? lines : undefined);
     if (changes.length > 0) {
@@ -297,7 +320,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
     }
 
-    return NextResponse.json({ ok: true, data: updatedPO });
+    return NextResponse.json({ ok: true, data: finalPO });
   } catch (error: any) {
     console.error("Update purchase order error:", error);
     return NextResponse.json({ error: error.message || "Failed to update" }, { status: 500 });
