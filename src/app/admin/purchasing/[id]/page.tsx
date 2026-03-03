@@ -1196,8 +1196,41 @@ export default function ViewPO() {
                         draggedLineId === line.id ? 'bg-blue-100 opacity-70' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                       }`}
                     >
-                      <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-400 hover:text-slate-600 align-top select-none">
-                        ⋮
+                      <td className="border-r border-gray-300 px-1 py-1.5 text-center text-slate-400 align-top select-none">
+                        <div className="flex flex-col items-center gap-0.5 print:hidden">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (index > 0) {
+                                const prevLine = po.lines[index - 1];
+                                handleReorderLineItems(line.id, prevLine.id);
+                              }
+                            }}
+                            disabled={index === 0}
+                            className={`text-xs leading-none ${index === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'}`}
+                            title="Move up"
+                          >
+                            ▲
+                          </button>
+                          <span className="cursor-move hover:text-slate-600">⋮</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (index < po.lines.length - 1) {
+                                const nextLine = po.lines[index + 1];
+                                handleReorderLineItems(line.id, nextLine.id);
+                              }
+                            }}
+                            disabled={index === po.lines.length - 1}
+                            className={`text-xs leading-none ${index === po.lines.length - 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'}`}
+                            title="Move down"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                        <span className="hidden print:inline">⋮</span>
                       </td>
                       <td className="border-r border-gray-300 px-2 py-1.5 text-center text-slate-700 align-top">
                         {index + 1}
@@ -1308,7 +1341,33 @@ export default function ViewPO() {
                       draggedLineIndex === index ? 'bg-blue-100 opacity-70' : 'hover:bg-slate-50'
                     } cursor-move`}
                   >
-                    <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center text-slate-400 hover:text-slate-600">⋮</div>
+                    <div className="col-span-1 border-r border-slate-200 p-2 flex flex-col items-center justify-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (index > 0) reorderTempLine(index, index - 1);
+                        }}
+                        disabled={index === 0}
+                        className={`text-xs ${index === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'}`}
+                        title="Move up"
+                      >
+                        ▲
+                      </button>
+                      <span className="text-slate-400 cursor-move">⋮</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (index < tempLines.length - 1) reorderTempLine(index, index + 1);
+                        }}
+                        disabled={index === tempLines.length - 1}
+                        className={`text-xs ${index === tempLines.length - 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:text-blue-600'}`}
+                        title="Move down"
+                      >
+                        ▼
+                      </button>
+                    </div>
                     <div className="col-span-2 border-r border-slate-200 p-2">
                       <input
                         type="text"
