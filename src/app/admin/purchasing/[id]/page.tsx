@@ -1456,7 +1456,7 @@ export default function ViewPO() {
         </div>
 
         {/* Page 2: Standard Terms and Specifications */}
-        <div className="border border-slate-300 bg-white p-6 mt-8 print:mt-2">
+        <div className="border border-slate-300 bg-white p-6 mt-8 print:mt-0 print:break-before-page">
           <h2 className="text-base font-bold text-slate-900 mb-3">Page 2 - NOTES</h2>
 
           <div className="space-y-2 text-xs text-slate-800">
