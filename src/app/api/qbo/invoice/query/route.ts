@@ -25,9 +25,9 @@ export async function GET(req: NextRequest) {
     if (status) {
       // QuickBooks uses Balance = 0 for paid invoices
       if (status.toLowerCase() === "paid") {
-        conditions.push("Balance = '0'");
+        conditions.push("Balance = 0");
       } else if (status.toLowerCase() === "unpaid") {
-        conditions.push("Balance > '0'");
+        conditions.push("Balance > 0");
       }
     }
 
