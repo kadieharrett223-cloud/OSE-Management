@@ -71,60 +71,38 @@ export function TopBar() {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchPaymentsToday = async () => {
+    const fetchPaymentsAndFunds = async () => {
       try {
         setLoadingPaymentsToday(true);
-        const today = getLocalDateYmd();
-        const invoiceRes = await fetch(
-          `/api/qbo/invoice/query?startDate=${today}&endDate=${today}&status=paid&allPages=true&totalsOnly=true&_=${Date.now()}`
-        );
-
-        if (!invoiceRes.ok) {
-          throw new Error("Failed to fetch paid invoices total");
-        }
-
-        const invoiceData = await invoiceRes.json();
-        const todayTotalPaid = Number(invoiceData?.totalPaid || 0);
-        if (isMounted) setPaymentsTodayTotal(todayTotalPaid);
-      } catch (error) {
-        if (isMounted) setPaymentsTodayTotal(0);
-      } finally {
-        if (isMounted) setLoadingPaymentsToday(false);
-      }
-    };
-
-    fetchPaymentsToday();
-    const interval = setInterval(fetchPaymentsToday, 30000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchUndepositedFunds = async () => {
-      try {
         setLoadingUndepositedFunds(true);
         const res = await fetch(`/api/qbo/undeposited-funds?_=${Date.now()}`);
 
         if (!res.ok) {
-          throw new Error("Failed to fetch undeposited funds");
+          throw new Error("Failed to fetch payments and funds");
         }
 
         const data = await res.json();
-        const totalUndeposited = Number(data?.undeposited || 0);
-        if (isMounted) setUndepositedFunds(totalUndeposited);
+        const todayTotal = Number(data?.todaySalesTotal || 0);
+        const undeposited = Number(data?.undeposited || 0);
+        if (isMounted) {
+          setPaymentsTodayTotal(todayTotal);
+          setUndepositedFunds(undeposited);
+        }
       } catch (error) {
-        if (isMounted) setUndepositedFunds(0);
+        if (isMounted) {
+          setPaymentsTodayTotal(0);
+          setUndepositedFunds(0);
+        }
       } finally {
-        if (isMounted) setLoadingUndepositedFunds(false);
+        if (isMounted) {
+          setLoadingPaymentsToday(false);
+          setLoadingUndepositedFunds(false);
+        }
       }
     };
 
-    fetchUndepositedFunds();
-    const interval = setInterval(fetchUndepositedFunds, 30000);
+    fetchPaymentsAndFunds();
+    const interval = setInterval(fetchPaymentsAndFunds, 30000);
     return () => {
       isMounted = false;
       clearInterval(interval);
