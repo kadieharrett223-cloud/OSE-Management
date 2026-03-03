@@ -71,22 +71,40 @@ export function TopBar() {
   useEffect(() => {
     let isMounted = true;
 
+    const getLocalDateYmd = () => {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
     const fetchPaymentsAndFunds = async () => {
       try {
         setLoadingPaymentsToday(true);
         setLoadingUndepositedFunds(true);
-        const res = await fetch(`/api/qbo/undeposited-funds?_=${Date.now()}`);
+        const today = getLocalDateYmd();
+        const [invoiceRes, undepositedRes] = await Promise.all([
+          fetch(`/api/qbo/invoice/query?startDate=${today}&endDate=${today}&status=paid&allPages=true&totalsOnly=true&_=${Date.now()}`),
+          fetch(`/api/qbo/query?query=${encodeURIComponent("SELECT * FROM Account WHERE Name = 'Undeposited Funds'")}&_=${Date.now()}`),
+        ]);
 
-        if (!res.ok) {
-          throw new Error("Failed to fetch payments and funds");
+        if (invoiceRes.ok) {
+          const data = await invoiceRes.json();
+          const totalPaid = Number(data?.totalPaid || 0);
+          if (isMounted) setPaymentsTodayTotal(totalPaid);
+        } else {
+          if (isMounted) setPaymentsTodayTotal(0);
         }
 
-        const data = await res.json();
-        const todayTotal = Number(data?.todaySalesTotal || 0);
-        const undeposited = Number(data?.undeposited || 0);
-        if (isMounted) {
-          setPaymentsTodayTotal(todayTotal);
-          setUndepositedFunds(undeposited);
+        if (undepositedRes.ok) {
+          const data = await undepositedRes.json();
+          const accounts = data?.QueryResponse?.Account || [];
+          const account = accounts[0];
+          const undeposited = account ? Number(account.CurrentBalance || 0) : 0;
+          if (isMounted) setUndepositedFunds(undeposited);
+        } else {
+          if (isMounted) setUndepositedFunds(0);
         }
       } catch (error) {
         if (isMounted) {

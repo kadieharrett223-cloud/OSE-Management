@@ -993,17 +993,17 @@ export default function Dashboard() {
               </div>
 
               <div className="bg-white border border-slate-200 rounded-lg p-4">
+                <div className="text-xs font-medium text-slate-500 mb-3">Sales This Week</div>
+                <div className="text-[26px] font-semibold text-slate-900 leading-none">${money(Math.round(animatedSalesWeekTotal))}</div>
+                <div className="mt-2 text-xs text-slate-600 leading-relaxed">Mon to today (paid invoices)</div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-lg p-4">
                 <div className="text-xs font-medium text-slate-500 mb-3">Sales This Month</div>
                 <div className="text-[26px] font-semibold text-slate-900 leading-none">
                   ${money(Math.round(animatedMonthlyTotal))}
                 </div>
                 <div className="mt-2 text-xs text-slate-600 leading-relaxed">${money(lastMonthTotal)} last month</div>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-lg p-4">
-                <div className="text-xs font-medium text-slate-500 mb-3">Sales This Week</div>
-                <div className="text-[26px] font-semibold text-slate-900 leading-none">${money(Math.round(animatedSalesWeekTotal))}</div>
-                <div className="mt-2 text-xs text-slate-600 leading-relaxed">Mon to today (paid invoices)</div>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-lg p-4">
