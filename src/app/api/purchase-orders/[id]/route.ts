@@ -125,7 +125,7 @@ const buildLineItemChanges = (oldLinesRaw: any[], newLinesRaw: any[]): ChangeEnt
   return changes;
 };
 
-const buildChangeEntries = (oldPO: any, newPO: any): ChangeEntry[] => {
+const buildChangeEntries = (oldPO: any, newPO: any, incomingLines?: any[]): ChangeEntry[] => {
   const trackedFields: Array<{ key: string; label: string }> = [
     { key: "po_number", label: "PO Number" },
     { key: "vendor_name", label: "Vendor Name" },
@@ -154,7 +154,7 @@ const buildChangeEntries = (oldPO: any, newPO: any): ChangeEntry[] => {
   }
 
   const oldLines = oldPO?.lines || [];
-  const newLines = newPO?.lines || [];
+  const newLines = Array.isArray(incomingLines) ? incomingLines : (newPO?.lines || []);
   changes.push(...buildLineItemChanges(oldLines, newLines));
 
   return changes;
@@ -277,7 +277,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (fetchError) throw fetchError;
 
-    const changes = buildChangeEntries(existingPO, updatedPO);
+    const changes = buildChangeEntries(existingPO, updatedPO, Array.isArray(lines) ? lines : undefined);
     if (changes.length > 0) {
       const changedBy = session?.user?.email || session?.user?.name || "Unknown";
       const { error: logError } = await supabase
