@@ -71,56 +71,60 @@ export function TopBar() {
   useEffect(() => {
     let isMounted = true;
 
-    const getLocalDateYmd = () => {
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const dd = String(now.getDate()).padStart(2, "0");
-      return `${yyyy}-${mm}-${dd}`;
-    };
-
-    const fetchPaymentsAndFunds = async () => {
+    const fetchPaymentsToday = async () => {
       try {
         setLoadingPaymentsToday(true);
-        setLoadingUndepositedFunds(true);
         const today = getLocalDateYmd();
-        const [invoiceRes, undepositedRes] = await Promise.all([
-          fetch(`/api/qbo/invoice/query?startDate=${today}&endDate=${today}&status=paid&allPages=true&totalsOnly=true&_=${Date.now()}`),
-          fetch(`/api/qbo/query?query=${encodeURIComponent("SELECT * FROM Account WHERE Name = 'Undeposited Funds'")}&_=${Date.now()}`),
-        ]);
+        const paymentRes = await fetch(
+          `/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`
+        );
 
-        if (invoiceRes.ok) {
-          const data = await invoiceRes.json();
-          const totalPaid = Number(data?.totalPaid || 0);
-          if (isMounted) setPaymentsTodayTotal(totalPaid);
-        } else {
-          if (isMounted) setPaymentsTodayTotal(0);
+        if (!paymentRes.ok) {
+          throw new Error("Failed to fetch payments");
         }
 
-        if (undepositedRes.ok) {
-          const data = await undepositedRes.json();
-          const accounts = data?.QueryResponse?.Account || [];
-          const account = accounts[0];
-          const undeposited = account ? Number(account.CurrentBalance || 0) : 0;
-          if (isMounted) setUndepositedFunds(undeposited);
-        } else {
-          if (isMounted) setUndepositedFunds(0);
-        }
+        const paymentData = await paymentRes.json();
+        const totalApplied = Number(paymentData?.totalApplied || 0);
+        if (isMounted) setPaymentsTodayTotal(totalApplied);
       } catch (error) {
-        if (isMounted) {
-          setPaymentsTodayTotal(0);
-          setUndepositedFunds(0);
-        }
+        if (isMounted) setPaymentsTodayTotal(0);
       } finally {
-        if (isMounted) {
-          setLoadingPaymentsToday(false);
-          setLoadingUndepositedFunds(false);
-        }
+        if (isMounted) setLoadingPaymentsToday(false);
       }
     };
 
-    fetchPaymentsAndFunds();
-    const interval = setInterval(fetchPaymentsAndFunds, 30000);
+    fetchPaymentsToday();
+    const interval = setInterval(fetchPaymentsToday, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUndepositedFunds = async () => {
+      try {
+        setLoadingUndepositedFunds(true);
+        const res = await fetch(`/api/qbo/undeposited-funds?_=${Date.now()}`);
+
+        if (!res.ok) {
+          throw new Error("Failed to fetch undeposited funds");
+        }
+
+        const data = await res.json();
+        const totalUndeposited = Number(data?.undeposited || 0);
+        if (isMounted) setUndepositedFunds(totalUndeposited);
+      } catch (error) {
+        if (isMounted) setUndepositedFunds(0);
+      } finally {
+        if (isMounted) setLoadingUndepositedFunds(false);
+      }
+    };
+
+    fetchUndepositedFunds();
+    const interval = setInterval(fetchUndepositedFunds, 30000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -153,8 +157,8 @@ export function TopBar() {
             <span className="text-blue-100/70">Checking…</span>
           )}
           <div className="flex items-center gap-1 rounded-full border border-blue-400/30 bg-blue-900/30 px-2 py-1 text-xs font-semibold text-blue-100 sm:ml-2 sm:gap-2 sm:px-3">
-            <span className="hidden sm:inline">Sales Today:</span>
-            <span className="sm:hidden">Today:</span>
+            <span className="hidden sm:inline">Payments Received:</span>
+            <span className="sm:hidden">Received:</span>
             <span className="text-xs font-bold text-white sm:text-sm">
               {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
             </span>
