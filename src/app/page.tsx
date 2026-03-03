@@ -340,7 +340,7 @@ export default function Dashboard() {
     fetchUnpaidInvoices();
   }, []);
 
-  // Fetch sales for current and previous month (paid invoices only)
+  // Fetch sales (payments received) for current and previous month
   useEffect(() => {
     const fetchMonthlySales = async () => {
       setLoadingMonthlyTotal(true);
@@ -364,38 +364,42 @@ export default function Dashboard() {
         const lastMonthStartDate = `${lastMonthStart.getFullYear()}-${String(lastMonthStart.getMonth() + 1).padStart(2, "0")}-01`;
         const lastMonthEndDate = `${lastMonthEnd.getFullYear()}-${String(lastMonthEnd.getMonth() + 1).padStart(2, "0")}-${String(lastMonthEnd.getDate()).padStart(2, "0")}`;
 
-        const [todaySalesResponse, weekSalesResponse, paidInvoicesResponse, lastMonthResponse] = await Promise.all([
-          fetch(`/api/qbo/invoice/query?startDate=${todayDate}&endDate=${todayDate}&status=paid&allPages=true&totalsOnly=true`),
-          fetch(`/api/qbo/invoice/query?startDate=${weekStartDate}&endDate=${endDate}&status=paid&allPages=true&totalsOnly=true`),
-          fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid&allPages=true&totalsOnly=true`),
-          fetch(`/api/qbo/invoice/query?startDate=${lastMonthStartDate}&endDate=${lastMonthEndDate}&status=paid&allPages=true&totalsOnly=true`),
+        const [todayPaymentResponse, weekPaymentResponse, monthPaymentResponse, lastMonthPaymentResponse] = await Promise.all([
+          fetch(`/api/qbo/payment/query?startDate=${todayDate}&endDate=${todayDate}&_=${Date.now()}`),
+          fetch(`/api/qbo/payment/query?startDate=${weekStartDate}&endDate=${endDate}&_=${Date.now()}`),
+          fetch(`/api/qbo/payment/query?startDate=${startDate}&endDate=${endDate}&_=${Date.now()}`),
+          fetch(`/api/qbo/payment/query?startDate=${lastMonthStartDate}&endDate=${lastMonthEndDate}&_=${Date.now()}`),
         ]);
 
-        if (!todaySalesResponse.ok || !weekSalesResponse.ok || !paidInvoicesResponse.ok || !lastMonthResponse.ok) {
-          throw new Error("Failed to fetch monthly sales");
+        if (!todayPaymentResponse.ok || !weekPaymentResponse.ok || !monthPaymentResponse.ok || !lastMonthPaymentResponse.ok) {
+          throw new Error("Failed to fetch payment data");
         }
 
-        const [todaySalesData, weekSalesData, paidInvoicesData, lastMonthData] = await Promise.all([
-          todaySalesResponse.json(),
-          weekSalesResponse.json(),
-          paidInvoicesResponse.json(),
-          lastMonthResponse.json(),
+        const [todayPaymentData, weekPaymentData, monthPaymentData, lastMonthPaymentData] = await Promise.all([
+          todayPaymentResponse.json(),
+          weekPaymentResponse.json(),
+          monthPaymentResponse.json(),
+          lastMonthPaymentResponse.json(),
         ]);
 
-        const todayTotalPaid = Number(todaySalesData.totalPaid || 0);
-        const weekTotalPaid = Number(weekSalesData.totalPaid || 0);
-        const paidInvoicesTotal = Number(paidInvoicesData.totalPaid || 0);
-        const lastMonthTotalPaid = Number(lastMonthData.totalPaid || 0);
+        const todayTotalApplied = Number(todayPaymentData.totalApplied || 0);
+        const weekTotalApplied = Number(weekPaymentData.totalApplied || 0);
+        const monthTotalApplied = Number(monthPaymentData.totalApplied || 0);
+        const lastMonthTotalApplied = Number(lastMonthPaymentData.totalApplied || 0);
 
         console.log(
-          `[dashboard] Sales fetched: today ${todayTotalPaid}, week ${weekTotalPaid}, month ${paidInvoicesTotal}, last month ${lastMonthTotalPaid}`
+          `[dashboard] Payments received: today ${todayTotalApplied}, week ${weekTotalApplied}, month ${monthTotalApplied}, last month ${lastMonthTotalApplied}`
         );
-        setSalesTodayTotal(todayTotalPaid);
-        setSalesWeekTotal(weekTotalPaid);
-        setMonthlyTotal(paidInvoicesTotal);
-        setLastMonthTotal(lastMonthTotalPaid);
+        setSalesTodayTotal(todayTotalApplied);
+        setSalesWeekTotal(weekTotalApplied);
+        setMonthlyTotal(monthTotalApplied);
+        setLastMonthTotal(lastMonthTotalApplied);
       } catch (error) {
         console.error("Error fetching monthly sales:", error);
+        console.error("Full error details:", {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         setSalesTodayTotal(0);
         setSalesWeekTotal(0);
         setMonthlyTotal(0);
@@ -988,14 +992,14 @@ export default function Dashboard() {
                   ${money(Math.round(animatedSalesTodayTotal))}
                 </div>
                 <div className="mt-2 text-xs text-slate-600 leading-relaxed">
-                  Paid invoices today
+                  Payments received today
                 </div>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-lg p-4">
                 <div className="text-xs font-medium text-slate-500 mb-3">Sales This Week</div>
                 <div className="text-[26px] font-semibold text-slate-900 leading-none">${money(Math.round(animatedSalesWeekTotal))}</div>
-                <div className="mt-2 text-xs text-slate-600 leading-relaxed">Mon to today (paid invoices)</div>
+                <div className="mt-2 text-xs text-slate-600 leading-relaxed">Mon to today (payments received)</div>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-lg p-4">
