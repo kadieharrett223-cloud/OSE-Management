@@ -370,17 +370,18 @@ export default function PurchasingPage() {
       });
       const payload = await res.json();
       if (res.ok) {
-        // Refresh the PO list to get updated payment data
-        await fetchPOs();
+        // Fetch the updated PO with its payments
+        const updatedPORes = await fetch(`/api/purchase-orders/${poId}`);
+        const updatedPOPayload = await updatedPORes.json();
         
-        // Find and re-select the updated PO to keep the modal open with fresh data
-        const updatedPOsRes = await fetch("/api/purchase-orders");
-        const updatedPOsPayload = await updatedPOsRes.json();
-        if (updatedPOsPayload.ok) {
-          const updatedPO = updatedPOsPayload.data?.find((po: any) => po.id === poId);
-          if (updatedPO) {
-            setSelectedPO(updatedPO);
-          }
+        console.log("Updated PO payload:", updatedPOPayload);
+        
+        if (updatedPOPayload.ok && updatedPOPayload.data) {
+          // Update the selectedPO with fresh data including payments
+          setSelectedPO(updatedPOPayload.data);
+          
+          // Also refresh the PO list in the background
+          fetchPOs();
         }
         
         // Reset the form
@@ -1417,6 +1418,12 @@ export default function PurchasingPage() {
                   </p>
                   
                   {/* Existing Payments */}
+                  {(() => {
+                    console.log("Payment modal - selectedPO:", selectedPO);
+                    console.log("Payment modal - payments array:", selectedPO.payments);
+                    console.log("Payment modal - payments length:", selectedPO.payments?.length);
+                    return null;
+                  })()}
                   {selectedPO.payments && selectedPO.payments.length > 0 && (
                     <div className="border-t border-slate-200 pt-4">
                       <h3 className="text-sm font-semibold text-slate-700 mb-2">Payment History</h3>
