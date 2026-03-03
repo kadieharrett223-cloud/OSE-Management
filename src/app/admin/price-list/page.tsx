@@ -846,7 +846,14 @@ export default function AdminPriceListPage() {
                 </div>
 
                 {/* Price List by Category */}
-                {itemsByCategory.map(({ category, items: categoryItems }) => (
+                {itemsByCategory.map(({ category, items: categoryItems }) => {
+                  // Check if this category contains KATOOL items (check first item's supplier)
+                  const isCategoryKatool = categoryItems.length > 0 && (
+                    categoryItems[0].supplier?.toUpperCase().includes('KATOOL') ||
+                    categoryItems[0].supplier?.toUpperCase().includes('KATA')
+                  );
+                  
+                  return (
                   <section key={category.id} className="rounded-2xl bg-white shadow-md ring-1 ring-slate-200">
                     {/* Category Header */}
                     <div className="border-b-2 border-blue-600 bg-blue-50 px-6 py-3">
@@ -863,25 +870,13 @@ export default function AdminPriceListPage() {
                             <th className="pl-2 pr-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
                             <th className="px-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap text-xs">Description</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
-                            {!category.tariff_exempt && (
-                              <>
-                                <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Qty</th>
-                                <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff</th>
-                                <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean</th>
-                                <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Import</th>
-                              </>
-                            )}
-                            <th className="px-1 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Zone 5</th>
-                            {!category.tariff_exempt && (
-                              <>
-                                <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Per Unit</th>
-                                <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost+Ship</th>
-                              </>
-                            )}
-                            {category.tariff_exempt && (
-                              <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Price Delivered</th>
-                            )}
+                            {!isCategoryKatool && <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>}
+                            {!isCategoryKatool && <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Qty</th>}
+                            {!isCategoryKatool && <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff</th>}
+                            {!isCategoryKatool && <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean</th>}
+                            {!isCategoryKatool && <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Import</th>}
+                            <th className="px-1 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Shipping</th>
+                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost+Ship</th>
                             <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List</th>
@@ -894,6 +889,7 @@ export default function AdminPriceListPage() {
                           {categoryItems.map((item, index) => {
                             const isEditing = editingId === item.id;
                             const displayItem = isEditing && editingItem ? editingItem : item;
+                            const isKatool = displayItem.supplier?.toUpperCase().includes('KATOOL') || displayItem.supplier?.toUpperCase().includes('KATA');
                             
                             return (
                             <React.Fragment key={item.id}>
@@ -944,7 +940,8 @@ export default function AdminPriceListPage() {
                                 )}
                               </td>
 
-                              {/* FOB Cost (INPUT) */}
+                              {/* FOB Cost (INPUT) - hidden for KATOOL */}
+                              {!isCategoryKatool && (
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
@@ -958,10 +955,10 @@ export default function AdminPriceListPage() {
                                   <span className="text-blue-900 font-semibold">${money(item.fob_cost)}</span>
                                 )}
                               </td>
+                              )}
 
-                              {!category.tariff_exempt && (
-                              <>
-                              {/* Quantity (INPUT) */}
+                              {/* Quantity (INPUT) - hidden for KATOOL */}
+                              {!isCategoryKatool && (
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
@@ -975,13 +972,17 @@ export default function AdminPriceListPage() {
                                   <span className="text-blue-900">{item.quantity ?? "—"}</span>
                                 )}
                               </td>
+                              )}
 
-                              {/* Tariff +105% (DERIVED) */}
+                              {/* Tariff +105% (DERIVED) - hidden for KATOOL */}
+                              {!isCategoryKatool && (
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-slate-600 text-xs">${money(displayItem.tariff_105)}</span>
                               </td>
+                              )}
 
-                              {/* Ocean Frt (INPUT) */}
+                              {/* Ocean Frt (INPUT) - hidden for KATOOL */}
+                              {!isCategoryKatool && (
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
@@ -995,8 +996,10 @@ export default function AdminPriceListPage() {
                                   <span className="text-blue-900">${money(displayItem.ocean_frt)}</span>
                                 )}
                               </td>
+                              )}
 
-                              {/* Importing (INPUT) */}
+                              {/* Importing (INPUT) - hidden for KATOOL */}
+                              {!isCategoryKatool && (
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
@@ -1010,7 +1013,6 @@ export default function AdminPriceListPage() {
                                   <span className="text-blue-900">${money(displayItem.importing)}</span>
                                 )}
                               </td>
-                              </>
                               )}
 
                               {/* Zone 5 Shipping (INPUT) - labeled as "Price Delivered" for tariff exempt */}
@@ -1027,19 +1029,12 @@ export default function AdminPriceListPage() {
                                   <span className="font-semibold text-amber-700">${money(item.zone5_shipping)}</span>
                                 )}
                               </td>
-                              {!category.tariff_exempt && (
-                              <>
-                              {/* Per Unit (DERIVED) */}
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                <span className="text-slate-600 text-xs">${money(displayItem.per_unit)}</span>
-                              </td>
 
-                              {/* Cost w/ Shipping (DERIVED) */}
+
+                              {/* Cost w/ Shipping (DERIVED) - always visible */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-slate-600 text-xs font-semibold">${money(displayItem.cost_with_shipping)}</span>
                               </td>
-                              </>
-                              )}
 
                               {/* Margin % (INPUT) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
@@ -1295,7 +1290,8 @@ export default function AdminPriceListPage() {
                       )}
                     </div>
                   </section>
-                ))}
+                  );
+                })}
               </>
             )}
 
