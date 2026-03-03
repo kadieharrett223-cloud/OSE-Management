@@ -118,6 +118,7 @@ export default function PurchasingPage() {
     reference_number: "",
     notes: "",
   });
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
 
   const [supplierModal, setSupplierModal] = useState<{open:boolean, mode:"create"|"edit", supplier?: Supplier|null}>({open:false, mode:"create"});
   const [supplierForm, setSupplierForm] = useState<Supplier>({
@@ -361,46 +362,86 @@ export default function PurchasingPage() {
     }
   }
 
-  async function handleAddPayment(poId: string) {
+  function resetPaymentForm() {
+    setPaymentForm({
+      payment_date: new Date().toISOString().split("T")[0],
+      amount: 0,
+      payment_method: "",
+      reference_number: "",
+      notes: "",
+    });
+    setEditingPaymentId(null);
+  }
+
+  async function refreshSelectedPO(poId: string) {
+    const updatedPORes = await fetch(`/api/purchase-orders/${poId}`);
+    const updatedPOPayload = await updatedPORes.json();
+    if (updatedPOPayload.ok && updatedPOPayload.data) {
+      setSelectedPO(updatedPOPayload.data);
+    }
+    await fetchPOs();
+  }
+
+  function startEditingPayment(payment: any) {
+    setEditingPaymentId(payment.id);
+    setPaymentForm({
+      payment_date: payment.payment_date || new Date().toISOString().split("T")[0],
+      amount: Number(payment.amount) || 0,
+      payment_method: payment.payment_method || "",
+      reference_number: payment.reference_number || "",
+      notes: payment.notes || "",
+    });
+  }
+
+  async function handleDeletePayment(poId: string, paymentId: string) {
+    if (!confirm("Delete this payment?")) return;
+
     try {
-      const res = await fetch(`/api/purchase-orders/${poId}/payments`, {
-        method: "POST",
+      const res = await fetch(`/api/purchase-orders/${poId}/payments/${paymentId}`, {
+        method: "DELETE",
+      });
+      const payload = await res.json();
+
+      if (res.ok) {
+        if (editingPaymentId === paymentId) {
+          resetPaymentForm();
+        }
+        await refreshSelectedPO(poId);
+        alert("Payment deleted successfully");
+      } else {
+        alert(payload.error || "Failed to delete payment");
+      }
+    } catch (error) {
+      console.error("Delete payment error:", error);
+      alert("Failed to delete payment");
+    }
+  }
+
+  async function handleSavePayment(poId: string) {
+    try {
+      const isEditing = Boolean(editingPaymentId);
+      const res = await fetch(
+        isEditing
+          ? `/api/purchase-orders/${poId}/payments/${editingPaymentId}`
+          : `/api/purchase-orders/${poId}/payments`,
+        {
+        method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(paymentForm),
       });
       const payload = await res.json();
+
       if (res.ok) {
-        // Fetch the updated PO with its payments
-        const updatedPORes = await fetch(`/api/purchase-orders/${poId}`);
-        const updatedPOPayload = await updatedPORes.json();
-        
-        console.log("Updated PO payload:", updatedPOPayload);
-        
-        if (updatedPOPayload.ok && updatedPOPayload.data) {
-          // Update the selectedPO with fresh data including payments
-          setSelectedPO(updatedPOPayload.data);
-          
-          // Also refresh the PO list in the background
-          fetchPOs();
-        }
-        
-        // Reset the form
-        setPaymentForm({
-          payment_date: new Date().toISOString().split("T")[0],
-          amount: 0,
-          payment_method: "",
-          reference_number: "",
-          notes: "",
-        });
-        
-        // Show success message
-        alert(`Payment of $${paymentForm.amount} added successfully!`);
+        await refreshSelectedPO(poId);
+        const amountMessage = Number(paymentForm.amount || 0).toFixed(2);
+        resetPaymentForm();
+        alert(isEditing ? "Payment updated successfully!" : `Payment of $${amountMessage} added successfully!`);
       } else {
-        alert(payload.error || "Failed to add payment");
+        alert(payload.error || (editingPaymentId ? "Failed to update payment" : "Failed to add payment"));
       }
     } catch (error) {
-      console.error("Add payment error:", error);
-      alert("Failed to add payment");
+      console.error("Save payment error:", error);
+      alert(editingPaymentId ? "Failed to update payment" : "Failed to add payment");
     }
   }
 
@@ -1421,12 +1462,6 @@ export default function PurchasingPage() {
                   </p>
                   
                   {/* Existing Payments */}
-                  {(() => {
-                    console.log("Payment modal - selectedPO:", selectedPO);
-                    console.log("Payment modal - payments array:", selectedPO.payments);
-                    console.log("Payment modal - payments length:", selectedPO.payments?.length);
-                    return null;
-                  })()}
                   {selectedPO.payments && selectedPO.payments.length > 0 && (
                     <div className="border-t border-slate-200 pt-4">
                       <h3 className="text-sm font-semibold text-slate-700 mb-2">Payment History</h3>
@@ -1445,6 +1480,22 @@ export default function PurchasingPage() {
                                 <div className="text-slate-500 mt-1">{payment.notes}</div>
                               )}
                             </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startEditingPayment(payment)}
+                                className="text-blue-600 hover:text-blue-700 font-semibold"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePayment(selectedPO.id, payment.id)}
+                                className="text-red-600 hover:text-red-700 font-semibold"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -1456,7 +1507,18 @@ export default function PurchasingPage() {
                   
                   {/* Payment Form */}
                   <div className="border-t border-slate-200 pt-4 space-y-4">
-                    <h3 className="text-sm font-semibold text-slate-700">New Payment</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-700">{editingPaymentId ? "Edit Payment" : "New Payment"}</h3>
+                      {editingPaymentId && (
+                        <button
+                          type="button"
+                          onClick={resetPaymentForm}
+                          className="text-xs font-semibold text-slate-600 hover:text-slate-800"
+                        >
+                          Cancel Edit
+                        </button>
+                      )}
+                    </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Payment Date</label>
                     <input
@@ -1541,17 +1603,20 @@ export default function PurchasingPage() {
                   <div className="flex gap-2 pt-4">
                     <button
                       type="button"
-                      onClick={() => setSelectedPO(null)}
+                      onClick={() => {
+                        resetPaymentForm();
+                        setSelectedPO(null);
+                      }}
                       className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleAddPayment(selectedPO.id)}
+                      onClick={() => handleSavePayment(selectedPO.id)}
                       className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                     >
-                      Add Payment
+                      {editingPaymentId ? "Save Payment" : "Add Payment"}
                     </button>
                   </div>
                 </div>

@@ -129,6 +129,16 @@ export default function ViewPO() {
   const [sendingNotification, setSendingNotification] = useState(false);
   const [changeLogs, setChangeLogs] = useState<POChangeLogEntry[]>([]);
   const [loadingChangeLogs, setLoadingChangeLogs] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<any>(null);
+  const [showPaymentEditModal, setShowPaymentEditModal] = useState(false);
+  const [paymentEditForm, setPaymentEditForm] = useState({
+    payment_date: "",
+    amount: 0,
+    payment_method: "",
+    reference_number: "",
+    notes: "",
+  });
+  const [savingPayment, setSavingPayment] = useState(false);
 
   const loadChangeLogs = async (poId: string) => {
     setLoadingChangeLogs(true);
@@ -770,6 +780,81 @@ export default function ViewPO() {
     );
   }
 
+  const handleEditPayment = (payment: any) => {
+    setEditingPayment(payment);
+    setPaymentEditForm({
+      payment_date: payment.payment_date,
+      amount: payment.amount,
+      payment_method: payment.payment_method || "",
+      reference_number: payment.reference_number || "",
+      notes: payment.notes || "",
+    });
+    setShowPaymentEditModal(true);
+  };
+
+  const handleSavePayment = async () => {
+    if (!po?.id || !editingPayment?.id) return;
+
+    setSavingPayment(true);
+    try {
+      const res = await fetch(`/api/purchase-orders/${po.id}/payments/${editingPayment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(paymentEditForm),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to update payment");
+        return;
+      }
+
+      // Refresh PO data
+      const poRes = await fetch(`/api/purchase-orders/${po.id}`);
+      const poPayload = await poRes.json();
+      if (poPayload.ok) {
+        setPO(poPayload.data);
+      }
+
+      setShowPaymentEditModal(false);
+      setEditingPayment(null);
+      alert("Payment updated successfully");
+    } catch (error) {
+      console.error("Save payment error:", error);
+      alert("Failed to update payment");
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!po?.id || !confirm("Are you sure you want to delete this payment?")) return;
+
+    try {
+      const res = await fetch(`/api/purchase-orders/${po.id}/payments/${paymentId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to delete payment");
+        return;
+      }
+
+      // Refresh PO data
+      const poRes = await fetch(`/api/purchase-orders/${po.id}`);
+      const poPayload = await poRes.json();
+      if (poPayload.ok) {
+        setPO(poPayload.data);
+      }
+
+      alert("Payment deleted successfully");
+    } catch (error) {
+      console.error("Delete payment error:", error);
+      alert("Failed to delete payment");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-6xl mx-auto p-8">
@@ -1311,6 +1396,7 @@ export default function ViewPO() {
                     <th className="px-2 py-1.5 text-left font-bold text-slate-900">Method</th>
                     <th className="px-2 py-1.5 text-left font-bold text-slate-900">Reference</th>
                     <th className="px-2 py-1.5 text-right font-bold text-slate-900">Amount</th>
+                    <th className="px-2 py-1.5 text-center font-bold text-slate-900">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1328,6 +1414,22 @@ export default function ViewPO() {
                       <td className="px-2 py-1.5 text-right font-semibold text-slate-900">
                         ${money(payment.amount)}
                       </td>
+                      <td className="px-2 py-1.5 text-center space-x-1">
+                        <button
+                          onClick={() => handleEditPayment(payment)}
+                          className="text-blue-600 hover:text-blue-800 font-semibold text-[9px] px-2 py-1 hover:bg-blue-50 rounded"
+                          title="Edit"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeletePayment(payment.id)}
+                          className="text-red-600 hover:text-red-800 font-semibold text-[9px] px-2 py-1 hover:bg-red-50 rounded"
+                          title="Delete"
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   <tr className="border-t-2 border-gray-400 bg-gray-100">
@@ -1337,6 +1439,7 @@ export default function ViewPO() {
                     <td className="px-2 py-1.5 text-right font-bold text-slate-900">
                       ${money(totalPaid)}
                     </td>
+                    <td></td>
                   </tr>
                 </tbody>
               </table>
@@ -2048,6 +2151,88 @@ export default function ViewPO() {
                 className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {creatingProduct ? "Creating..." : "Create Product"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPaymentEditModal && editingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+          <div className="w-full max-w-sm sm:max-w-md rounded-lg bg-white p-4 sm:p-6 shadow-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-slate-900 mb-4">Edit Payment</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Payment Date</label>
+                <input
+                  type="date"
+                  value={paymentEditForm.payment_date}
+                  onChange={(e) => setPaymentEditForm({ ...paymentEditForm, payment_date: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={paymentEditForm.amount}
+                  onChange={(e) => setPaymentEditForm({ ...paymentEditForm, amount: Number(e.target.value) })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Payment Method</label>
+                <select
+                  value={paymentEditForm.payment_method}
+                  onChange={(e) => setPaymentEditForm({ ...paymentEditForm, payment_method: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="">Select...</option>
+                  <option value="CHECK">Check</option>
+                  <option value="WIRE">Wire Transfer</option>
+                  <option value="ACH">ACH</option>
+                  <option value="CREDIT_CARD">Credit Card</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Reference Number</label>
+                <input
+                  type="text"
+                  value={paymentEditForm.reference_number}
+                  onChange={(e) => setPaymentEditForm({ ...paymentEditForm, reference_number: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Notes</label>
+                <textarea
+                  rows={3}
+                  value={paymentEditForm.notes}
+                  onChange={(e) => setPaymentEditForm({ ...paymentEditForm, notes: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPaymentEditModal(false);
+                  setEditingPayment(null);
+                }}
+                disabled={savingPayment}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePayment}
+                disabled={savingPayment}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingPayment ? "Saving..." : "Save Payment"}
               </button>
             </div>
           </div>
