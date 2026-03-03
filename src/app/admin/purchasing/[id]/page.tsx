@@ -36,6 +36,14 @@ interface PurchaseOrder {
     line_total: number;
     weight_lbs?: number;
   }>;
+  payments?: Array<{
+    id: string;
+    payment_date: string;
+    amount: number;
+    payment_method?: string;
+    reference_number?: string;
+    notes?: string;
+  }>;
 }
 
 interface POChangeLogEntry {
@@ -660,6 +668,10 @@ export default function ViewPO() {
     return date.toLocaleString();
   };
 
+  // Calculate payment totals
+  const totalPaid = (po.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+  const balanceDue = po.total_amount - totalPaid;
+
   const skuExists = Boolean(
     lineItemForm.sku && priceList.some((item) => (item.sku || item.item_no)?.toLowerCase() === lineItemForm.sku.toLowerCase())
   );
@@ -1151,6 +1163,26 @@ export default function ViewPO() {
                       ${money(po.total_amount)}
                     </td>
                   </tr>
+                  {po.payments && po.payments.length > 0 && (
+                    <>
+                      <tr className="border-t border-gray-300">
+                        <td colSpan={6} className="px-2 py-2 text-right text-xs font-bold text-emerald-700 uppercase tracking-wide">
+                          Total Paid
+                        </td>
+                        <td className="px-2 py-2 text-right text-sm font-bold text-emerald-700">
+                          ${money(totalPaid)}
+                        </td>
+                      </tr>
+                      <tr className="border-t border-gray-300">
+                        <td colSpan={6} className="px-2 py-2 text-right text-xs font-bold text-amber-700 uppercase tracking-wide">
+                          Balance Due
+                        </td>
+                        <td className="px-2 py-2 text-right text-sm font-bold text-amber-700">
+                          ${money(balanceDue)}
+                        </td>
+                      </tr>
+                    </>
+                  )}
                   <tr className="border-t border-gray-300">
                     <td colSpan={6} className="px-2 py-2 text-right text-[10px] font-semibold text-slate-700 uppercase tracking-wide">
                       Container Weight Remaining
@@ -1267,6 +1299,49 @@ export default function ViewPO() {
               </div>
             )}
           </div>
+
+          {/* Payment History Section */}
+          {po.payments && po.payments.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-300">
+              <h3 className="text-sm font-bold text-slate-900 mb-3">Payment History</h3>
+              <table className="w-full text-[10px]">
+                <thead>
+                  <tr className="bg-gray-100 border-b border-gray-300">
+                    <th className="px-2 py-1.5 text-left font-bold text-slate-900">Date</th>
+                    <th className="px-2 py-1.5 text-left font-bold text-slate-900">Method</th>
+                    <th className="px-2 py-1.5 text-left font-bold text-slate-900">Reference</th>
+                    <th className="px-2 py-1.5 text-right font-bold text-slate-900">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {po.payments.map((payment, index) => (
+                    <tr key={payment.id} className={`border-b border-gray-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                      <td className="px-2 py-1.5 text-slate-900">
+                        {new Date(payment.payment_date).toLocaleDateString()}
+                      </td>
+                      <td className="px-2 py-1.5 text-slate-900">
+                        {payment.payment_method || '—'}
+                      </td>
+                      <td className="px-2 py-1.5 text-slate-900">
+                        {payment.reference_number || '—'}
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-semibold text-slate-900">
+                        ${money(payment.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-gray-400 bg-gray-100">
+                    <td colSpan={3} className="px-2 py-1.5 text-right font-bold text-slate-900">
+                      Total Paid:
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-bold text-slate-900">
+                      ${money(totalPaid)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="mt-3 pt-2 border-t border-gray-300 text-center">
