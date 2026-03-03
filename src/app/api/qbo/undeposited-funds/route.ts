@@ -6,9 +6,9 @@ export async function GET(req: NextRequest) {
   try {
     const userId = await getUserId();
 
-    // Query for payments that have not been deposited yet
-    // Undeposited funds are payments where DepositToAccountRef is empty or null
-    const query = "SELECT * FROM Payment WHERE DepositToAccountRef IS NULL ORDERBY TxnDate DESC";
+    // Query for the "Undeposited Funds" account
+    // This is the actual source of truth for undeposited funds in QBO
+    const query = "SELECT * FROM Account WHERE Name = 'Undeposited Funds'";
 
     const data = await authorizedQboFetch<any>(
       `/query?query=${encodeURIComponent(query)}&minorversion=65`,
@@ -16,20 +16,15 @@ export async function GET(req: NextRequest) {
       userId || undefined
     );
 
-    const payments = data?.QueryResponse?.Payment || [];
+    const accounts = data?.QueryResponse?.Account || [];
+    const undepositedAccount = accounts[0];
 
-    // Sum up the applied amounts (money that's arrived but not yet deposited)
-    const undeposited = payments.reduce((sum: number, payment: any) => {
-      const total = Number(payment.TotalAmt) || 0;
-      const unapplied = Number(payment.UnappliedAmt) || 0;
-      const applied = Math.max(total - unapplied, 0);
-      return sum + applied;
-    }, 0);
+    // Get the current balance of the Undeposited Funds account
+    const undeposited = undepositedAccount ? Number(undepositedAccount.CurrentBalance || 0) : 0;
 
     return NextResponse.json({
       ok: true,
-      payments,
-      count: payments.length,
+      account: undepositedAccount,
       undeposited,
     });
   } catch (error: any) {
