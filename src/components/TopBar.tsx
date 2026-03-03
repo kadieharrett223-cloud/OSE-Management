@@ -8,6 +8,8 @@ export function TopBar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [paymentsTodayTotal, setPaymentsTodayTotal] = useState(0);
   const [loadingPaymentsToday, setLoadingPaymentsToday] = useState(true);
+  const [undepositedFunds, setUndepositedFunds] = useState(0);
+  const [loadingUndepositedFunds, setLoadingUndepositedFunds] = useState(true);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
@@ -99,6 +101,36 @@ export function TopBar() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUndepositedFunds = async () => {
+      try {
+        setLoadingUndepositedFunds(true);
+        const res = await fetch(`/api/qbo/undeposited-funds?_=${Date.now()}`);
+
+        if (!res.ok) {
+          throw new Error("Failed to fetch undeposited funds");
+        }
+
+        const data = await res.json();
+        const totalUndeposited = Number(data?.undeposited || 0);
+        if (isMounted) setUndepositedFunds(totalUndeposited);
+      } catch (error) {
+        if (isMounted) setUndepositedFunds(0);
+      } finally {
+        if (isMounted) setLoadingUndepositedFunds(false);
+      }
+    };
+
+    fetchUndepositedFunds();
+    const interval = setInterval(fetchUndepositedFunds, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <div className="sticky top-0 z-40 w-full border-b border-slate-900/60 bg-gradient-to-r from-slate-950 via-blue-900 to-blue-700 text-slate-100 print:hidden">
       <div className="mx-auto flex w-full flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
@@ -129,6 +161,13 @@ export function TopBar() {
             <span className="sm:hidden">Today:</span>
             <span className="text-xs font-bold text-white sm:text-sm">
               {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-900/30 px-2 py-1 text-xs font-semibold text-amber-100 sm:gap-2 sm:px-3">
+            <span className="hidden sm:inline">Undeposited:</span>
+            <span className="sm:hidden">Undeposited:</span>
+            <span className="text-xs font-bold text-white sm:text-sm">
+              {loadingUndepositedFunds ? "…" : formatCurrency(undepositedFunds)}
             </span>
           </div>
         </div>
