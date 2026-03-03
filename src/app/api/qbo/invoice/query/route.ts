@@ -37,6 +37,8 @@ export async function GET(req: NextRequest) {
 
     query += " ORDERBY TxnDate DESC";
 
+    console.log(`[invoice/query] Final query: ${query}`);
+
     const maxResults = 1000;
     const invoices: any[] = [];
     let totalAmount = 0;
@@ -65,6 +67,7 @@ export async function GET(req: NextRequest) {
         );
 
         const pageInvoices = data?.QueryResponse?.Invoice || [];
+        console.log(`[invoice/query] Page ${startPosition}: fetched ${pageInvoices.length} invoices`);
         accumulateTotals(pageInvoices);
 
         if (!totalsOnly) {
@@ -72,6 +75,7 @@ export async function GET(req: NextRequest) {
         }
 
         if (pageInvoices.length < maxResults) {
+          console.log(`[invoice/query] Final totals: totalPaid=${totalPaid}, totalAmount=${totalAmount}`);
           break;
         }
 
@@ -85,6 +89,10 @@ export async function GET(req: NextRequest) {
       );
 
       const pageInvoices = data?.QueryResponse?.Invoice || [];
+      console.log(`[invoice/query] Fetched ${pageInvoices.length} invoices, totalPaid: ${totalPaid}`, {
+        query,
+        firstInvoice: pageInvoices[0],
+      });
       accumulateTotals(pageInvoices);
       if (!totalsOnly) {
         invoices.push(...pageInvoices);
