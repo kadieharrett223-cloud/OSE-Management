@@ -45,6 +45,7 @@ type Category = {
   id: string;
   category_name: string;
   display_order: number;
+  tariff_exempt?: boolean;
 };
 
 type ShopifySyncPreviewItem = {
@@ -863,13 +864,24 @@ export default function AdminPriceListPage() {
                             <th className="px-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap text-xs">Description</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
                             <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Qty</th>
-                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Import</th>
+                            {!category.tariff_exempt && (
+                              <>
+                                <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Qty</th>
+                                <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff</th>
+                                <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean</th>
+                                <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Import</th>
+                              </>
+                            )}
                             <th className="px-1 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Zone 5</th>
-                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Per Unit</th>
-                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost+Ship</th>
+                            {!category.tariff_exempt && (
+                              <>
+                                <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Per Unit</th>
+                                <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost+Ship</th>
+                              </>
+                            )}
+                            {category.tariff_exempt && (
+                              <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Price Delivered</th>
+                            )}
                             <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List</th>
@@ -947,6 +959,8 @@ export default function AdminPriceListPage() {
                                 )}
                               </td>
 
+                              {!category.tariff_exempt && (
+                              <>
                               {/* Quantity (INPUT) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
@@ -996,8 +1010,10 @@ export default function AdminPriceListPage() {
                                   <span className="text-blue-900">${money(displayItem.importing)}</span>
                                 )}
                               </td>
+                              </>
+                              )}
 
-                              {/* Zone 5 Shipping (INPUT) */}
+                              {/* Zone 5 Shipping (INPUT) - labeled as "Price Delivered" for tariff exempt */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
@@ -1011,7 +1027,8 @@ export default function AdminPriceListPage() {
                                   <span className="font-semibold text-amber-700">${money(item.zone5_shipping)}</span>
                                 )}
                               </td>
-
+                              {!category.tariff_exempt && (
+                              <>
                               {/* Per Unit (DERIVED) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-slate-600 text-xs">${money(displayItem.per_unit)}</span>
@@ -1021,6 +1038,8 @@ export default function AdminPriceListPage() {
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-slate-600 text-xs font-semibold">${money(displayItem.cost_with_shipping)}</span>
                               </td>
+                              </>
+                              )}
 
                               {/* Margin % (INPUT) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
