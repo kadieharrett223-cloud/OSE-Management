@@ -1458,7 +1458,33 @@ export default function PurchasingPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Amount</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">Amount</label>
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentForm({ ...paymentForm, amount: Number((selectedPO.total_amount * 0.3).toFixed(2)) })}
+                        className="flex-1 rounded-lg border-2 border-blue-500 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                      >
+                        30% Down
+                        <div className="text-[10px] font-normal text-blue-600">${money(selectedPO.total_amount * 0.3)}</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentForm({ ...paymentForm, amount: Number((selectedPO.total_amount * 0.7).toFixed(2)) })}
+                        className="flex-1 rounded-lg border-2 border-green-500 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-100 transition-colors"
+                      >
+                        70% Final
+                        <div className="text-[10px] font-normal text-green-600">${money(selectedPO.total_amount * 0.7)}</div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentForm({ ...paymentForm, amount: 0 })}
+                        className="flex-1 rounded-lg border-2 border-slate-400 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                      >
+                        Custom
+                        <div className="text-[10px] font-normal text-slate-600">Enter amount</div>
+                      </button>
+                    </div>
                     <input
                       type="number"
                       step="0.01"
