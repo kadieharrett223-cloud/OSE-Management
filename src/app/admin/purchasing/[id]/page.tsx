@@ -668,9 +668,9 @@ export default function ViewPO() {
     return date.toLocaleString();
   };
 
-  // Calculate payment totals
-  const totalPaid = (po.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-  const balanceDue = po.total_amount - totalPaid;
+  // Calculate payment totals - only when po is not null
+  const totalPaid = po ? (po.payments || []).reduce((sum, p) => sum + Number(p.amount), 0) : 0;
+  const balanceDue = po ? po.total_amount - totalPaid : 0;
 
   const skuExists = Boolean(
     lineItemForm.sku && priceList.some((item) => (item.sku || item.item_no)?.toLowerCase() === lineItemForm.sku.toLowerCase())
