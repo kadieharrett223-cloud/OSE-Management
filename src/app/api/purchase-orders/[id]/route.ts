@@ -19,6 +19,112 @@ const valuesDifferent = (oldValue: unknown, newValue: unknown): boolean => {
   return stringifyValue(oldValue) !== stringifyValue(newValue);
 };
 
+const normalizeLine = (line: any) => ({
+  lineNumber: Number(line?.line_number ?? 0),
+  sku: stringifyValue(line?.sku),
+  description: stringifyValue(line?.description),
+  quantity: Number(line?.quantity ?? 0),
+  unitPrice: Number(line?.unit_price ?? 0),
+  lineTotal: Number(line?.line_total ?? 0),
+  weightLbs: line?.weight_lbs === null || line?.weight_lbs === undefined ? null : Number(line.weight_lbs),
+});
+
+const buildLineItemChanges = (oldLinesRaw: any[], newLinesRaw: any[]): ChangeEntry[] => {
+  const oldLines = [...(oldLinesRaw || [])]
+    .map(normalizeLine)
+    .sort((a, b) => a.lineNumber - b.lineNumber);
+  const newLines = [...(newLinesRaw || [])]
+    .map(normalizeLine)
+    .sort((a, b) => a.lineNumber - b.lineNumber);
+
+  const changes: ChangeEntry[] = [];
+
+  if (oldLines.length !== newLines.length) {
+    changes.push({
+      field: "Line Items Count",
+      oldValue: `${oldLines.length} item(s)`,
+      newValue: `${newLines.length} item(s)`,
+    });
+  }
+
+  const maxLength = Math.max(oldLines.length, newLines.length);
+  for (let index = 0; index < maxLength; index++) {
+    const oldLine = oldLines[index];
+    const newLine = newLines[index];
+    const lineLabel = `Line ${index + 1}`;
+
+    if (!oldLine && newLine) {
+      changes.push({
+        field: `${lineLabel} Added`,
+        oldValue: "—",
+        newValue: `${newLine.sku} | ${newLine.description} | Qty ${newLine.quantity} | $${newLine.unitPrice}`,
+      });
+      continue;
+    }
+
+    if (oldLine && !newLine) {
+      changes.push({
+        field: `${lineLabel} Removed`,
+        oldValue: `${oldLine.sku} | ${oldLine.description} | Qty ${oldLine.quantity} | $${oldLine.unitPrice}`,
+        newValue: "—",
+      });
+      continue;
+    }
+
+    if (!oldLine || !newLine) continue;
+
+    if (oldLine.sku !== newLine.sku) {
+      changes.push({
+        field: `${lineLabel} SKU`,
+        oldValue: oldLine.sku,
+        newValue: newLine.sku,
+      });
+    }
+
+    if (oldLine.description !== newLine.description) {
+      changes.push({
+        field: `${lineLabel} Description`,
+        oldValue: oldLine.description,
+        newValue: newLine.description,
+      });
+    }
+
+    if (oldLine.quantity !== newLine.quantity) {
+      changes.push({
+        field: `${lineLabel} Quantity`,
+        oldValue: String(oldLine.quantity),
+        newValue: String(newLine.quantity),
+      });
+    }
+
+    if (oldLine.unitPrice !== newLine.unitPrice) {
+      changes.push({
+        field: `${lineLabel} Unit Price`,
+        oldValue: String(oldLine.unitPrice),
+        newValue: String(newLine.unitPrice),
+      });
+    }
+
+    if (oldLine.lineTotal !== newLine.lineTotal) {
+      changes.push({
+        field: `${lineLabel} Line Total`,
+        oldValue: String(oldLine.lineTotal),
+        newValue: String(newLine.lineTotal),
+      });
+    }
+
+    if (oldLine.weightLbs !== newLine.weightLbs) {
+      changes.push({
+        field: `${lineLabel} Weight (lbs)`,
+        oldValue: oldLine.weightLbs === null ? "—" : String(oldLine.weightLbs),
+        newValue: newLine.weightLbs === null ? "—" : String(newLine.weightLbs),
+      });
+    }
+  }
+
+  return changes;
+};
+
 const buildChangeEntries = (oldPO: any, newPO: any): ChangeEntry[] => {
   const trackedFields: Array<{ key: string; label: string }> = [
     { key: "po_number", label: "PO Number" },
@@ -49,13 +155,7 @@ const buildChangeEntries = (oldPO: any, newPO: any): ChangeEntry[] => {
 
   const oldLines = oldPO?.lines || [];
   const newLines = newPO?.lines || [];
-  if (JSON.stringify(oldLines) !== JSON.stringify(newLines)) {
-    changes.push({
-      field: "Line Items",
-      oldValue: `${oldLines.length} item(s)`,
-      newValue: `${newLines.length} item(s)`,
-    });
-  }
+  changes.push(...buildLineItemChanges(oldLines, newLines));
 
   return changes;
 };

@@ -1447,7 +1447,7 @@ export default function ViewPO() {
           )}
 
           {/* Footer */}
-          <div className="mt-3 pt-2 border-t border-gray-300 text-center">
+          <div className="mt-3 pt-2 border-t border-gray-300 text-center print:mt-1 print:pt-1">
             <p className="text-[9px] text-slate-600 mb-0.5">If you have any questions about this purchase order, please contact</p>
             <p className="text-[9px] text-slate-900 font-bold">Peter Harrett • 360-651-2540 • <span className="font-bold">peter@olympicequipment.com</span></p>
             <p className="text-[8px] text-slate-400 mt-1 italic">Thank you for your business</p>
@@ -1456,7 +1456,7 @@ export default function ViewPO() {
         </div>
 
         {/* Page 2: Standard Terms and Specifications */}
-        <div className="border border-slate-300 bg-white p-6 mt-8 page-break-before">
+        <div className="border border-slate-300 bg-white p-6 mt-8 print:mt-2">
           <h2 className="text-base font-bold text-slate-900 mb-3">Page 2 - NOTES</h2>
 
           <div className="space-y-2 text-xs text-slate-800">
@@ -1572,12 +1572,6 @@ export default function ViewPO() {
           }
           .print\\:hidden {
             display: none !important;
-          }
-
-          /* Force page 2 to start on a new page */
-          .page-break-before {
-            page-break-before: always;
-            break-before: page;
           }
 
           /* Light gray borders */
