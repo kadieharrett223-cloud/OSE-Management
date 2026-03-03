@@ -1387,7 +1387,7 @@ export default function ViewPO() {
 
           {/* Payment History Section */}
           {po.payments && po.payments.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-300">
+            <div className="mt-4 pt-4 border-t border-gray-300 print:hidden">
               <h3 className="text-sm font-bold text-slate-900 mb-3">Payment History</h3>
               <table className="w-full text-[10px]">
                 <thead>
