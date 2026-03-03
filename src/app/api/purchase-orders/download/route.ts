@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    // Get user session for authenticated access
+    // Verify user is authenticated before allowing download
     const session: any = await getSession();
     if (!session) {
       return NextResponse.json(
@@ -23,12 +23,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Use service role client for server-side file access
+    // (now allowed by storage policy for authenticated users)
     const supabase = getServerSupabaseClient();
     const { data, error } = await supabase.storage
       .from("chinese-po-files")
       .download(path);
 
     if (error) {
+      console.error("Download error:", error);
       return NextResponse.json(
         { error: `Download failed: ${error.message}` },
         { status: 500 }
