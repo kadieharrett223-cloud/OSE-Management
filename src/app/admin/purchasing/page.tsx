@@ -1211,6 +1211,7 @@ export default function PurchasingPage() {
                       <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Supplier</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Created</th>
                       <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total</th>
+                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Balance Due</th>
                       <th className="px-6 py-3 text-center text-xs font-semibold uppercase text-slate-500">Status</th>
                       <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
                     </tr>
@@ -1223,13 +1224,14 @@ export default function PurchasingPage() {
                           <td className="px-6 py-4"><div className="h-3 w-40 rounded bg-slate-200" /></td>
                           <td className="px-6 py-4"><div className="h-3 w-28 rounded bg-slate-200" /></td>
                           <td className="px-6 py-4 text-right"><div className="ml-auto h-3 w-20 rounded bg-slate-200" /></td>
+                          <td className="px-6 py-4 text-right"><div className="ml-auto h-3 w-20 rounded bg-slate-200" /></td>
                           <td className="px-6 py-4 text-center"><div className="mx-auto h-3 w-16 rounded bg-slate-200" /></td>
                           <td className="px-6 py-4 text-right"><div className="ml-auto h-3 w-24 rounded bg-slate-200" /></td>
                         </tr>
                       ))
                     ) : filteredPos.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-slate-600">
+                        <td colSpan={7} className="px-6 py-12 text-center text-slate-600">
                           <div className="text-lg font-semibold text-slate-900">No purchase orders yet</div>
                           <div className="mt-2 text-sm text-slate-600">Create your first PO to start tracking purchasing.</div>
                           <div className="mt-4">
@@ -1249,6 +1251,7 @@ export default function PurchasingPage() {
                           <td className="px-6 py-3 text-slate-600">{po.vendor_name}</td>
                           <td className="px-6 py-3 text-slate-600">{formatDate(po.order_date)}</td>
                           <td className="px-6 py-3 text-right font-semibold text-slate-900">${money(po.total_amount)}</td>
+                          <td className="px-6 py-3 text-right font-semibold text-amber-700">${money(balance(po))}</td>
                           <td className="px-6 py-3 text-center">
                             <span
                               className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
