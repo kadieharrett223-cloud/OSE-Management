@@ -25,6 +25,7 @@ type PriceListItem = {
   importing: number | null;
   zone5_shipping: number | null;
   margin: number | null; // Margin as decimal (e.g., 0.2296 for 22.96%)
+  manual_pricing_override: boolean; // Allow manual control of pricing calculations
   // Derived fields (computed by DB)
   tariff_105: number | null;
   per_unit: number | null;
@@ -846,14 +847,7 @@ export default function AdminPriceListPage() {
                 </div>
 
                 {/* Price List by Category */}
-                {itemsByCategory.map(({ category, items: categoryItems }) => {
-                  // Check if this category contains KATOOL items (check first item's supplier)
-                  const isCategoryKatool = categoryItems.length > 0 && (
-                    categoryItems[0].supplier?.toUpperCase().includes('KATOOL') ||
-                    categoryItems[0].supplier?.toUpperCase().includes('KATA')
-                  );
-                  
-                  return (
+                {itemsByCategory.map(({ category, items: categoryItems }) => (
                   <section key={category.id} className="rounded-2xl bg-white shadow-md ring-1 ring-slate-200">
                     {/* Category Header */}
                     <div className="border-b-2 border-blue-600 bg-blue-50 px-6 py-3">
@@ -870,11 +864,11 @@ export default function AdminPriceListPage() {
                             <th className="pl-2 pr-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
                             <th className="px-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap text-xs">Description</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
-                            {!isCategoryKatool && <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>}
-                            {!isCategoryKatool && <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Qty</th>}
-                            {!isCategoryKatool && <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff</th>}
-                            {!isCategoryKatool && <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean</th>}
-                            {!isCategoryKatool && <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Import</th>}
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Qty</th>
+                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Import</th>
                             <th className="px-1 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Shipping</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost+Ship</th>
                             <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin</th>
@@ -889,7 +883,6 @@ export default function AdminPriceListPage() {
                           {categoryItems.map((item, index) => {
                             const isEditing = editingId === item.id;
                             const displayItem = isEditing && editingItem ? editingItem : item;
-                            const isKatool = displayItem.supplier?.toUpperCase().includes('KATOOL') || displayItem.supplier?.toUpperCase().includes('KATA');
                             
                             return (
                             <React.Fragment key={item.id}>
@@ -940,8 +933,7 @@ export default function AdminPriceListPage() {
                                 )}
                               </td>
 
-                              {/* FOB Cost (INPUT) - hidden for KATOOL */}
-                              {!isCategoryKatool && (
+                              {/* FOB Cost (INPUT) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
@@ -955,10 +947,8 @@ export default function AdminPriceListPage() {
                                   <span className="text-blue-900 font-semibold">${money(item.fob_cost)}</span>
                                 )}
                               </td>
-                              )}
 
-                              {/* Quantity (INPUT) - hidden for KATOOL */}
-                              {!isCategoryKatool && (
+                              {/* Quantity (INPUT) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
                                   <input
@@ -966,54 +956,62 @@ export default function AdminPriceListPage() {
                                     step="1"
                                     value={displayItem.quantity !== null && displayItem.quantity !== undefined ? displayItem.quantity : ""}
                                     onChange={(e) => updateEditingItem("quantity", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                    disabled={displayItem.manual_pricing_override}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums disabled:bg-slate-100 disabled:text-slate-500"
+                                    title={displayItem.manual_pricing_override ? "Disabled when manual override is on" : ""}
                                   />
                                 ) : (
                                   <span className="text-blue-900">{item.quantity ?? "—"}</span>
                                 )}
                               </td>
-                              )}
 
-                              {/* Tariff +105% (DERIVED) - hidden for KATOOL */}
-                              {!isCategoryKatool && (
+                              {/* Tariff +105% (INPUT/DERIVED) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                <span className="text-slate-600 text-xs">${money(displayItem.tariff_105)}</span>
+                                {isEditing && displayItem.manual_pricing_override ? (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={displayItem.tariff_105 !== null && displayItem.tariff_105 !== undefined ? displayItem.tariff_105 : ""}
+                                    onChange={(e) => updateEditingItem("tariff_105", e.target.value === "" ? null : Number(e.target.value))}
+                                    className="w-full rounded border border-green-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                    title="Manual override enabled"
+                                  />
+                                ) : (
+                                  <span className="text-slate-600 text-xs">${money(displayItem.tariff_105)}</span>
+                                )}
                               </td>
-                              )}
 
-                              {/* Ocean Frt (INPUT) - hidden for KATOOL */}
-                              {!isCategoryKatool && (
+                              {/* Ocean Frt (INPUT/DERIVED) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
+                                {isEditing && displayItem.manual_pricing_override ? (
                                   <input
                                     type="number"
                                     step="0.01"
                                     value={displayItem.ocean_frt !== null && displayItem.ocean_frt !== undefined ? displayItem.ocean_frt : ""}
                                     onChange={(e) => updateEditingItem("ocean_frt", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                    className="w-full rounded border border-green-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                    title="Manual override enabled"
                                   />
                                 ) : (
                                   <span className="text-blue-900">${money(displayItem.ocean_frt)}</span>
                                 )}
                               </td>
-                              )}
 
-                              {/* Importing (INPUT) - hidden for KATOOL */}
-                              {!isCategoryKatool && (
+                              {/* Importing (INPUT/DERIVED) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
+                                {isEditing && displayItem.manual_pricing_override ? (
                                   <input
                                     type="number"
                                     step="0.01"
                                     value={displayItem.importing !== null && displayItem.importing !== undefined ? displayItem.importing : ""}
                                     onChange={(e) => updateEditingItem("importing", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                    className="w-full rounded border border-green-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                    title="Manual override enabled"
                                   />
                                 ) : (
                                   <span className="text-blue-900">${money(displayItem.importing)}</span>
                                 )}
                               </td>
-                              )}
 
                               {/* Zone 5 Shipping (INPUT) - labeled as "Price Delivered" for tariff exempt */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
@@ -1098,6 +1096,14 @@ export default function AdminPriceListPage() {
                                       Save
                                     </button>
                                     <button
+                                      onClick={() => setEditingItem((prev) => prev ? { ...prev, manual_pricing_override: !prev.manual_pricing_override } : prev)}
+                                      className={`px-2 py-1 text-xs font-semibold rounded ${editingItem?.manual_pricing_override ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
+                                      type="button"
+                                      title={editingItem?.manual_pricing_override ? "Manual pricing override enabled - tariff/ocean/import won't auto-calculate" : "Enable manual pricing override"}
+                                    >
+                                      {editingItem?.manual_pricing_override ? '✓ Manual' : 'Manual'}
+                                    </button>
+                                    <button
                                       onClick={cancelEditing}
                                       disabled={isLoading}
                                       className="px-2 py-1 text-xs font-semibold text-slate-600 bg-transparent hover:bg-slate-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1115,6 +1121,9 @@ export default function AdminPriceListPage() {
                                     >
                                       Edit
                                     </button>
+                                    {item.manual_pricing_override && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded">Override</span>
+                                    )}
                                     <button
                                       onClick={() => handleDeleteProduct(item.id)}
                                       disabled={isLoading}
@@ -1290,8 +1299,7 @@ export default function AdminPriceListPage() {
                       )}
                     </div>
                   </section>
-                  );
-                })}
+                ))}
               </>
             )}
 
