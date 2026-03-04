@@ -345,13 +345,28 @@ export default function AdminPriceListPage() {
   const computeDerivedFields = (item: PriceListItem, discountOverride?: number): PriceListItem => {
     const fob_cost = item.fob_cost || 0;
     const quantity = item.quantity || 0;
-    const ocean_per_unit = quantity > 0 ? 3000 / quantity : (item.ocean_frt || 0);
-    const importing_per_unit = quantity > 0 ? 2100 / quantity : (item.importing || 0);
     const zone5_shipping = item.zone5_shipping || 0;
     const margin = item.margin || 0;
 
-    // 1) Tariff: FOB × 2
-    const tariff_105 = fob_cost * 2;
+    // Check if manual override is enabled
+    const isManualOverride = item.manual_pricing_override === true;
+
+    // Calculate or preserve tariff/ocean/import based on override flag
+    let tariff_105: number;
+    let ocean_per_unit: number;
+    let importing_per_unit: number;
+
+    if (isManualOverride) {
+      // Manual override mode: use the user-entered values as-is
+      tariff_105 = item.tariff_105 || 0;
+      ocean_per_unit = item.ocean_frt || 0;
+      importing_per_unit = item.importing || 0;
+    } else {
+      // Auto-calculate mode: use standard formulas
+      tariff_105 = fob_cost * 2;
+      ocean_per_unit = quantity > 0 ? 3000 / quantity : (item.ocean_frt || 0);
+      importing_per_unit = quantity > 0 ? 2100 / quantity : (item.importing || 0);
+    }
 
     // 2) Per unit: Tariff + Ocean per-unit + Importing per-unit
     const per_unit = tariff_105 + ocean_per_unit + importing_per_unit;
