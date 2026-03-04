@@ -319,10 +319,12 @@ export default function AdminPriceListPage() {
           supplier: editingItem.supplier,
           fob_cost: editingItem.fob_cost,
           quantity: editingItem.quantity,
+          tariff_105: editingItem.tariff_105,
           ocean_frt: editingItem.ocean_frt,
           importing: editingItem.importing,
           zone5_shipping: editingItem.zone5_shipping,
           margin: editingItem.margin,
+          manual_pricing_override: editingItem.manual_pricing_override,
         })
         .eq("id", editingItem.id);
       
