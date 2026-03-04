@@ -982,61 +982,64 @@ export default function AdminPriceListPage() {
                                 )}
                               </td>
 
-                              {/* Tariff +105% (INPUT when manual override, DERIVED otherwise) */}
+                              {/* Tariff +105% (INPUT/READ-ONLY) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
-                                  displayItem.manual_pricing_override ? (
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={displayItem.tariff_105 !== null && displayItem.tariff_105 !== undefined ? displayItem.tariff_105 : ""}
-                                      onChange={(e) => updateEditingItem("tariff_105", e.target.value === "" ? null : Number(e.target.value))}
-                                      className="w-full rounded border-2 border-green-500 px-1.5 py-0.5 text-right text-xs font-semibold text-slate-900 bg-green-50 tabular-nums focus:outline-none focus:ring-2 focus:ring-green-400"
-                                      title="Manual override: edit tariff value"
-                                    />
-                                  ) : (
-                                    <span className="text-slate-600 text-xs">${money(displayItem.tariff_105)}</span>
-                                  )
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={displayItem.tariff_105 !== null && displayItem.tariff_105 !== undefined ? displayItem.tariff_105 : ""}
+                                    onChange={(e) => updateEditingItem("tariff_105", e.target.value === "" ? null : Number(e.target.value))}
+                                    disabled={!displayItem.manual_pricing_override}
+                                    className={`w-full rounded px-1.5 py-0.5 text-right text-xs font-medium tabular-nums focus:outline-none ${
+                                      displayItem.manual_pricing_override
+                                        ? "border-2 border-green-500 text-slate-900 bg-green-50 font-semibold focus:ring-2 focus:ring-green-400"
+                                        : "border border-slate-300 text-slate-600 bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    }`}
+                                    title={displayItem.manual_pricing_override ? "Manual override enabled - edit tariff" : "Enable manual override to edit"}
+                                  />
                                 ) : (
                                   <span className="text-slate-600 text-xs">${money(displayItem.tariff_105)}</span>
                                 )}
                               </td>
 
-                              {/* Ocean Frt (INPUT when manual override, DERIVED otherwise) */}
+                              {/* Ocean Frt (INPUT/READ-ONLY) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
-                                  displayItem.manual_pricing_override ? (
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={displayItem.ocean_frt !== null && displayItem.ocean_frt !== undefined ? displayItem.ocean_frt : ""}
-                                      onChange={(e) => updateEditingItem("ocean_frt", e.target.value === "" ? null : Number(e.target.value))}
-                                      className="w-full rounded border-2 border-green-500 px-1.5 py-0.5 text-right text-xs font-semibold text-slate-900 bg-green-50 tabular-nums focus:outline-none focus:ring-2 focus:ring-green-400"
-                                      title="Manual override: edit ocean freight"
-                                    />
-                                  ) : (
-                                    <span className="text-blue-900">${money(displayItem.ocean_frt)}</span>
-                                  )
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={displayItem.ocean_frt !== null && displayItem.ocean_frt !== undefined ? displayItem.ocean_frt : ""}
+                                    onChange={(e) => updateEditingItem("ocean_frt", e.target.value === "" ? null : Number(e.target.value))}
+                                    disabled={!displayItem.manual_pricing_override}
+                                    className={`w-full rounded px-1.5 py-0.5 text-right text-xs font-medium tabular-nums focus:outline-none ${
+                                      displayItem.manual_pricing_override
+                                        ? "border-2 border-green-500 text-slate-900 bg-green-50 font-semibold focus:ring-2 focus:ring-green-400"
+                                        : "border border-slate-300 text-slate-600 bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    }`}
+                                    title={displayItem.manual_pricing_override ? "Manual override enabled - edit ocean" : "Enable manual override to edit"}
+                                  />
                                 ) : (
                                   <span className="text-blue-900">${money(displayItem.ocean_frt)}</span>
                                 )}
                               </td>
 
-                              {/* Importing (INPUT when manual override, DERIVED otherwise) */}
+                              {/* Importing (INPUT/READ-ONLY) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
-                                  displayItem.manual_pricing_override ? (
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={displayItem.importing !== null && displayItem.importing !== undefined ? displayItem.importing : ""}
-                                      onChange={(e) => updateEditingItem("importing", e.target.value === "" ? null : Number(e.target.value))}
-                                      className="w-full rounded border-2 border-green-500 px-1.5 py-0.5 text-right text-xs font-semibold text-slate-900 bg-green-50 tabular-nums focus:outline-none focus:ring-2 focus:ring-green-400"
-                                      title="Manual override: edit import duties"
-                                    />
-                                  ) : (
-                                    <span className="text-blue-900">${money(displayItem.importing)}</span>
-                                  )
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={displayItem.importing !== null && displayItem.importing !== undefined ? displayItem.importing : ""}
+                                    onChange={(e) => updateEditingItem("importing", e.target.value === "" ? null : Number(e.target.value))}
+                                    disabled={!displayItem.manual_pricing_override}
+                                    className={`w-full rounded px-1.5 py-0.5 text-right text-xs font-medium tabular-nums focus:outline-none ${
+                                      displayItem.manual_pricing_override
+                                        ? "border-2 border-green-500 text-slate-900 bg-green-50 font-semibold focus:ring-2 focus:ring-green-400"
+                                        : "border border-slate-300 text-slate-600 bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    }`}
+                                    title={displayItem.manual_pricing_override ? "Manual override enabled - edit import" : "Enable manual override to edit"}
+                                  />
                                 ) : (
                                   <span className="text-blue-900">${money(displayItem.importing)}</span>
                                 )}
