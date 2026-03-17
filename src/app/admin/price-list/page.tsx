@@ -182,6 +182,9 @@ export default function AdminPriceListPage() {
   const [editingItem, setEditingItem] = useState<PriceListItem | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [discountPercentage, setDiscountPercentage] = useState<number>(20); // Default 20% off list
+  const [globalTariffPercent, setGlobalTariffPercent] = useState<number>(100);
+  const [globalTariffInput, setGlobalTariffInput] = useState<string>("100");
+  const [isSavingTariff, setIsSavingTariff] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -235,7 +238,7 @@ export default function AdminPriceListPage() {
     }
   }, []);
 
-  // Recompute items when discount percentage changes
+  // Recompute items when discount percentage or global tariff changes
   useEffect(() => {
     if (items.length > 0) {
       const recomputedItems = items.map((item) =>
@@ -243,11 +246,19 @@ export default function AdminPriceListPage() {
       );
       setItems(recomputedItems);
     }
-  }, [discountPercentage]);
+  }, [discountPercentage, globalTariffPercent]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
+      const settingsRes = await fetch("/api/pricing/settings");
+      if (settingsRes.ok) {
+        const settingsPayload = await settingsRes.json();
+        const tariff = Number(settingsPayload?.settings?.global_tariff_percent ?? 100);
+        setGlobalTariffPercent(tariff);
+        setGlobalTariffInput(String(tariff));
+      }
+
       // Load categories
       const { data: cats, error: catError } = await supabase
         .from("price_list_categories")
@@ -341,12 +352,13 @@ export default function AdminPriceListPage() {
     }
   };
 
-  // Client-side calculation: Tariff = FOB×2, Ocean/Import per unit from container constants, Cost = Tariff+Ocean+Import, Final = Cost+Shipping, Sell = Final / (1 - Margin)
+  // Client-side calculation follows DB formulas and global tariff setting.
   const computeDerivedFields = (item: PriceListItem, discountOverride?: number): PriceListItem => {
     const fob_cost = item.fob_cost || 0;
     const quantity = item.quantity || 0;
     const zone5_shipping = item.zone5_shipping || 0;
     const margin = item.margin || 0;
+    const tariffMultiplier = 1 + globalTariffPercent / 100;
 
     // Check if manual override is enabled
     const isManualOverride = item.manual_pricing_override === true;
@@ -363,7 +375,7 @@ export default function AdminPriceListPage() {
       importing_per_unit = item.importing || 0;
     } else {
       // Auto-calculate mode: use standard formulas
-      tariff_105 = fob_cost * 2;
+      tariff_105 = fob_cost * tariffMultiplier;
       ocean_per_unit = quantity > 0 ? 3000 / quantity : (item.ocean_frt || 0);
       importing_per_unit = quantity > 0 ? 2100 / quantity : (item.importing || 0);
     }
@@ -409,6 +421,38 @@ export default function AdminPriceListPage() {
       rounded_sale_price,
       profit,
     };
+  };
+
+  const handleSaveGlobalTariff = async () => {
+    const parsed = Number(globalTariffInput);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 500) {
+      setStatus("Tariff % must be a number between 0 and 500.");
+      return;
+    }
+
+    setIsSavingTariff(true);
+    setStatus(null);
+    try {
+      const response = await fetch("/api/pricing/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ global_tariff_percent: parsed }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to update tariff setting");
+      }
+
+      setGlobalTariffPercent(parsed);
+      setGlobalTariffInput(String(parsed));
+      setStatus("✓ Global tariff updated and non-manual products recalculated.");
+      await loadData();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed to update tariff setting");
+    } finally {
+      setIsSavingTariff(false);
+    }
   };
 
   const updateEditingItem = (field: keyof PriceListItem, value: string | number | null) => {
@@ -645,9 +689,9 @@ export default function AdminPriceListPage() {
                       <h3 className="font-semibold text-blue-900">Price List Guide</h3>
                       <div className="mt-3 text-sm text-blue-800 space-y-2">
                         <p><span className="font-semibold">Manual inputs:</span> FOB cost, quantity (container capacity), shipping, margin %, optional list price.</p>
-                        <p><span className="font-semibold">Constants:</span> Tariff rate = 100%, Ocean freight = 3000 per container, Importing = 2100 per container.</p>
+                        <p><span className="font-semibold">Constants:</span> Tariff rate = {globalTariffPercent}%, Ocean freight = 3000 per container, Importing = 2100 per container.</p>
                         <div className="rounded-xl bg-white/80 p-4 ring-1 ring-blue-200/70 text-xs text-blue-900 space-y-1">
-                          <div>Tariff = FOB × 2</div>
+                          <div>Tariff = FOB × (1 + Tariff%/100)</div>
                           <div>Ocean per unit = 3000 ÷ Quantity</div>
                           <div>Importing per unit = 2100 ÷ Quantity</div>
                           <div>Cost (no shipping) = Tariff + Ocean + Importing</div>
@@ -689,6 +733,28 @@ export default function AdminPriceListPage() {
                   
                   {/* Discount Percentage Control */}
                   <div className="flex items-center gap-2 ml-auto">
+                    <label className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+                      Tariff:
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="500"
+                      step="0.01"
+                      value={globalTariffInput}
+                      onChange={(e) => setGlobalTariffInput(e.target.value)}
+                      className="w-20 rounded-lg border border-blue-300 bg-white px-2 py-1.5 text-sm text-slate-900 text-right font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                    />
+                    <span className="text-sm font-semibold text-blue-700">%</span>
+                    <button
+                      type="button"
+                      onClick={handleSaveGlobalTariff}
+                      disabled={isSavingTariff}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isSavingTariff ? "Saving..." : "Save Tariff"}
+                    </button>
+
                     <label className="text-sm font-semibold text-slate-700 whitespace-nowrap">
                       Discount:
                     </label>

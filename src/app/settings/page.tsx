@@ -21,6 +21,8 @@ export default function SettingsPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmationStep, setConfirmationStep] = useState(1);
   const [activeTab, setActiveTab] = useState<'integrations' | 'defaults' | 'billing'>('integrations');
+  const [globalTariffPercent, setGlobalTariffPercent] = useState<string>('100');
+  const [savingTariff, setSavingTariff] = useState(false);
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -35,6 +37,14 @@ export default function SettingsPage() {
           const data = await shopifyRes.json();
           setShopifyConnected(data.connected);
           setShopifyShop(data.shop);
+        }
+
+        // Load global pricing settings (admin-only)
+        const pricingRes = await fetch('/api/pricing/settings');
+        if (pricingRes.ok) {
+          const pricingData = await pricingRes.json();
+          const tariff = Number(pricingData?.settings?.global_tariff_percent ?? 100);
+          setGlobalTariffPercent(String(tariff));
         }
       } catch (err) {
         console.error('Failed to check connection status:', err);
@@ -154,6 +164,38 @@ export default function SettingsPage() {
 
   const handleLogout = async () => {
     await signOut({ redirect: true, callbackUrl: '/' });
+  };
+
+  const handleSaveTariff = async () => {
+    try {
+      const parsed = Number(globalTariffPercent);
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 500) {
+        setError('Tariff must be a number between 0 and 500');
+        return;
+      }
+
+      setSavingTariff(true);
+      setError(null);
+      setSuccess(null);
+
+      const res = await fetch('/api/pricing/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ global_tariff_percent: parsed }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save tariff setting');
+      }
+
+      setGlobalTariffPercent(String(parsed));
+      setSuccess('Global tariff updated. Non-manual products were recalculated.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to save tariff setting');
+    } finally {
+      setSavingTariff(false);
+    }
   };
 
   if (loading) {
@@ -337,6 +379,33 @@ export default function SettingsPage() {
 
         {activeTab === 'defaults' && (
           <>
+            <div className="bg-white rounded-lg shadow mb-6 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Pricing Defaults</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Set the global tariff percent used to auto-calculate pricing for all products unless manual override is enabled.
+              </p>
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-700">Global Tariff %</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="500"
+                  step="0.01"
+                  value={globalTariffPercent}
+                  onChange={(e) => setGlobalTariffPercent(e.target.value)}
+                  className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveTariff}
+                  disabled={savingTariff}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingTariff ? 'Saving...' : 'Save Tariff'}
+                </button>
+              </div>
+            </div>
+
             <div className="bg-white rounded-lg shadow mb-6 p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Defaults</h2>
               <p className="text-sm text-gray-500">

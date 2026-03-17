@@ -1,35 +1,25 @@
--- Add margin and manual pricing override columns to enable pricing overrides
--- This migration is safe to run even if the table doesn't exist yet
-DO $$ 
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'price_list_items') THEN
-    -- Add margin column if it doesn't exist
-    IF NOT EXISTS (
-      SELECT 1 FROM information_schema.columns 
-      WHERE table_name = 'price_list_items' AND column_name = 'margin'
-    ) THEN
-      ALTER TABLE price_list_items ADD COLUMN margin NUMERIC(8, 4) DEFAULT 0;
-    END IF;
+-- Global tariff percent setting with automatic recalculation support
 
-    -- Add manual_pricing_override column if it doesn't exist
-    IF NOT EXISTS (
-      SELECT 1 FROM information_schema.columns 
-      WHERE table_name = 'price_list_items' AND column_name = 'manual_pricing_override'
-    ) THEN
-      ALTER TABLE price_list_items ADD COLUMN manual_pricing_override BOOLEAN DEFAULT FALSE;
-    END IF;
+CREATE TABLE IF NOT EXISTS pricing_settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  global_tariff_percent NUMERIC(8, 4) NOT NULL DEFAULT 100,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-    -- Add profit column if it doesn't exist
-    IF NOT EXISTS (
-      SELECT 1 FROM information_schema.columns 
-      WHERE table_name = 'price_list_items' AND column_name = 'profit'
-    ) THEN
-      ALTER TABLE price_list_items ADD COLUMN profit NUMERIC(12, 2);
-    END IF;
-  END IF;
-END $$;
+ALTER TABLE pricing_settings ENABLE ROW LEVEL SECURITY;
 
--- Update pricing trigger to respect manual override (only if table exists)
+DROP POLICY IF EXISTS "Allow service role full access to pricing_settings" ON pricing_settings;
+CREATE POLICY "Allow service role full access to pricing_settings"
+  ON pricing_settings
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+INSERT INTO pricing_settings (id, global_tariff_percent)
+VALUES ('00000000-0000-0000-0000-000000000002', 100)
+ON CONFLICT (id) DO NOTHING;
+
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'price_list_items') THEN
@@ -42,9 +32,19 @@ CREATE OR REPLACE FUNCTION compute_price_list_derived_fields()
 RETURNS TRIGGER AS $$
 DECLARE
   is_katool BOOLEAN;
+  tariff_percent NUMERIC(8, 4) := 100;
+  tariff_multiplier NUMERIC(10, 6) := 2;
 BEGIN
   -- Check if supplier contains KATOOL or KATA (case-insensitive)
   is_katool := (UPPER(COALESCE(NEW.supplier, '')) LIKE '%KATOOL%' OR UPPER(COALESCE(NEW.supplier, '')) LIKE '%KATA%');
+
+  SELECT COALESCE(ps.global_tariff_percent, 100)
+  INTO tariff_percent
+  FROM pricing_settings ps
+  ORDER BY ps.updated_at DESC
+  LIMIT 1;
+
+  tariff_multiplier := 1 + (tariff_percent / 100);
 
   -- If manual_pricing_override is FALSE, auto-calculate based on supplier type
   IF NOT COALESCE(NEW.manual_pricing_override, FALSE) THEN
@@ -56,8 +56,8 @@ BEGIN
       NEW.per_unit := COALESCE(NEW.fob_cost, 0);
       NEW.cost_with_shipping := COALESCE(NEW.fob_cost, 0) + COALESCE(NEW.zone5_shipping, 0);
     ELSE
-      -- Normal Pricing (with tariffs)
-      NEW.tariff_105 := COALESCE(NEW.fob_cost, 0) * 2;
+      -- Normal Pricing (with configurable global tariff)
+      NEW.tariff_105 := COALESCE(NEW.fob_cost, 0) * tariff_multiplier;
 
       IF COALESCE(NEW.quantity, 0) > 0 THEN
         NEW.ocean_frt := 3000 / NEW.quantity;
@@ -71,7 +71,6 @@ BEGIN
       NEW.cost_with_shipping := NEW.per_unit + COALESCE(NEW.zone5_shipping, 0);
     END IF;
   END IF;
-  -- If manual_pricing_override is TRUE, tariff_105, ocean_frt, importing, per_unit, and cost_with_shipping keep their user-entered values
 
   -- Calculate sell price based on margin (applies to all cases)
   IF COALESCE(NEW.margin, 0) > 0 AND COALESCE(NEW.margin, 0) < 1 THEN
@@ -89,7 +88,6 @@ BEGIN
     NEW.list_price := NEW.sell_price * 1.25;
   END IF;
 
-  -- Black Friday and sale prices
   NEW.black_friday_price := NEW.list_price * 0.75;
   NEW.rounded_sale_price := FLOOR(NEW.black_friday_price / 100) * 100 - 1;
 
@@ -97,7 +95,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger only if table exists
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'price_list_items') THEN
@@ -105,5 +102,10 @@ BEGIN
       BEFORE INSERT OR UPDATE ON price_list_items
       FOR EACH ROW
       EXECUTE FUNCTION compute_price_list_derived_fields();
+
+    -- Recalculate all products except manual overrides using the latest global tariff setting
+    UPDATE price_list_items
+    SET updated_at = NOW()
+    WHERE COALESCE(manual_pricing_override, FALSE) = FALSE;
   END IF;
 END $$;
