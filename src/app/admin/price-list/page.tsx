@@ -430,13 +430,20 @@ export default function AdminPriceListPage() {
       return;
     }
 
+    // Support both input styles:
+    // - Percent: 25 => 25%
+    // - Multiplier: 1.25 => 25%
+    const normalizedTariffPercent = parsed >= 1 && parsed <= 3
+      ? (parsed - 1) * 100
+      : parsed;
+
     setIsSavingTariff(true);
     setStatus(null);
     try {
       const response = await fetch("/api/pricing/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ global_tariff_percent: parsed }),
+        body: JSON.stringify({ global_tariff_percent: normalizedTariffPercent }),
       });
       const payload = await response.json();
 
@@ -444,8 +451,8 @@ export default function AdminPriceListPage() {
         throw new Error(payload?.error || "Failed to update tariff setting");
       }
 
-      setGlobalTariffPercent(parsed);
-      setGlobalTariffInput(String(parsed));
+      setGlobalTariffPercent(normalizedTariffPercent);
+      setGlobalTariffInput(String(Number(normalizedTariffPercent.toFixed(4))));
       setStatus("✓ Global tariff updated and non-manual products recalculated.");
       await loadData();
     } catch (error) {
@@ -588,6 +595,134 @@ export default function AdminPriceListPage() {
     } finally {
       setIsShopifySyncing(false);
     }
+  };
+
+  const handlePrintReport = () => {
+    const printDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    // Build all items grouped by category using current derived data
+    const allCategories = [...categories]
+      .map((cat) => {
+        const catItems = items
+          .filter((item) => item.category_id === cat.id)
+          .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
+          .sort((a, b) => Number(a.sell_price || 0) - Number(b.sell_price || 0));
+        return { category: cat, items: catItems };
+      })
+      .filter(({ items: ci }) => ci.length > 0)
+      .sort((a, b) => (a.category.display_order ?? 0) - (b.category.display_order ?? 0));
+
+    const fmt = (v: number | null | undefined) =>
+      v == null ? "—" : v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const tableRows = allCategories
+      .map(
+        ({ category, items: ci }) => `
+          <tr class="cat-header">
+            <td colspan="15">${category.category_name}</td>
+          </tr>
+          ${ci
+            .map(
+              (item) => `
+            <tr>
+              <td class="mono">${item.item_no}</td>
+              <td>${item.description || "—"}</td>
+              <td>${item.supplier || "—"}</td>
+              <td class="num">$${fmt(item.fob_cost)}</td>
+              <td class="num">${item.quantity ?? "—"}</td>
+              <td class="num">$${fmt(item.tariff_105)}</td>
+              <td class="num">$${fmt(item.ocean_frt)}</td>
+              <td class="num">$${fmt(item.importing)}</td>
+              <td class="num">$${fmt(item.zone5_shipping)}</td>
+              <td class="num">$${fmt(item.cost_with_shipping)}</td>
+              <td class="num">${item.margin != null ? (item.margin * 100).toFixed(2) + "%" : "—"}</td>
+              <td class="num bold">$${fmt(item.sell_price)}</td>
+              <td class="num">$${fmt(item.list_price)}</td>
+              <td class="num profit">$${fmt(item.profit)}</td>
+              <td class="num">${item.weight_lbs ?? "—"}</td>
+            </tr>`
+            )
+            .join("")}`
+      )
+      .join("");
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Price List Report — ${printDate}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #1e293b; background: #fff; }
+    .report-header { padding: 16px 20px 10px; border-bottom: 2px solid #2563eb; display: flex; justify-content: space-between; align-items: flex-end; }
+    .report-header h1 { font-size: 16pt; font-weight: 700; color: #1e3a8a; }
+    .report-header .meta { font-size: 7.5pt; color: #475569; text-align: right; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th { background: #1e3a8a; color: #fff; font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 4px 5px; text-align: left; }
+    th.num, td.num { text-align: right; }
+    td { padding: 3px 5px; border-bottom: 1px solid #e2e8f0; font-size: 7.5pt; vertical-align: middle; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    tr.cat-header td { background: #dbeafe; color: #1e40af; font-weight: 700; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.05em; padding: 5px 6px; border-top: 2pt solid #2563eb; border-bottom: 1pt solid #93c5fd; }
+    td.mono { font-family: 'Courier New', monospace; font-weight: 600; }
+    td.bold { font-weight: 700; color: #0f172a; }
+    td.profit { color: #15803d; font-weight: 600; }
+    .footer { margin-top: 14px; font-size: 7pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      @page { size: landscape; margin: 10mm 8mm; }
+      tr.cat-header { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="report-header">
+    <div>
+      <h1>Price List Cost Report</h1>
+      <div style="font-size:8pt;color:#475569;margin-top:4px;">Tariff Rate: ${globalTariffPercent}% &nbsp;|&nbsp; Discount: ${discountPercentage}% off list</div>
+    </div>
+    <div class="meta">
+      Generated: ${printDate}<br/>
+      Total products: ${items.length}
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Item No</th>
+        <th>Description</th>
+        <th>Supplier</th>
+        <th class="num">FOB Cost</th>
+        <th class="num">Qty</th>
+        <th class="num">Tariff</th>
+        <th class="num">Ocean/Unit</th>
+        <th class="num">Import/Unit</th>
+        <th class="num">Shipping</th>
+        <th class="num">Cost+Ship</th>
+        <th class="num">Margin</th>
+        <th class="num">Sell Price</th>
+        <th class="num">List Price</th>
+        <th class="num">Profit</th>
+        <th class="num">Wt (lbs)</th>
+      </tr>
+    </thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+  <div class="footer">OSE Management &mdash; Confidential &mdash; ${printDate}</div>
+  <script>window.onload = function() { window.print(); }<\/script>
+</body>
+</html>`;
+
+    const printWindow = window.open("", "_blank", "width=1200,height=800");
+    if (!printWindow) {
+      alert("Pop-up blocked. Please allow pop-ups for this site and try again.");
+      return;
+    }
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   // Filter items by search query and supplier
@@ -770,6 +905,9 @@ export default function AdminPriceListPage() {
                     <span className="text-sm font-semibold text-emerald-700">% off</span>
                   </div>
                 </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Tariff input supports <strong>25</strong> (percent) or <strong>1.25</strong> (1.25x multiplier).
+                </p>
 
                 <div className="mt-4">
                   <button
@@ -880,6 +1018,16 @@ export default function AdminPriceListPage() {
 
               {/* Actions */}
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePrintReport}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-slate-700 rounded-lg hover:bg-slate-800 shadow-md transition-colors flex items-center gap-2"
+                  type="button"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Print Report
+                </button>
                 <button
                   onClick={handleOpenShopifyPreview}
                   disabled={isShopifySyncing || isShopifyPreviewLoading}
