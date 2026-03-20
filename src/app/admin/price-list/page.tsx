@@ -173,6 +173,32 @@ async function bufferFromFile(file: File): Promise<ArrayBuffer> {
   });
 }
 
+type PrintColKey =
+  | "item_no" | "description" | "supplier" | "fob_cost" | "quantity"
+  | "tariff_105" | "ocean_frt" | "importing" | "zone5_shipping"
+  | "cost_with_shipping" | "margin" | "sell_price" | "list_price"
+  | "profit" | "weight_lbs";
+
+const ALL_PRINT_COLUMNS: { key: PrintColKey; label: string; num: boolean }[] = [
+  { key: "item_no",           label: "Item No",       num: false },
+  { key: "description",      label: "Description",   num: false },
+  { key: "supplier",         label: "Supplier",      num: false },
+  { key: "fob_cost",         label: "FOB Cost",      num: true  },
+  { key: "quantity",         label: "Qty",           num: true  },
+  { key: "tariff_105",       label: "Tariff",        num: true  },
+  { key: "ocean_frt",        label: "Ocean/Unit",    num: true  },
+  { key: "importing",        label: "Import/Unit",   num: true  },
+  { key: "zone5_shipping",   label: "Shipping",      num: true  },
+  { key: "cost_with_shipping",label: "Cost+Ship",    num: true  },
+  { key: "margin",           label: "Margin",        num: true  },
+  { key: "sell_price",       label: "Sell Price",    num: true  },
+  { key: "list_price",       label: "List Price",    num: true  },
+  { key: "profit",           label: "Profit",        num: true  },
+  { key: "weight_lbs",       label: "Wt (lbs)",      num: true  },
+];
+
+const DEFAULT_PRINT_COLS = new Set<PrintColKey>(ALL_PRINT_COLUMNS.map((c) => c.key));
+
 export default function AdminPriceListPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<PriceListItem[]>([]);
@@ -196,6 +222,8 @@ export default function AdminPriceListPage() {
   const [isShopifyPreviewLoading, setIsShopifyPreviewLoading] = useState(false);
   const [showShopifyPreviewModal, setShowShopifyPreviewModal] = useState(false);
   const [shopifyPreviewItems, setShopifyPreviewItems] = useState<ShopifySyncPreviewItem[]>([]);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printCols, setPrintCols] = useState<Set<PrintColKey>>(new Set(DEFAULT_PRINT_COLS));
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -1085,7 +1113,7 @@ export default function AdminPriceListPage() {
               {/* Actions */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handlePrintReport}
+                  onClick={() => setShowPrintModal(true)}
                   className="px-4 py-2 text-sm font-semibold text-white bg-slate-700 rounded-lg hover:bg-slate-800 shadow-md transition-colors flex items-center gap-2"
                   type="button"
                 >
@@ -1854,6 +1882,80 @@ export default function AdminPriceListPage() {
                 disabled={isShopifySyncing || shopifyPreviewItems.length === 0}
               >
                 {isShopifySyncing ? "Pushing..." : "Confirm Push to Shopify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Print Column Picker Modal */}
+      {showPrintModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900">Choose Columns to Print</h2>
+              <button
+                onClick={() => setShowPrintModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+                type="button"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <div className="flex gap-3 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setPrintCols(new Set(ALL_PRINT_COLUMNS.map((c) => c.key)))}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                >Select all</button>
+                <button
+                  type="button"
+                  onClick={() => setPrintCols(new Set())}
+                  className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                >Clear all</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {ALL_PRINT_COLUMNS.map((col) => (
+                  <label key={col.key} className="flex items-center gap-2 cursor-pointer select-none rounded-lg px-3 py-2 hover:bg-slate-50 border border-slate-100">
+                    <input
+                      type="checkbox"
+                      checked={printCols.has(col.key)}
+                      onChange={(e) => {
+                        const next = new Set(printCols);
+                        if (e.target.checked) next.add(col.key);
+                        else next.delete(col.key);
+                        setPrintCols(next);
+                      }}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 accent-blue-600"
+                    />
+                    <span className="text-sm text-slate-700">{col.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <button
+                onClick={() => setShowPrintModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (printCols.size === 0) { alert("Select at least one column."); return; }
+                  setShowPrintModal(false);
+                  handlePrintReport(printCols);
+                }}
+                className="px-4 py-2 text-sm font-semibold text-white bg-slate-700 rounded-lg hover:bg-slate-800 flex items-center gap-2"
+                type="button"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print
               </button>
             </div>
           </div>
