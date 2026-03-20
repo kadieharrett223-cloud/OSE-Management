@@ -673,7 +673,9 @@ export default function AdminPriceListPage() {
     .footer { margin-top: 14px; font-size: 7pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 8px; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      @page { size: landscape; margin: 10mm 8mm; }
+      @page { size: portrait; margin: 8mm 6mm; }
+      table { font-size: 6.5pt; }
+      th, td { padding: 2px 3px; }
       tr.cat-header { page-break-inside: avoid; }
     }
   </style>
