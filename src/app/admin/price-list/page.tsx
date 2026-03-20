@@ -727,6 +727,70 @@ export default function AdminPriceListPage() {
     printWindow.document.close();
   };
 
+  const handleExportCSV = () => {
+    const allCategories = [...categories]
+      .map((cat) => {
+        const catItems = items
+          .filter((item) => item.category_id === cat.id)
+          .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
+          .sort((a, b) => Number(a.sell_price || 0) - Number(b.sell_price || 0));
+        return { category: cat, items: catItems };
+      })
+      .filter(({ items: ci }) => ci.length > 0)
+      .sort((a, b) => (a.category.display_order ?? 0) - (b.category.display_order ?? 0));
+
+    const escape = (v: string | number | null | undefined) => {
+      if (v == null) return "";
+      const s = String(v);
+      return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const fmt = (v: number | null | undefined) =>
+      v == null ? "" : v.toFixed(2);
+
+    const headers = [
+      "Category","Item No","Description","Supplier",
+      "FOB Cost","Qty","Tariff","Ocean/Unit","Import/Unit",
+      "Zone5 Shipping","Cost+Ship","Margin %","Sell Price",
+      "List Price","Profit","Weight (lbs)",
+    ];
+
+    const rows: string[][] = [headers];
+
+    allCategories.forEach(({ category, items: ci }) => {
+      ci.forEach((item) => {
+        rows.push([
+          escape(category.category_name),
+          escape(item.item_no),
+          escape(item.description),
+          escape(item.supplier),
+          fmt(item.fob_cost),
+          item.quantity != null ? String(item.quantity) : "",
+          fmt(item.tariff_105),
+          fmt(item.ocean_frt),
+          fmt(item.importing),
+          fmt(item.zone5_shipping),
+          fmt(item.cost_with_shipping),
+          item.margin != null ? (item.margin * 100).toFixed(2) : "",
+          fmt(item.sell_price),
+          fmt(item.list_price),
+          fmt(item.profit),
+          item.weight_lbs != null ? String(item.weight_lbs) : "",
+        ]);
+      });
+    });
+
+    const csv = rows.map((r) => r.join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const dateStr = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `price-list-${dateStr}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Filter items by search query and supplier
   const filteredItems = items.filter((item) => {
     const matchesSearch = !searchQuery || (
@@ -1029,6 +1093,16 @@ export default function AdminPriceListPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                   </svg>
                   Print Report
+                </button>
+                <button
+                  onClick={handleExportCSV}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 shadow-md transition-colors flex items-center gap-2"
+                  type="button"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                  </svg>
+                  Export CSV
                 </button>
                 <button
                   onClick={handleOpenShopifyPreview}
