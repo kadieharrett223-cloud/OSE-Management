@@ -552,6 +552,9 @@ export default function PurchasingPage() {
     const updated = [...formData.lines];
     updated[index] = { ...updated[index], [field]: value };
 
+    // Always reflect what the user typed immediately.
+    setFormData({ ...formData, lines: updated });
+
     // Auto-populate description, price, and weight when SKU is selected
     if (field === "sku" && value) {
       const item = priceList.find((p) => p.sku === value);
@@ -576,8 +579,6 @@ export default function PurchasingPage() {
           })
           .catch((err) => console.error("Failed to fetch fresh product data:", err));
       }
-    } else {
-      setFormData({ ...formData, lines: updated });
     }
   }
 
