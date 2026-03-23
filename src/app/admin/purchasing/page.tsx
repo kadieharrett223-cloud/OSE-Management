@@ -1034,28 +1034,38 @@ export default function PurchasingPage() {
                           <div className="flex flex-col gap-1">
                             <input
                               type="text"
-                              list={`sku-list-${index}`}
                               placeholder="Type SKU to search product"
                               value={line.sku}
                               onChange={(e) => updateLine(index, "sku", e.target.value)}
                               className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                              autoComplete="off"
                               required
                             />
-                            <datalist id={`sku-list-${index}`}>
-                              {priceList
-                                .filter((item) => {
-                                  const query = (line.sku || "").toLowerCase();
-                                  if (!query) return true;
-                                  return (
-                                    (item.sku || "").toLowerCase().includes(query) ||
-                                    (item.description || "").toLowerCase().includes(query)
-                                  );
-                                })
-                                .slice(0, 50)
-                                .map((item) => (
-                                  <option key={item.id} value={item.sku}>{item.description}</option>
-                                ))}
-                            </datalist>
+
+                            {!!line.sku && (
+                              <div className="max-h-36 overflow-y-auto rounded border border-slate-200 bg-white">
+                                {priceList
+                                  .filter((item) => {
+                                    const query = (line.sku || "").toLowerCase();
+                                    return (
+                                      (item.sku || "").toLowerCase().includes(query) ||
+                                      (item.description || "").toLowerCase().includes(query)
+                                    );
+                                  })
+                                  .slice(0, 8)
+                                  .map((item) => (
+                                    <button
+                                      key={item.id}
+                                      type="button"
+                                      onClick={() => updateLine(index, "sku", item.sku)}
+                                      className="block w-full border-b border-slate-100 px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-50"
+                                    >
+                                      <span className="font-mono font-semibold">{item.sku}</span>
+                                      <span className="ml-2 text-slate-500">{item.description}</span>
+                                    </button>
+                                  ))}
+                              </div>
+                            )}
 
                             {!priceList.some((item) => item.sku === line.sku) && line.sku && (
                               <button
