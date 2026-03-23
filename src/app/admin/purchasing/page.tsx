@@ -549,37 +549,62 @@ export default function PurchasingPage() {
   }
 
   function updateLine(index: number, field: string, value: any) {
-    const updated = [...formData.lines];
-    updated[index] = { ...updated[index], [field]: value };
+    setFormData((prev) => {
+      const updated = [...prev.lines];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, lines: updated };
+    });
 
-    // Always reflect what the user typed immediately.
-    setFormData({ ...formData, lines: updated });
+    if (field !== "sku") return;
 
-    // Auto-populate description, price, and weight when SKU is selected
-    if (field === "sku" && value) {
-      const item = priceList.find((p) => p.sku === value);
-      if (item) {
-        updated[index].description = item.description || "";
-        updated[index].unit_price = item.fob_cost || 0;
-        updated[index].weight_lbs = item.weight_lbs || 0;
-        setFormData({ ...formData, lines: updated });
-      } else {
-        // If not found in cache, fetch fresh price list to get latest data
-        fetch("/api/price-list?_=" + Date.now(), { cache: "no-store" })
-          .then((res) => res.json())
-          .then((data) => {
-            const freshItem = data.find((p: any) => p.sku === value);
-            if (freshItem) {
-              const freshUpdated = [...formData.lines];
-              freshUpdated[index].description = freshItem.description || "";
-              freshUpdated[index].unit_price = freshItem.fob_cost || 0;
-              freshUpdated[index].weight_lbs = freshItem.weight_lbs || 0;
-              setFormData({ ...formData, lines: freshUpdated });
-            }
-          })
-          .catch((err) => console.error("Failed to fetch fresh product data:", err));
-      }
+    const sku = String(value || "");
+    if (!sku) return;
+
+    // Try immediate local cache match first.
+    const cachedItem = priceList.find((p) => p.sku === sku);
+    if (cachedItem) {
+      setFormData((prev) => {
+        const updated = [...prev.lines];
+        const current = updated[index];
+        if (!current) return prev;
+        if ((current.sku || "") !== sku) return prev;
+
+        updated[index] = {
+          ...current,
+          description: cachedItem.description || "",
+          unit_price: cachedItem.fob_cost || 0,
+          weight_lbs: cachedItem.weight_lbs || 0,
+        };
+
+        return { ...prev, lines: updated };
+      });
+      return;
     }
+
+    // Fallback to fresh fetch; apply only if the user still has same SKU typed.
+    fetch("/api/price-list?_=" + Date.now(), { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        const freshItem = data.find((p: any) => p.sku === sku);
+        if (!freshItem) return;
+
+        setFormData((prev) => {
+          const updated = [...prev.lines];
+          const current = updated[index];
+          if (!current) return prev;
+          if ((current.sku || "") !== sku) return prev;
+
+          updated[index] = {
+            ...current,
+            description: freshItem.description || "",
+            unit_price: freshItem.fob_cost || 0,
+            weight_lbs: freshItem.weight_lbs || 0,
+          };
+
+          return { ...prev, lines: updated };
+        });
+      })
+      .catch((err) => console.error("Failed to fetch fresh product data:", err));
   }
 
   const toNumber = (value: unknown) => {
