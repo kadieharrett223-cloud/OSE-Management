@@ -174,6 +174,13 @@ export default function SettingsPage() {
         return;
       }
 
+      // Support both input styles:
+      // - Percent: 25 => 25%
+      // - Multiplier: 1.25 => 25%
+      const normalizedTariffPercent = parsed >= 1 && parsed <= 3
+        ? (parsed - 1) * 100
+        : parsed;
+
       setSavingTariff(true);
       setError(null);
       setSuccess(null);
@@ -181,7 +188,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/pricing/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ global_tariff_percent: parsed }),
+        body: JSON.stringify({ global_tariff_percent: normalizedTariffPercent }),
       });
 
       const data = await res.json();
@@ -189,7 +196,7 @@ export default function SettingsPage() {
         throw new Error(data.error || 'Failed to save tariff setting');
       }
 
-      setGlobalTariffPercent(String(parsed));
+      setGlobalTariffPercent(String(Number(normalizedTariffPercent.toFixed(4))));
       setSuccess('Global tariff updated. Non-manual products were recalculated.');
     } catch (err: any) {
       setError(err.message || 'Failed to save tariff setting');
@@ -404,6 +411,9 @@ export default function SettingsPage() {
                   {savingTariff ? 'Saving...' : 'Save Tariff'}
                 </button>
               </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Enter <strong>25</strong> for 25%, or <strong>1.25</strong> for a 1.25x tariff multiplier.
+              </p>
             </div>
 
             <div className="bg-white rounded-lg shadow mb-6 p-6">
