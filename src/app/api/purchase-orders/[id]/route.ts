@@ -19,6 +19,29 @@ const valuesDifferent = (oldValue: unknown, newValue: unknown): boolean => {
   return stringifyValue(oldValue) !== stringifyValue(newValue);
 };
 
+const normalizeCurrency = (value: unknown): number => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const cleaned = value.replace(/[^0-9.-]/g, "");
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const deriveTotalFromLines = (po: any): number => {
+  const lines = Array.isArray(po?.lines) ? po.lines : [];
+  if (lines.length === 0) return normalizeCurrency(po?.total_amount);
+
+  return lines.reduce((sum: number, line: any) => {
+    const quantity = normalizeCurrency(line?.quantity);
+    const unitPrice = normalizeCurrency(line?.unit_price);
+    const fallbackLineTotal = quantity * unitPrice;
+    const lineTotal = normalizeCurrency(line?.line_total);
+    return sum + (lineTotal || fallbackLineTotal);
+  }, 0);
+};
+
 const normalizeLine = (line: any) => ({
   lineNumber: Number(line?.line_number ?? 0),
   sku: stringifyValue(line?.sku),
@@ -181,7 +204,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .single();
 
     if (error) throw error;
-    return NextResponse.json({ ok: true, data });
+    const normalizedData = {
+      ...data,
+      total_amount: deriveTotalFromLines(data),
+    };
+
+    return NextResponse.json({ ok: true, data: normalizedData });
   } catch (error: any) {
     console.error("Fetch purchase order error:", error);
     return NextResponse.json({ error: error.message || "Not found" }, { status: 404 });
@@ -216,6 +244,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       poData.expected_delivery = null;
     }
 
+    // Always derive PO total from line items when lines are provided.
+    // This prevents stale/incorrect totals in the list view and balance calculations.
+    if (Array.isArray(lines)) {
+      poData.total_amount = lines.reduce((sum: number, line: any) => {
+        const quantity = normalizeCurrency(line?.quantity);
+        const unitPrice = normalizeCurrency(line?.unit_price);
+        const fallbackLineTotal = quantity * unitPrice;
+        const lineTotal = normalizeCurrency(line?.line_total);
+        return sum + (lineTotal || fallbackLineTotal);
+      }, 0);
+    }
+
     // Update PO fields
     const { data, error } = await supabase
       .from("purchase_orders")
@@ -243,14 +283,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
       // Insert all lines (both new and existing) with fresh line numbers
       for (const [index, line] of lines.entries()) {
+        const quantity = normalizeCurrency(line?.quantity);
+        const unitPrice = normalizeCurrency(line?.unit_price);
+        const fallbackLineTotal = quantity * unitPrice;
+        const lineTotal = normalizeCurrency(line?.line_total) || fallbackLineTotal;
+
         const insertData = {
           purchase_order_id: params.id,
           line_number: index + 1,
           sku: line.sku || null,
           description: line.description,
-          quantity: line.quantity,
-          unit_price: line.unit_price,
-          line_total: line.line_total,
+          quantity,
+          unit_price: unitPrice,
+          line_total: lineTotal,
           weight_lbs: line.weight_lbs || null,
         };
         console.log("Inserting line:", insertData);
@@ -297,7 +342,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
     }
 
-    return NextResponse.json({ ok: true, data: updatedPO });
+    const normalizedPO = {
+      ...updatedPO,
+      total_amount: deriveTotalFromLines(updatedPO),
+    };
+
+    return NextResponse.json({ ok: true, data: normalizedPO });
   } catch (error: any) {
     console.error("Update purchase order error:", error);
     return NextResponse.json({ error: error.message || "Failed to update" }, { status: 500 });

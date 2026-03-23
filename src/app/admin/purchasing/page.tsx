@@ -579,9 +579,31 @@ export default function PurchasingPage() {
     }
   }
 
+  const toNumber = (value: unknown) => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    if (typeof value === "string") {
+      const cleaned = value.replace(/[^0-9.-]/g, "");
+      const parsed = Number(cleaned);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
+
+  const computedTotal = (po: PurchaseOrder) => {
+    const lines = po.lines || [];
+    if (lines.length === 0) return toNumber(po.total_amount);
+    return lines.reduce((sum, line) => {
+      const lineTotal = toNumber(line?.line_total);
+      if (lineTotal !== 0) return sum + lineTotal;
+      const qty = toNumber(line?.quantity);
+      const unitPrice = toNumber(line?.unit_price);
+      return sum + qty * unitPrice;
+    }, 0);
+  };
+
   const totalPaid = (po: PurchaseOrder) =>
-    (po.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-  const balance = (po: PurchaseOrder) => Number(po.total_amount) - totalPaid(po);
+    (po.payments || []).reduce((sum, p) => sum + toNumber(p?.amount), 0);
+  const balance = (po: PurchaseOrder) => computedTotal(po) - totalPaid(po);
 
   // Calculate total weight from line items
   const calculateTotalWeight = () => {
@@ -610,9 +632,23 @@ export default function PurchasingPage() {
     return matchesQuery && matchesStatus && matchesStart && matchesEnd;
   });
 
-  const totalPages = Math.max(Math.ceil(filteredPos.length / pageSize), 1);
+  const sortedFilteredPos = [...filteredPos].sort((a, b) => {
+    const aNum = Number.parseInt(String(a.po_number || "").replace(/\D/g, ""), 10);
+    const bNum = Number.parseInt(String(b.po_number || "").replace(/\D/g, ""), 10);
+
+    if (!Number.isNaN(aNum) && !Number.isNaN(bNum) && aNum !== bNum) {
+      return bNum - aNum;
+    }
+
+    return String(b.po_number || "").localeCompare(String(a.po_number || ""), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
+
+  const totalPages = Math.max(Math.ceil(sortedFilteredPos.length / pageSize), 1);
   const safePage = Math.min(currentPage, totalPages);
-  const pagedPos = filteredPos.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const pagedPos = sortedFilteredPos.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const pathname = usePathname();
   const tabs = [
@@ -1270,7 +1306,7 @@ export default function PurchasingPage() {
                           <td className="px-6 py-4 text-right"><div className="ml-auto h-3 w-24 rounded bg-slate-200" /></td>
                         </tr>
                       ))
-                    ) : filteredPos.length === 0 ? (
+                    ) : sortedFilteredPos.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-6 py-12 text-center text-slate-600">
                           <div className="text-lg font-semibold text-slate-900">No purchase orders yet</div>
@@ -1291,7 +1327,7 @@ export default function PurchasingPage() {
                           <td className="px-6 py-3 font-medium text-slate-900">{po.po_number}</td>
                           <td className="px-6 py-3 text-slate-600">{po.vendor_name}</td>
                           <td className="px-6 py-3 text-slate-600">{formatDate(po.order_date)}</td>
-                          <td className="px-6 py-3 text-right font-semibold text-slate-900">${money(po.total_amount)}</td>
+                          <td className="px-6 py-3 text-right font-semibold text-slate-900">${money(computedTotal(po))}</td>
                           <td className="px-6 py-3 text-right font-semibold text-amber-700">${money(balance(po))}</td>
                           <td className="px-6 py-3 text-center">
                             <span
@@ -1355,7 +1391,7 @@ export default function PurchasingPage() {
                       <div className="h-3 w-32 rounded bg-slate-200" />
                     </div>
                   ))
-                ) : filteredPos.length === 0 ? (
+                ) : sortedFilteredPos.length === 0 ? (
                   <div className="p-8 text-center text-slate-600">
                     <div className="text-lg font-semibold text-slate-900">No purchase orders yet</div>
                     <div className="mt-2 text-sm text-slate-600">Create your first PO to start tracking purchasing.</div>
@@ -1395,7 +1431,7 @@ export default function PurchasingPage() {
                         </div>
                         <div className="text-right">
                           <span className="text-slate-500">Total:</span>{" "}
-                          <span className="font-semibold text-slate-900">${money(po.total_amount)}</span>
+                          <span className="font-semibold text-slate-900">${money(computedTotal(po))}</span>
                         </div>
                       </div>
                       <div className="flex gap-2 pt-2 border-t border-slate-200">
@@ -1427,10 +1463,10 @@ export default function PurchasingPage() {
                 )}
               </div>
 
-              {!loading && filteredPos.length > 0 && (
+              {!loading && sortedFilteredPos.length > 0 && (
                 <div className="flex items-center justify-between border-t border-slate-200 px-4 md:px-6 py-3 text-sm text-slate-600">
                   <div className="text-xs md:text-sm">
-                    Showing {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filteredPos.length)} of {filteredPos.length}
+                    Showing {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, sortedFilteredPos.length)} of {sortedFilteredPos.length}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -1458,7 +1494,7 @@ export default function PurchasingPage() {
                 <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl space-y-4">
                   <h2 className="text-xl font-semibold text-slate-900">Add Payment</h2>
                   <p className="text-sm text-slate-600">
-                    PO: {selectedPO.po_number} | Total: ${money(selectedPO.total_amount || 0)} | Balance: ${money(balance(selectedPO))}
+                    PO: {selectedPO.po_number} | Total: ${money(computedTotal(selectedPO))} | Balance: ${money(balance(selectedPO))}
                   </p>
                   
                   {/* Existing Payments */}
@@ -1534,19 +1570,19 @@ export default function PurchasingPage() {
                     <div className="flex gap-2 mb-2">
                       <button
                         type="button"
-                        onClick={() => setPaymentForm({ ...paymentForm, amount: Number((selectedPO.total_amount * 0.3).toFixed(2)) })}
+                        onClick={() => setPaymentForm({ ...paymentForm, amount: Number((computedTotal(selectedPO) * 0.3).toFixed(2)) })}
                         className="flex-1 rounded-lg border-2 border-blue-500 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
                       >
                         30% Down
-                        <div className="text-[10px] font-normal text-blue-600">${money(selectedPO.total_amount * 0.3)}</div>
+                        <div className="text-[10px] font-normal text-blue-600">${money(computedTotal(selectedPO) * 0.3)}</div>
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPaymentForm({ ...paymentForm, amount: Number((selectedPO.total_amount * 0.7).toFixed(2)) })}
+                        onClick={() => setPaymentForm({ ...paymentForm, amount: Number((computedTotal(selectedPO) * 0.7).toFixed(2)) })}
                         className="flex-1 rounded-lg border-2 border-green-500 bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-100 transition-colors"
                       >
                         70% Final
-                        <div className="text-[10px] font-normal text-green-600">${money(selectedPO.total_amount * 0.7)}</div>
+                        <div className="text-[10px] font-normal text-green-600">${money(computedTotal(selectedPO) * 0.7)}</div>
                       </button>
                       <button
                         type="button"

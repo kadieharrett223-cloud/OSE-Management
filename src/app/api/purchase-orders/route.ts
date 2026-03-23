@@ -11,6 +11,29 @@ export async function GET(req: NextRequest) {
   const china = params.get("china");
 
   try {
+    const normalizeCurrency = (value: unknown): number => {
+      if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+      if (typeof value === "string") {
+        const cleaned = value.replace(/[^0-9.-]/g, "");
+        const parsed = Number(cleaned);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+      return 0;
+    };
+
+    const deriveTotalFromLines = (po: any): number => {
+      const lines = Array.isArray(po?.lines) ? po.lines : [];
+      if (lines.length === 0) return normalizeCurrency(po?.total_amount);
+
+      return lines.reduce((sum: number, line: any) => {
+        const quantity = normalizeCurrency(line?.quantity);
+        const unitPrice = normalizeCurrency(line?.unit_price);
+        const fallbackLineTotal = quantity * unitPrice;
+        const lineTotal = normalizeCurrency(line?.line_total);
+        return sum + (lineTotal || fallbackLineTotal);
+      }, 0);
+    };
+
     let query = supabase
       .from("purchase_orders")
       .select(`
@@ -31,7 +54,12 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
     if (error) throw error;
 
-    return NextResponse.json({ ok: true, data });
+    const normalizedData = (data || []).map((po: any) => ({
+      ...po,
+      total_amount: deriveTotalFromLines(po),
+    }));
+
+    return NextResponse.json({ ok: true, data: normalizedData });
   } catch (error: any) {
     console.error("Fetch purchase orders error:", error);
     return NextResponse.json({ error: error.message || "Failed to fetch" }, { status: 500 });
