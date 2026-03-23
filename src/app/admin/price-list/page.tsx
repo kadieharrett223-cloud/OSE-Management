@@ -625,12 +625,14 @@ export default function AdminPriceListPage() {
     }
   };
 
-  const handlePrintReport = () => {
+  const handlePrintReport = (selectedCols: Set<PrintColKey> = printCols) => {
     const printDate = new Date().toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
     });
+
+    const activeCols = ALL_PRINT_COLUMNS.filter((c) => selectedCols.has(c.key));
 
     // Build all items grouped by category using current derived data
     const allCategories = [...categories]
@@ -647,35 +649,62 @@ export default function AdminPriceListPage() {
     const fmt = (v: number | null | undefined) =>
       v == null ? "—" : v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+    const getCellHtml = (item: PriceListItem, key: PrintColKey) => {
+      switch (key) {
+        case "item_no":
+          return `<td class="mono">${item.item_no}</td>`;
+        case "description":
+          return `<td>${item.description || "—"}</td>`;
+        case "supplier":
+          return `<td>${item.supplier || "—"}</td>`;
+        case "fob_cost":
+          return `<td class="num">$${fmt(item.fob_cost)}</td>`;
+        case "quantity":
+          return `<td class="num">${item.quantity ?? "—"}</td>`;
+        case "tariff_105":
+          return `<td class="num">$${fmt(item.tariff_105)}</td>`;
+        case "ocean_frt":
+          return `<td class="num">$${fmt(item.ocean_frt)}</td>`;
+        case "importing":
+          return `<td class="num">$${fmt(item.importing)}</td>`;
+        case "zone5_shipping":
+          return `<td class="num">$${fmt(item.zone5_shipping)}</td>`;
+        case "cost_with_shipping":
+          return `<td class="num">$${fmt(item.cost_with_shipping)}</td>`;
+        case "margin":
+          return `<td class="num">${item.margin != null ? (item.margin * 100).toFixed(2) + "%" : "—"}</td>`;
+        case "sell_price":
+          return `<td class="num bold">$${fmt(item.sell_price)}</td>`;
+        case "list_price":
+          return `<td class="num">$${fmt(item.list_price)}</td>`;
+        case "profit":
+          return `<td class="num profit">$${fmt(item.profit)}</td>`;
+        case "weight_lbs":
+          return `<td class="num">${item.weight_lbs ?? "—"}</td>`;
+        default:
+          return "<td></td>";
+      }
+    };
+
     const tableRows = allCategories
       .map(
         ({ category, items: ci }) => `
           <tr class="cat-header">
-            <td colspan="15">${category.category_name}</td>
+            <td colspan="${activeCols.length}">${category.category_name}</td>
           </tr>
           ${ci
             .map(
               (item) => `
             <tr>
-              <td class="mono">${item.item_no}</td>
-              <td>${item.description || "—"}</td>
-              <td>${item.supplier || "—"}</td>
-              <td class="num">$${fmt(item.fob_cost)}</td>
-              <td class="num">${item.quantity ?? "—"}</td>
-              <td class="num">$${fmt(item.tariff_105)}</td>
-              <td class="num">$${fmt(item.ocean_frt)}</td>
-              <td class="num">$${fmt(item.importing)}</td>
-              <td class="num">$${fmt(item.zone5_shipping)}</td>
-              <td class="num">$${fmt(item.cost_with_shipping)}</td>
-              <td class="num">${item.margin != null ? (item.margin * 100).toFixed(2) + "%" : "—"}</td>
-              <td class="num bold">$${fmt(item.sell_price)}</td>
-              <td class="num">$${fmt(item.list_price)}</td>
-              <td class="num profit">$${fmt(item.profit)}</td>
-              <td class="num">${item.weight_lbs ?? "—"}</td>
+              ${activeCols.map((col) => getCellHtml(item, col.key)).join("")}
             </tr>`
             )
             .join("")}`
       )
+      .join("");
+
+    const headerCells = activeCols
+      .map((col) => `<th${col.num ? ' class="num"' : ""}>${col.label}</th>`)
       .join("");
 
     const html = `<!DOCTYPE html>
@@ -721,23 +750,7 @@ export default function AdminPriceListPage() {
   </div>
   <table>
     <thead>
-      <tr>
-        <th>Item No</th>
-        <th>Description</th>
-        <th>Supplier</th>
-        <th class="num">FOB Cost</th>
-        <th class="num">Qty</th>
-        <th class="num">Tariff</th>
-        <th class="num">Ocean/Unit</th>
-        <th class="num">Import/Unit</th>
-        <th class="num">Shipping</th>
-        <th class="num">Cost+Ship</th>
-        <th class="num">Margin</th>
-        <th class="num">Sell Price</th>
-        <th class="num">List Price</th>
-        <th class="num">Profit</th>
-        <th class="num">Wt (lbs)</th>
-      </tr>
+      <tr>${headerCells}</tr>
     </thead>
     <tbody>${tableRows}</tbody>
   </table>
