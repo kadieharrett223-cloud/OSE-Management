@@ -25,6 +25,8 @@ type PriceListItem = {
   currentSalePricePerUnit: number;
   weight_lbs?: number;
   fob_cost?: number;
+  category_id?: string | null;
+  category_name?: string | null;
 };
 
 type Supplier = {
@@ -109,7 +111,7 @@ export default function PurchasingPage() {
     expected_delivery: "",
     status: "TO_BE_PAID",
     notes: "",
-    lines: [{ sku: "", description: "", quantity: 1, unit_price: 0, weight_lbs: 0 }],
+    lines: [{ collection_name: "", sku: "", description: "", quantity: 1, unit_price: 0, weight_lbs: 0 }],
   });
   const [paymentForm, setPaymentForm] = useState({
     payment_date: new Date().toISOString().split("T")[0],
@@ -521,14 +523,14 @@ export default function PurchasingPage() {
       expected_delivery: "",
       status: "TO_BE_PAID",
       notes: "",
-      lines: [{ sku: "", description: "", quantity: 1, unit_price: 0, weight_lbs: 0 }],
+      lines: [{ collection_name: "", sku: "", description: "", quantity: 1, unit_price: 0, weight_lbs: 0 }],
     });
   }
 
   function addLine() {
     setFormData({
       ...formData,
-      lines: [...formData.lines, { sku: "", description: "", quantity: 1, unit_price: 0, weight_lbs: 0 }],
+      lines: [...formData.lines, { collection_name: "", sku: "", description: "", quantity: 1, unit_price: 0, weight_lbs: 0 }],
     });
   }
 
@@ -554,6 +556,7 @@ export default function PurchasingPage() {
     if (field === "sku" && value) {
       const item = priceList.find((p) => p.sku === value);
       if (item) {
+        updated[index].collection_name = item.category_name || "";
         updated[index].description = item.description || "";
         updated[index].unit_price = item.fob_cost || 0;
         updated[index].weight_lbs = item.weight_lbs || 0;
@@ -566,6 +569,7 @@ export default function PurchasingPage() {
             const freshItem = data.find((p: any) => p.sku === value);
             if (freshItem) {
               const freshUpdated = [...formData.lines];
+              freshUpdated[index].collection_name = freshItem.category_name || "";
               freshUpdated[index].description = freshItem.description || "";
               freshUpdated[index].unit_price = freshItem.fob_cost || 0;
               freshUpdated[index].weight_lbs = freshItem.weight_lbs || 0;
@@ -578,6 +582,28 @@ export default function PurchasingPage() {
       setFormData({ ...formData, lines: updated });
     }
   }
+
+  const handleCollectionChange = (index: number, collectionName: string) => {
+    const updated = [...formData.lines];
+    updated[index] = {
+      ...updated[index],
+      collection_name: collectionName,
+      sku: "",
+      description: "",
+      unit_price: 0,
+      weight_lbs: 0,
+    };
+    setFormData({ ...formData, lines: updated });
+  };
+
+  const collectionOptions = Array.from(
+    new Set(
+      [
+        ...categories.map((cat: any) => cat?.category_name).filter(Boolean),
+        ...priceList.map((item) => item.category_name).filter(Boolean),
+      ] as string[]
+    )
+  );
 
   const toNumber = (value: unknown) => {
     if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -1030,21 +1056,34 @@ export default function PurchasingPage() {
                         </div>
                         <div className="col-span-2 border-r border-slate-200 p-2">
                           <div className="flex flex-col gap-1">
-                            <input
-                              type="text"
-                              list={`sku-list-${index}`}
-                              placeholder="Enter or search SKU"
+                            <select
+                              value={line.collection_name || ""}
+                              onChange={(e) => handleCollectionChange(index, e.target.value)}
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                              required
+                            >
+                              <option value="">Select collection...</option>
+                              {collectionOptions.map((collectionName) => (
+                                <option key={collectionName} value={collectionName}>{collectionName}</option>
+                              ))}
+                            </select>
+
+                            <select
                               value={line.sku}
                               onChange={(e) => updateLine(index, "sku", e.target.value)}
-                              className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                               required
-                            />
-                            <datalist id={`sku-list-${index}`}>
-                              {priceList.map((item) => (
-                                <option key={item.id} value={item.sku}>{item.description}</option>
-                              ))}
-                            </datalist>
-                            {!priceList.some((item) => item.sku === line.sku) && line.sku && (
+                              disabled={!line.collection_name}
+                            >
+                              <option value="">{line.collection_name ? "Select product..." : "Choose collection first"}</option>
+                              {priceList
+                                .filter((item) => item.category_name === line.collection_name)
+                                .map((item) => (
+                                  <option key={item.id} value={item.sku}>{item.sku} - {item.description}</option>
+                                ))}
+                            </select>
+
+                            {line.collection_name && !line.sku && (
                               <button
                                 type="button"
                                 onClick={() => openCreateProductModal(index)}

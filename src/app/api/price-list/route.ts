@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabase
       .from("price_list_items")
-      .select("id, item_no, description, list_price, shipping_included_per_unit, weight_lbs, fob_cost, shopify_variant_id")
+      .select("id, item_no, description, list_price, shipping_included_per_unit, weight_lbs, fob_cost, shopify_variant_id, category_id, price_list_categories(category_name)")
       .eq("is_active", true);
 
     if (error) throw error;
@@ -32,6 +32,8 @@ export async function GET(req: NextRequest) {
       weight_lbs: item.weight_lbs ? Number(item.weight_lbs) : null,
       fob_cost: item.fob_cost ? Number(item.fob_cost) : null,
       shopify_variant_id: item.shopify_variant_id || null,
+      category_id: item.category_id || null,
+      category_name: item.price_list_categories?.category_name || null,
     }));
 
     const response = NextResponse.json(items);
