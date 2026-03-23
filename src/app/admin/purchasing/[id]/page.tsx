@@ -91,7 +91,6 @@ export default function ViewPO() {
   const [showLineItemModal, setShowLineItemModal] = useState(false);
   const [editingLineItem, setEditingLineItem] = useState<any>(null);
   const [lineItemForm, setLineItemForm] = useState({
-    collection_name: "",
     sku: "",
     description: "",
     quantity: 0,
@@ -367,10 +366,8 @@ export default function ViewPO() {
 
   const openLineItemModal = (line?: any) => {
     if (line) {
-      const matchedItem = priceList.find((item) => (item.sku || item.item_no) === (line.sku || ""));
       setEditingLineItem(line);
       setLineItemForm({
-        collection_name: matchedItem?.category_name || "",
         sku: line.sku || "",
         description: line.description || "",
         quantity: line.quantity || 0,
@@ -380,7 +377,6 @@ export default function ViewPO() {
     } else {
       setEditingLineItem(null);
       setLineItemForm({
-        collection_name: "",
         sku: "",
         description: "",
         quantity: 0,
@@ -421,7 +417,6 @@ export default function ViewPO() {
   const handleSelectProduct = (product: any) => {
     const isNote = (product.item_no || "").toLowerCase() === "note";
     setLineItemForm({
-      collection_name: product.category_name || "",
       sku: product.item_no || "",
       description: product.description || "",
       quantity: isNote ? 0 : (lineItemForm.quantity || 1),
@@ -664,26 +659,6 @@ export default function ViewPO() {
   };
 
   const containerMaxLbs = 44000;
-  const lineItemCollectionOptions = Array.from(
-    new Set(
-      [
-        ...categories.map((category: any) => category?.category_name).filter(Boolean),
-        ...priceList.map((item: any) => item?.category_name).filter(Boolean),
-      ] as string[]
-    )
-  );
-
-  const handleLineItemCollectionChange = (collectionName: string) => {
-    setLineItemForm((prev) => ({
-      ...prev,
-      collection_name: collectionName,
-      sku: "",
-      description: "",
-      unit_price: 0,
-      weight_lbs: 0,
-    }));
-  };
-
   const totalWeightLbs = (po?.lines || []).reduce((sum, line) => {
     const weightEach = Number(line.weight_lbs) || 0;
     const qty = Number(line.quantity) || 0;
@@ -1961,53 +1936,49 @@ export default function ViewPO() {
               </div>
               <div className="grid grid-cols-12 gap-0 border-b border-slate-200 bg-slate-50 p-0">
                 <div className="col-span-3 border-r border-slate-200 p-2">
-                  <div className="flex flex-col gap-2">
-                    <select
-                      value={lineItemForm.collection_name || ""}
-                      onChange={(e) => handleLineItemCollectionChange(e.target.value)}
-                      className="w-full border border-slate-300 px-2 py-1 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                      autoFocus
-                    >
-                      <option value="">Select collection...</option>
-                      {lineItemCollectionOptions.map((collectionName) => (
-                        <option key={collectionName} value={collectionName}>{collectionName}</option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={lineItemForm.sku}
-                      onChange={(e) => {
-                        const sku = e.target.value;
-                        const found = priceList.find((item) => (item.sku || item.item_no) === sku);
-                        if (!found) {
-                          setLineItemForm((prev) => ({ ...prev, sku }));
-                          return;
-                        }
-
+                  <input
+                    type="text"
+                    list="sku-list-edit"
+                    placeholder="Type SKU to search product"
+                    value={lineItemForm.sku}
+                    onChange={(e) => {
+                      const sku = e.target.value;
+                      setLineItemForm((prev) => ({ ...prev, sku }));
+                      const found = priceList.find(
+                        (item) => (item.sku || item.item_no)?.toLowerCase() === sku.toLowerCase()
+                      );
+                      if (found) {
                         const isNote = (found.item_no || "").toLowerCase() === "note";
                         setLineItemForm((prev) => ({
                           ...prev,
-                          collection_name: found.category_name || prev.collection_name,
                           sku: found.sku || found.item_no || "",
                           description: found.description || "",
                           unit_price: isNote ? 0 : (found.fob_cost || found.cost_with_shipping || 0),
                           quantity: isNote ? 0 : (prev.quantity || 1),
                           weight_lbs: found.weight_lbs || 0,
                         }));
-                      }}
-                      className="w-full border border-slate-300 px-2 py-1 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                      disabled={!lineItemForm.collection_name}
-                      required
-                    >
-                      <option value="">{lineItemForm.collection_name ? "Select product..." : "Choose collection first"}</option>
-                      {priceList
-                        .filter((item) => item.category_name === lineItemForm.collection_name)
-                        .map((item) => (
-                          <option key={item.id} value={item.sku || item.item_no || ""}>{item.sku || item.item_no || ""} - {item.description}</option>
-                        ))}
-                    </select>
-                  </div>
-                  {!lineItemForm.sku && lineItemForm.collection_name && (
+                      }
+                    }}
+                    className="w-full border border-slate-300 px-2 py-1 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    autoFocus
+                    required
+                  />
+                  <datalist id="sku-list-edit">
+                    {priceList
+                      .filter((item) => {
+                        const query = (lineItemForm.sku || "").toLowerCase();
+                        if (!query) return true;
+                        return (
+                          (item.sku || item.item_no || "").toLowerCase().includes(query) ||
+                          (item.description || "").toLowerCase().includes(query)
+                        );
+                      })
+                      .slice(0, 50)
+                      .map((item) => (
+                        <option key={item.id} value={item.sku || item.item_no || ""}>{item.description}</option>
+                      ))}
+                  </datalist>
+                  {!priceList.find(item => (item.sku || item.item_no || "").toLowerCase() === lineItemForm.sku.toLowerCase()) && lineItemForm.sku && (
                     <button
                       type="button"
                       onClick={openCreateProductModal}
