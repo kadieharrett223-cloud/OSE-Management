@@ -273,6 +273,26 @@ export default function PurchasingPage() {
     }
   };
 
+  const resolveUnitPrice = (item: any) => {
+    const candidates = [
+      Number(item?.cost_with_shipping),
+      Number(item?.shippingIncludedPerUnit),
+      Number(item?.shipping_included_per_unit),
+      Number(item?.per_unit),
+      Number(item?.sell_price),
+      Number(item?.currentSalePricePerUnit),
+      Number(item?.list_price),
+      Number(item?.fob_cost),
+      Number(item?.zone5_shipping),
+    ];
+
+    for (const value of candidates) {
+      if (Number.isFinite(value) && value > 0) return value;
+    }
+
+    return 0;
+  };
+
   const openCreateProductModal = (lineIndex: number) => {
     setCreatingForLineIndex(lineIndex);
     const line = formData.lines[lineIndex];
@@ -322,7 +342,7 @@ export default function PurchasingPage() {
         setPriceList((prev) => [newItem, ...prev]);
         // Update the line item with the created product info
         if (creatingForLineIndex !== null) {
-          updateLine(creatingForLineIndex, "unit_price", newItem.fob_cost || 0);
+          updateLine(creatingForLineIndex, "unit_price", resolveUnitPrice(newItem));
         }
       }
 
@@ -566,25 +586,6 @@ export default function PurchasingPage() {
 
     const sku = String(value || "");
     if (!sku) return;
-
-    const resolveUnitPrice = (item: any) => {
-      const candidates = [
-        Number(item?.fob_cost),
-        Number(item?.cost_with_shipping),
-        Number(item?.shippingIncludedPerUnit),
-        Number(item?.per_unit),
-        Number(item?.sell_price),
-        Number(item?.currentSalePricePerUnit),
-        Number(item?.list_price),
-        Number(item?.zone5_shipping),
-      ];
-
-      for (const value of candidates) {
-        if (Number.isFinite(value) && value > 0) return value;
-      }
-
-      return 0;
-    };
 
     // Try immediate local cache match first.
     const cachedItem = priceList.find((p) => p.sku === sku);

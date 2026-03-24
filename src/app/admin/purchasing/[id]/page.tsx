@@ -420,7 +420,7 @@ export default function ViewPO() {
       sku: product.item_no || "",
       description: product.description || "",
       quantity: isNote ? 0 : (lineItemForm.quantity || 1),
-      unit_price: isNote ? 0 : (product.fob_port_cost || product.cost_with_shipping || 0),
+      unit_price: isNote ? 0 : resolveUnitPrice(product),
       weight_lbs: lineItemForm.weight_lbs || 0,
     });
     setShowSearchResults(false);
@@ -673,6 +673,27 @@ export default function ViewPO() {
     return date.toLocaleString();
   };
 
+  const resolveUnitPrice = (item: any) => {
+    const candidates = [
+      Number(item?.cost_with_shipping),
+      Number(item?.shippingIncludedPerUnit),
+      Number(item?.shipping_included_per_unit),
+      Number(item?.per_unit),
+      Number(item?.sell_price),
+      Number(item?.currentSalePricePerUnit),
+      Number(item?.list_price),
+      Number(item?.fob_port_cost),
+      Number(item?.fob_cost),
+      Number(item?.zone5_shipping),
+    ];
+
+    for (const value of candidates) {
+      if (Number.isFinite(value) && value > 0) return value;
+    }
+
+    return 0;
+  };
+
   // Calculate payment totals - only when po is not null
   const totalPaid = po ? (po.payments || []).reduce((sum, p) => sum + Number(p.amount), 0) : 0;
   const balanceDue = po ? po.total_amount - totalPaid : 0;
@@ -746,7 +767,7 @@ export default function ViewPO() {
           ...prev,
           sku: newItem.sku || itemNo,
           description: newItem.description || description,
-          unit_price: Number(newItem.fob_cost ?? prev.unit_price),
+          unit_price: resolveUnitPrice(newItem) || Number(prev.unit_price || 0),
         }));
       }
 
@@ -974,14 +995,6 @@ export default function ViewPO() {
             <p className="text-sm text-amber-800">{poNotes}</p>
           </div>
         )}
-
-        {/* Chinese PO Files Section */}
-        <div className="mb-4 print:hidden">
-          <ChinesePOFiles 
-            poId={id}
-            poNumber={po?.po_number || ""}
-          />
-        </div>
 
         {/* PO Document */}
         <div className="border border-gray-300 bg-white p-4 print:text-[10px] print:[&_td]:text-[10px] print:[&_th]:text-[9px] print:[&_p]:text-[10px] print:[&_span]:text-[10px]">
@@ -1565,6 +1578,14 @@ export default function ViewPO() {
             </section>
           </div>
         </div>
+
+        {/* Chinese PO Files Section */}
+        <div className="mt-4 print:hidden">
+          <ChinesePOFiles 
+            poId={id}
+            poNumber={po?.po_number || ""}
+          />
+        </div>
       </div>
 
           </div>
@@ -1953,7 +1974,7 @@ export default function ViewPO() {
                           ...prev,
                           sku: found.sku || found.item_no || "",
                           description: found.description || "",
-                          unit_price: isNote ? 0 : (found.fob_cost || found.cost_with_shipping || 0),
+                          unit_price: isNote ? 0 : resolveUnitPrice(found),
                           quantity: isNote ? 0 : (prev.quantity || 1),
                           weight_lbs: found.weight_lbs || 0,
                         }));
