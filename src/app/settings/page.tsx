@@ -349,7 +349,7 @@ export default function SettingsPage() {
                         disabled={syncing}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {syncing ? 'Syncing...' : 'Sync Prices'}
+                        {syncing ? 'Syncing...' : 'Push Mapped to Shopify'}
                       </button>
                     ) : (
                       <div className="flex gap-2">
@@ -374,7 +374,7 @@ export default function SettingsPage() {
                 {shopifyConnected && (
                   <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-800">
-                      <strong>Note:</strong> Prices will sync from your price list to Shopify based on matching SKUs.
+                      <strong>Note:</strong> Use “Push Mapped to Shopify” here to send mapped price list updates to Shopify based on matching SKUs.
                       Make sure your Shopify product variants have SKUs that match your price list item numbers.
                     </p>
                   </div>
