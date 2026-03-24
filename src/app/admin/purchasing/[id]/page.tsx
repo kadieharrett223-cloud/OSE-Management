@@ -107,6 +107,7 @@ export default function ViewPO() {
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [editingLineItems, setEditingLineItems] = useState(false);
   const [tempLines, setTempLines] = useState<any[]>([]);
+  const [activeTempSkuSuggestionLine, setActiveTempSkuSuggestionLine] = useState<number | null>(null);
   const [newProductForm, setNewProductForm] = useState({
     item_no: "",
     description: "",
@@ -604,9 +605,34 @@ export default function ViewPO() {
   const updateTempLine = (index: number, field: string, value: any) => {
     const updated = [...tempLines];
     updated[index] = { ...updated[index], [field]: value };
+
+    if (field === "sku") {
+      const sku = String(value || "").trim().toLowerCase();
+      const matchedItem = priceList.find(
+        (item) => (item.sku || item.item_no || "").toLowerCase() === sku
+      );
+
+      if (matchedItem) {
+        const isNote = (matchedItem.sku || matchedItem.item_no || "").toLowerCase() === "note";
+        updated[index] = {
+          ...updated[index],
+          sku: matchedItem.sku || matchedItem.item_no || "",
+          description: matchedItem.description || updated[index].description || "",
+          unit_price: isNote ? 0 : resolveUnitPrice(matchedItem),
+          quantity: isNote ? 0 : (updated[index].quantity || 1),
+          weight_lbs: matchedItem.weight_lbs || 0,
+        };
+      }
+    }
+
     if (field === 'quantity' || field === 'unit_price') {
       updated[index].line_total = (updated[index].quantity || 0) * (updated[index].unit_price || 0);
     }
+
+    if (field === "sku" && updated[index]) {
+      updated[index].line_total = (updated[index].quantity || 0) * (updated[index].unit_price || 0);
+    }
+
     setTempLines(updated);
   };
 
@@ -1358,13 +1384,51 @@ export default function ViewPO() {
                       </button>
                     </div>
                     <div className="col-span-2 border-r border-slate-200 p-2">
-                      <input
-                        type="text"
-                        placeholder="SKU"
-                        value={line.sku || ""}
-                        onChange={(e) => updateTempLine(index, "sku", e.target.value)}
-                        className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                      />
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="text"
+                          placeholder="Type SKU to search product"
+                          value={line.sku || ""}
+                          onChange={(e) => updateTempLine(index, "sku", e.target.value)}
+                          onFocus={() => setActiveTempSkuSuggestionLine(index)}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              setActiveTempSkuSuggestionLine((prev) => (prev === index ? null : prev));
+                            }, 120);
+                          }}
+                          className="w-full border-0 px-2 py-1 text-sm text-slate-900 bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          autoComplete="off"
+                        />
+
+                        {!!line.sku && activeTempSkuSuggestionLine === index && !priceList.some((item) => (item.sku || item.item_no || "").toLowerCase() === (line.sku || "").toLowerCase()) && (
+                          <div className="max-h-36 overflow-y-auto rounded border border-slate-200 bg-white">
+                            {priceList
+                              .filter((item) => {
+                                const query = (line.sku || "").toLowerCase();
+                                return (
+                                  (item.sku || item.item_no || "").toLowerCase().includes(query) ||
+                                  (item.description || "").toLowerCase().includes(query)
+                                );
+                              })
+                              .slice(0, 8)
+                              .map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    updateTempLine(index, "sku", item.sku || item.item_no || "");
+                                    setActiveTempSkuSuggestionLine(null);
+                                  }}
+                                  className="block w-full border-b border-slate-100 px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-50"
+                                >
+                                  <span className="font-mono font-semibold">{item.sku || item.item_no}</span>
+                                  <span className="ml-2 text-slate-500">{item.description}</span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="col-span-3 border-r border-slate-200 p-2">
                       <textarea
