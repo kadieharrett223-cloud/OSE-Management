@@ -614,6 +614,21 @@ export default function ViewPO() {
     setTempLines(tempLines.filter((_, i) => i !== index));
   };
 
+  const addTempLine = () => {
+    setTempLines((prev) => [
+      ...prev,
+      {
+        id: `temp_${Date.now()}`,
+        sku: "",
+        description: "",
+        quantity: 1,
+        unit_price: 0,
+        weight_lbs: 0,
+        line_total: 0,
+      },
+    ]);
+  };
+
   const reorderTempLine = (fromIndex: number, toIndex: number) => {
     if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
     const updated = [...tempLines];
@@ -1139,6 +1154,13 @@ export default function ViewPO() {
               </>
             ) : (
               <>
+                <button
+                  onClick={addTempLine}
+                  disabled={savingLineItem}
+                  className="w-full sm:w-auto rounded-lg bg-green-600 px-3 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  + Add Line Item
+                </button>
                 <button
                   onClick={saveTempLineItems}
                   disabled={savingLineItem}
