@@ -144,6 +144,7 @@ export default function PurchasingPage() {
   const [creatingForLineIndex, setCreatingForLineIndex] = useState<number | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const [draggedLineIndex, setDraggedLineIndex] = useState<number | null>(null);
+  const [activeSkuSuggestionLine, setActiveSkuSuggestionLine] = useState<number | null>(null);
   const [newProductForm, setNewProductForm] = useState({
     item_no: "",
     description: "",
@@ -1063,12 +1064,18 @@ export default function PurchasingPage() {
                               placeholder="Type SKU to search product"
                               value={line.sku}
                               onChange={(e) => updateLine(index, "sku", e.target.value)}
+                              onFocus={() => setActiveSkuSuggestionLine(index)}
+                              onBlur={() => {
+                                setTimeout(() => {
+                                  setActiveSkuSuggestionLine((prev) => (prev === index ? null : prev));
+                                }, 120);
+                              }}
                               className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
                               autoComplete="off"
                               required
                             />
 
-                            {!!line.sku && !priceList.some((item) => (item.sku || "").toLowerCase() === (line.sku || "").toLowerCase()) && (
+                            {!!line.sku && activeSkuSuggestionLine === index && !priceList.some((item) => (item.sku || "").toLowerCase() === (line.sku || "").toLowerCase()) && (
                               <div className="max-h-36 overflow-y-auto rounded border border-slate-200 bg-white">
                                 {priceList
                                   .filter((item) => {
@@ -1083,7 +1090,11 @@ export default function PurchasingPage() {
                                     <button
                                       key={item.id}
                                       type="button"
-                                      onClick={() => updateLine(index, "sku", item.sku)}
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        updateLine(index, "sku", item.sku);
+                                        setActiveSkuSuggestionLine(null);
+                                      }}
                                       className="block w-full border-b border-slate-100 px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-50"
                                     >
                                       <span className="font-mono font-semibold">{item.sku}</span>
