@@ -997,7 +997,7 @@ export default function ViewPO() {
         )}
 
         {/* PO Document */}
-        <div className="border border-gray-300 bg-white p-4 print:text-[10px] print:[&_td]:text-[10px] print:[&_th]:text-[9px] print:[&_p]:text-[10px] print:[&_span]:text-[10px]">
+        <div className="border border-gray-300 bg-white p-4 text-slate-900 print:text-[10px] print:[&_td]:text-[10px] print:[&_th]:text-[9px] print:[&_p]:text-[10px] print:[&_span]:text-[10px]">
           {/* Header Section */}
           <div className="grid grid-cols-2 gap-6 pb-3 mb-3 border-b border-gray-300">
             <div>
@@ -1010,15 +1010,15 @@ export default function ViewPO() {
             </div>
             <div className="flex flex-col items-end justify-start">
               <h2 className="text-3xl font-bold text-slate-900 mb-1.5 tracking-tight">PURCHASE ORDER</h2>
-              <table className="border border-gray-400 text-[9px]">
+              <table className="border border-gray-400 text-[9px] text-slate-900">
                 <tbody>
                   <tr>
-                    <td className="border-r border-gray-400 px-2 py-1 bg-gray-50 font-bold uppercase text-[8px] tracking-wide">PO number</td>
-                    <td className="border-r border-gray-400 px-2 py-1 bg-gray-50 font-bold uppercase text-[8px] tracking-wide">PO DATE</td>
+                    <td className="border-r border-gray-400 px-2 py-1 bg-gray-50 font-bold uppercase text-[8px] tracking-wide text-slate-900">PO number</td>
+                    <td className="border-r border-gray-400 px-2 py-1 bg-gray-50 font-bold uppercase text-[8px] tracking-wide text-slate-900">PO DATE</td>
                   </tr>
                   <tr>
-                    <td className="border-r border-gray-400 px-2 py-1 font-semibold">{po.po_number}</td>
-                    <td className="px-2 py-1 font-semibold">{po.order_date}</td>
+                    <td className="border-r border-gray-400 px-2 py-1 font-semibold text-slate-900">{po.po_number}</td>
+                    <td className="px-2 py-1 font-semibold text-slate-900">{po.order_date}</td>
                   </tr>
                 </tbody>
               </table>
