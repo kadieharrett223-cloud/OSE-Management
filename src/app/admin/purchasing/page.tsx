@@ -1068,7 +1068,7 @@ export default function PurchasingPage() {
                               required
                             />
 
-                            {!!line.sku && (
+                            {!!line.sku && !priceList.some((item) => (item.sku || "").toLowerCase() === (line.sku || "").toLowerCase()) && (
                               <div className="max-h-36 overflow-y-auto rounded border border-slate-200 bg-white">
                                 {priceList
                                   .filter((item) => {
