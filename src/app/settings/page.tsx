@@ -391,7 +391,7 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-500 mb-4">
                 Set the global tariff percent used to auto-calculate pricing for all products unless manual override is enabled.
               </p>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <label className="text-sm font-medium text-gray-700">Global Tariff %</label>
                 <input
                   type="number"
@@ -400,13 +400,13 @@ export default function SettingsPage() {
                   step="0.01"
                   value={globalTariffPercent}
                   onChange={(e) => setGlobalTariffPercent(e.target.value)}
-                  className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
                 <button
                   type="button"
                   onClick={handleSaveTariff}
                   disabled={savingTariff}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {savingTariff ? 'Saving...' : 'Save Tariff'}
                 </button>
