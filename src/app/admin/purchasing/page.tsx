@@ -561,6 +561,19 @@ export default function PurchasingPage() {
     const sku = String(value || "");
     if (!sku) return;
 
+    const resolveUnitPrice = (item: any) => {
+      const fob = Number(item?.fob_cost);
+      if (Number.isFinite(fob) && fob > 0) return fob;
+
+      const shippingOnly = Number(item?.shippingIncludedPerUnit);
+      if (Number.isFinite(shippingOnly) && shippingOnly > 0) return shippingOnly;
+
+      const costWithShipping = Number(item?.cost_with_shipping);
+      if (Number.isFinite(costWithShipping) && costWithShipping > 0) return costWithShipping;
+
+      return 0;
+    };
+
     // Try immediate local cache match first.
     const cachedItem = priceList.find((p) => p.sku === sku);
     if (cachedItem) {
@@ -573,7 +586,7 @@ export default function PurchasingPage() {
         updated[index] = {
           ...current,
           description: cachedItem.description || "",
-          unit_price: cachedItem.fob_cost || 0,
+          unit_price: resolveUnitPrice(cachedItem),
           weight_lbs: cachedItem.weight_lbs || 0,
         };
 
@@ -598,7 +611,7 @@ export default function PurchasingPage() {
           updated[index] = {
             ...current,
             description: freshItem.description || "",
-            unit_price: freshItem.fob_cost || 0,
+            unit_price: resolveUnitPrice(freshItem),
             weight_lbs: freshItem.weight_lbs || 0,
           };
 
