@@ -23,6 +23,12 @@ type PriceListItem = {
   sku: string;
   description: string;
   currentSalePricePerUnit: number;
+  shippingIncludedPerUnit?: number;
+  list_price?: number;
+  sell_price?: number;
+  per_unit?: number;
+  cost_with_shipping?: number;
+  zone5_shipping?: number;
   weight_lbs?: number;
   fob_cost?: number;
   category_id?: string | null;
@@ -562,14 +568,20 @@ export default function PurchasingPage() {
     if (!sku) return;
 
     const resolveUnitPrice = (item: any) => {
-      const fob = Number(item?.fob_cost);
-      if (Number.isFinite(fob) && fob > 0) return fob;
+      const candidates = [
+        Number(item?.fob_cost),
+        Number(item?.cost_with_shipping),
+        Number(item?.shippingIncludedPerUnit),
+        Number(item?.per_unit),
+        Number(item?.sell_price),
+        Number(item?.currentSalePricePerUnit),
+        Number(item?.list_price),
+        Number(item?.zone5_shipping),
+      ];
 
-      const shippingOnly = Number(item?.shippingIncludedPerUnit);
-      if (Number.isFinite(shippingOnly) && shippingOnly > 0) return shippingOnly;
-
-      const costWithShipping = Number(item?.cost_with_shipping);
-      if (Number.isFinite(costWithShipping) && costWithShipping > 0) return costWithShipping;
+      for (const value of candidates) {
+        if (Number.isFinite(value) && value > 0) return value;
+      }
 
       return 0;
     };
