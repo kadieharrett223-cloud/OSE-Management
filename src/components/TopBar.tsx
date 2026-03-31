@@ -132,9 +132,9 @@ export function TopBar() {
   }, []);
 
   return (
-    <div className="sticky top-0 z-40 w-full border-b border-slate-900/60 bg-gradient-to-r from-slate-950 via-blue-900 to-blue-700 text-slate-100 print:hidden">
+    <div className="sticky top-0 z-40 w-full border-b border-slate-900/60 bg-gradient-to-r from-slate-950 via-blue-900 to-blue-700 pt-[env(safe-area-inset-top)] text-slate-100 print:hidden">
       <div className="mx-auto flex w-full flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
-        <div className="flex flex-nowrap items-center gap-2 text-xs sm:gap-4 sm:text-sm overflow-x-auto">
+        <div className="min-w-0 flex flex-nowrap items-center gap-2 overflow-x-auto text-xs sm:gap-4 sm:text-sm">
           <span className="font-semibold text-blue-100">QBO:</span>
           {qboStatus === "ok" ? (
             <span className="inline-flex items-center gap-1 text-emerald-300 sm:gap-2">
@@ -175,7 +175,7 @@ export function TopBar() {
           <span className="text-lg font-bold text-white tracking-wide">Olympic Shop Equipment</span>
           <span className="text-[10px] text-blue-200/60">brought to you by kadie ☺</span>
         </div>
-        <div className="relative w-full sm:flex-1 sm:max-w-sm">
+        <div className="relative w-full min-w-0 sm:flex-1 sm:max-w-sm">
           <input
             type="search"
             placeholder="Search..."
