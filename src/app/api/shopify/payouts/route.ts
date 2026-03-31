@@ -75,6 +75,17 @@ export interface ShopifyOrderWithDeposit {
   transactionType: string | null;
 }
 
+const normalizePayoutStatus = (status: string | undefined | null) =>
+  String(status || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+
+const isPendingPayoutStatus = (status: string | undefined | null) => {
+  const normalized = normalizePayoutStatus(status);
+  return normalized === "scheduled" || normalized === "in_transit";
+};
+
 export async function GET(req: NextRequest) {
   try {
     const tokens = await getShopifyTokens();
@@ -124,9 +135,7 @@ export async function GET(req: NextRequest) {
       return b.id - a.id;
     });
 
-    const pendingPayouts = payouts.filter(
-      (p) => p.status === "scheduled" || p.status === "in_transit"
-    );
+    const pendingPayouts = payouts.filter((p) => isPendingPayoutStatus(p.status));
 
     const relevantPayouts = pendingPayouts.length > 0 ? pendingPayouts : payouts.slice(0, 3);
 
@@ -196,7 +205,7 @@ export async function GET(req: NextRequest) {
             fulfillment_status: order?.fulfillment_status ?? null,
             customer: order?.customer,
             pendingDepositId: txn.payout_id ?? null,
-            pendingDepositStatus: txn.payout_status ?? null,
+            pendingDepositStatus: normalizePayoutStatus(txn.payout_status) || null,
             netAmount: txn.net ?? null,
             fee: txn.fee ?? null,
             processedAt: txn.processed_at ?? null,
@@ -223,8 +232,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Categorize payouts
-    const scheduledPayouts = payouts.filter((p) => p.status === "scheduled" || p.status === "in_transit");
-    const completedPayouts = payouts.filter((p) => p.status === "paid");
+    const scheduledPayouts = payouts.filter((p) => isPendingPayoutStatus(p.status));
+    const completedPayouts = payouts.filter((p) => normalizePayoutStatus(p.status) === "paid");
 
     return NextResponse.json({
       ok: true,

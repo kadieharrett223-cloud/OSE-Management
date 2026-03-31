@@ -12,6 +12,12 @@ const money = (value: number | undefined) => {
   return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+const normalizePayoutStatus = (status: string | null | undefined) =>
+  String(status || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+
 interface RepData {
   repName: string;
   isPrimary: boolean;
@@ -282,9 +288,10 @@ export default function Dashboard() {
   const [loadingShopifyPayouts, setLoadingShopifyPayouts] = useState(true);
   const [showShopifyPayoutsModal, setShowShopifyPayoutsModal] = useState(false);
 
-  const scheduledShopifyPayouts = shopifyPayouts.filter(
-    (payout) => payout.status === "scheduled" || payout.status === "in_transit"
-  );
+  const scheduledShopifyPayouts = shopifyPayouts.filter((payout) => {
+    const status = normalizePayoutStatus(payout.status);
+    return status === "scheduled" || status === "in_transit";
+  });
 
   // Compute derived values first (needed for animated count-ups)
   const totalExpenses = paidExpensesTotal + payrollExpenseTotal;
@@ -1674,9 +1681,15 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  {shopifyPayouts.filter(p => p.status === "scheduled" || p.status === "in_transit").length > 0 && (
+                  {shopifyPayouts.filter((p) => {
+                    const status = normalizePayoutStatus(p.status);
+                    return status === "scheduled" || status === "in_transit";
+                  }).length > 0 && (
                     <div className="text-right text-xs text-slate-500">
-                      {shopifyPayouts.filter(p => p.status === "scheduled" || p.status === "in_transit").length} payout(s) pending
+                      {shopifyPayouts.filter((p) => {
+                        const status = normalizePayoutStatus(p.status);
+                        return status === "scheduled" || status === "in_transit";
+                      }).length} payout(s) pending
                     </div>
                   )}
                   {shopifyOrders.length > 5 && (
@@ -1698,22 +1711,22 @@ export default function Dashboard() {
                     <span
                       key={payout.id}
                       className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-                        payout.status === "scheduled"
+                        normalizePayoutStatus(payout.status) === "scheduled"
                           ? "bg-blue-100 text-blue-700"
-                          : payout.status === "in_transit"
+                          : normalizePayoutStatus(payout.status) === "in_transit"
                           ? "bg-amber-100 text-amber-700"
-                          : payout.status === "paid"
+                          : normalizePayoutStatus(payout.status) === "paid"
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-slate-100 text-slate-700"
                       }`}
                     >
                       <span className={`h-1.5 w-1.5 rounded-full ${
-                        payout.status === "scheduled" ? "bg-blue-500"
-                        : payout.status === "in_transit" ? "bg-amber-500"
-                        : payout.status === "paid" ? "bg-emerald-500"
+                        normalizePayoutStatus(payout.status) === "scheduled" ? "bg-blue-500"
+                        : normalizePayoutStatus(payout.status) === "in_transit" ? "bg-amber-500"
+                        : normalizePayoutStatus(payout.status) === "paid" ? "bg-emerald-500"
                         : "bg-slate-400"
                       }`} />
-                      {payout.status === "scheduled" ? "Scheduled" : payout.status === "in_transit" ? "In Transit" : "Deposited"}: {payout.date} — ${Number(payout.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {payout.currency}
+                      {normalizePayoutStatus(payout.status) === "scheduled" ? "Scheduled" : normalizePayoutStatus(payout.status) === "in_transit" ? "In Transit" : "Deposited"}: {payout.date} — ${Number(payout.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {payout.currency}
                     </span>
                   ))}
                 </div>
@@ -1741,22 +1754,23 @@ export default function Dashboard() {
                       <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-500">No itemized Shopify payout transactions found</td></tr>
                     ) : (
                       shopifyOrders.slice(0, 8).map((order) => {
+                        const orderDepositStatus = normalizePayoutStatus(order.pendingDepositStatus);
                         const depositLabel =
-                          order.pendingDepositStatus === "paid"
+                          orderDepositStatus === "paid"
                             ? "Deposited"
-                            : order.pendingDepositStatus === "in_transit"
+                            : orderDepositStatus === "in_transit"
                             ? "In Transit"
-                            : order.pendingDepositStatus === "scheduled"
+                            : orderDepositStatus === "scheduled"
                             ? "Scheduled"
                             : order.financial_status === "paid"
                             ? "Paid — not linked"
                             : order.financial_status || "—";
                         const depositColor =
-                          order.pendingDepositStatus === "paid"
+                          orderDepositStatus === "paid"
                             ? "bg-emerald-100 text-emerald-700"
-                            : order.pendingDepositStatus === "in_transit"
+                            : orderDepositStatus === "in_transit"
                             ? "bg-amber-100 text-amber-700"
-                            : order.pendingDepositStatus === "scheduled"
+                            : orderDepositStatus === "scheduled"
                             ? "bg-blue-100 text-blue-700"
                             : "bg-slate-100 text-slate-600";
                         return (
@@ -2016,13 +2030,13 @@ export default function Dashboard() {
                         <span
                           key={payout.id}
                           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-                            payout.status === "scheduled" ? "bg-blue-100 text-blue-700"
-                            : payout.status === "in_transit" ? "bg-amber-100 text-amber-700"
-                            : payout.status === "paid" ? "bg-emerald-100 text-emerald-700"
+                            normalizePayoutStatus(payout.status) === "scheduled" ? "bg-blue-100 text-blue-700"
+                            : normalizePayoutStatus(payout.status) === "in_transit" ? "bg-amber-100 text-amber-700"
+                            : normalizePayoutStatus(payout.status) === "paid" ? "bg-emerald-100 text-emerald-700"
                             : "bg-slate-100 text-slate-700"
                           }`}
                         >
-                          {payout.date} — ${Number(payout.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {payout.currency} ({payout.status})
+                          {payout.date} — ${Number(payout.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {payout.currency} ({normalizePayoutStatus(payout.status) || payout.status})
                         </span>
                       ))}
                     </div>
@@ -2042,16 +2056,17 @@ export default function Dashboard() {
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {shopifyOrders.map((order) => {
+                          const orderDepositStatus = normalizePayoutStatus(order.pendingDepositStatus);
                           const depositLabel =
-                            order.pendingDepositStatus === "paid" ? "Deposited"
-                            : order.pendingDepositStatus === "in_transit" ? "In Transit"
-                            : order.pendingDepositStatus === "scheduled" ? "Scheduled"
+                            orderDepositStatus === "paid" ? "Deposited"
+                            : orderDepositStatus === "in_transit" ? "In Transit"
+                            : orderDepositStatus === "scheduled" ? "Scheduled"
                             : order.financial_status === "paid" ? "Paid — not linked"
                             : order.financial_status || "—";
                           const depositColor =
-                            order.pendingDepositStatus === "paid" ? "bg-emerald-100 text-emerald-700"
-                            : order.pendingDepositStatus === "in_transit" ? "bg-amber-100 text-amber-700"
-                            : order.pendingDepositStatus === "scheduled" ? "bg-blue-100 text-blue-700"
+                            orderDepositStatus === "paid" ? "bg-emerald-100 text-emerald-700"
+                            : orderDepositStatus === "in_transit" ? "bg-amber-100 text-amber-700"
+                            : orderDepositStatus === "scheduled" ? "bg-blue-100 text-blue-700"
                             : "bg-slate-100 text-slate-600";
                           return (
                             <tr key={order.id} className="hover:bg-slate-50">
