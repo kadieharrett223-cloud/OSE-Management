@@ -287,6 +287,7 @@ export default function Dashboard() {
   const [shopifyPaymentsEnabled, setShopifyPaymentsEnabled] = useState(true);
   const [loadingShopifyPayouts, setLoadingShopifyPayouts] = useState(true);
   const [showShopifyPayoutsModal, setShowShopifyPayoutsModal] = useState(false);
+  const [shopifyPayoutDiagnostics, setShopifyPayoutDiagnostics] = useState<string | null>(null);
 
   const scheduledShopifyPayouts = shopifyPayouts.filter((payout) => {
     const status = normalizePayoutStatus(payout.status);
@@ -1073,12 +1074,21 @@ export default function Dashboard() {
           setShopifyPayouts(data.allPayouts || []);
           setShopifyOrders(data.recentOrders || []);
           setShopifyBalance(data.balance || null);
+          const diagnosticsParts: string[] = [];
+          if (data?.diagnostics?.payoutFetchErrors?.length) {
+            diagnosticsParts.push(`API errors: ${data.diagnostics.payoutFetchErrors.join(" | ")}`);
+          }
+          if (data?.diagnostics?.tokenScope) {
+            diagnosticsParts.push(`Scopes: ${data.diagnostics.tokenScope}`);
+          }
+          setShopifyPayoutDiagnostics(diagnosticsParts.length > 0 ? diagnosticsParts.join(" • ") : null);
         }
       } catch (err) {
         console.error("Failed to fetch Shopify payouts:", err);
         if (isMounted) {
           setShopifyPayouts([]);
           setShopifyOrders([]);
+          setShopifyPayoutDiagnostics(err instanceof Error ? err.message : "Failed to fetch Shopify payouts");
         }
       } finally {
         if (isMounted) setLoadingShopifyPayouts(false);
@@ -1234,6 +1244,9 @@ export default function Dashboard() {
                           scheduledShopifyPayouts.reduce((sum, payout) => sum + (Number(payout.amount) || 0), 0)
                         )}
                       </p>
+                    )}
+                    {!loadingShopifyPayouts && shopifyPayoutDiagnostics && (
+                      <p className="mt-1 text-xs text-amber-700 break-words">{shopifyPayoutDiagnostics}</p>
                     )}
                   </div>
                   {scheduledShopifyPayouts.length > 0 && (

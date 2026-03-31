@@ -107,6 +107,7 @@ export async function GET(req: NextRequest) {
     let balance: { amount: string; currency: string } | null = null;
     let payoutOrders: ShopifyOrderWithDeposit[] = [];
     let pendingTransactions: Array<ShopifyBalanceTransaction & { payout_date?: string; payout_amount?: string; payout_currency?: string }> = [];
+    const payoutFetchErrors: string[] = [];
 
     const [allPayoutsResult, scheduledResult, inTransitResult] = await Promise.allSettled([
       shopifyApiFetch<{ payouts: ShopifyPayout[] }>(payoutsUrl),
@@ -121,12 +122,18 @@ export async function GET(req: NextRequest) {
 
     if (allPayoutsResult.status === "fulfilled") {
       mergePayouts(allPayoutsResult.value?.payouts || []);
+    } else {
+      payoutFetchErrors.push(`all: ${allPayoutsResult.reason?.message || String(allPayoutsResult.reason)}`);
     }
     if (scheduledResult.status === "fulfilled") {
       mergePayouts(scheduledResult.value?.payouts || []);
+    } else {
+      payoutFetchErrors.push(`scheduled: ${scheduledResult.reason?.message || String(scheduledResult.reason)}`);
     }
     if (inTransitResult.status === "fulfilled") {
       mergePayouts(inTransitResult.value?.payouts || []);
+    } else {
+      payoutFetchErrors.push(`in_transit: ${inTransitResult.reason?.message || String(inTransitResult.reason)}`);
     }
 
     payouts = Array.from(payoutMap.values()).sort((a, b) => {
@@ -243,6 +250,13 @@ export async function GET(req: NextRequest) {
       allPayouts: payouts,
       pendingTransactions,
       recentOrders: payoutOrders,
+      diagnostics: {
+        tokenScope: tokens.scope || null,
+        payoutFetchErrors,
+        totalPayouts: payouts.length,
+        scheduledCount: scheduledPayouts.length,
+        completedCount: completedPayouts.length,
+      },
     });
   } catch (error: any) {
     // Shopify Payments may not be enabled on this store
