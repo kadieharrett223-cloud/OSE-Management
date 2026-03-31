@@ -14,6 +14,9 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
+        const normalizedEmail = credentials.email.toString().trim().toLowerCase();
+        const normalizedPassword = credentials.password.toString().trim();
+
         const supabase = createClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -23,8 +26,8 @@ export const authOptions: NextAuthOptions = {
         const { data: user, error } = await supabase
           .from("auth_users")
           .select("*")
-          .ilike("email", credentials.email)
-          .eq("password", credentials.password)
+          .ilike("email", normalizedEmail)
+          .eq("password", normalizedPassword)
           .eq("active", true)
           .single();
 

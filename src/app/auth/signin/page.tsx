@@ -22,15 +22,22 @@ function SignInContent() {
 
     try {
       const result = await signIn("credentials", {
-        email,
-        password,
+        email: email.trim().toLowerCase(),
+        password: password.trim(),
+        callbackUrl,
         redirect: false,
       });
 
-      if (result?.error) {
+      if (!result) {
+        setError("No response from auth server. Please try again.");
+      } else if (result.error) {
         setError(result.error || "Sign-in failed");
-      } else if (result?.ok) {
-        router.push(callbackUrl);
+      } else if (result.ok) {
+        if (result.url) {
+          window.location.href = result.url;
+        } else {
+          router.push(callbackUrl);
+        }
       }
     } catch (err: any) {
       setError(err?.message || "An error occurred");
