@@ -52,6 +52,29 @@ export interface ShopifyOrder {
   };
 }
 
+export interface ShopifyOrderWithDeposit {
+  id: number;
+  name: string;
+  created_at: string;
+  total_price: string;
+  financial_status: string;
+  fulfillment_status: string | null;
+  customer?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+  };
+  pendingDepositId: number | null;
+  pendingDepositStatus: string | null;
+  netAmount: string | null;
+  fee: string | null;
+  processedAt: string | null;
+  payoutDate: string | null;
+  payoutAmount: string | null;
+  payoutCurrency: string | null;
+  transactionType: string | null;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const tokens = await getShopifyTokens();
@@ -71,40 +94,104 @@ export async function GET(req: NextRequest) {
 
     let payouts: ShopifyPayout[] = [];
     let balance: { amount: string; currency: string } | null = null;
-    let recentOrders: ShopifyOrder[] = [];
-    let pendingTransactions: ShopifyBalanceTransaction[] = [];
+    let payoutOrders: ShopifyOrderWithDeposit[] = [];
+    let pendingTransactions: Array<ShopifyBalanceTransaction & { payout_date?: string; payout_amount?: string; payout_currency?: string }> = [];
 
-    // Fetch payouts and recent orders in parallel
-    const [payoutsResult, ordersResult] = await Promise.allSettled([
+    const payoutsResult = await Promise.allSettled([
       shopifyApiFetch<{ payouts: ShopifyPayout[] }>(payoutsUrl),
-      shopifyApiFetch<{ orders: ShopifyOrder[] }>(
-        "/orders.json?limit=30&status=any&financial_status=paid&order=created_at+desc"
-      ),
     ]);
 
-    if (payoutsResult.status === "fulfilled") {
-      payouts = payoutsResult.value?.payouts || [];
+    if (payoutsResult[0].status === "fulfilled") {
+      payouts = payoutsResult[0].value?.payouts || [];
     }
 
-    if (ordersResult.status === "fulfilled") {
-      recentOrders = ordersResult.value?.orders || [];
-    }
-
-    // If we have payouts, try to fetch balance transactions for the most recent scheduled/in_transit payouts
     const pendingPayouts = payouts.filter(
       (p) => p.status === "scheduled" || p.status === "in_transit"
     );
 
-    if (pendingPayouts.length > 0) {
-      const txnResult = await shopifyApiFetch<{
-        balance_transactions: ShopifyBalanceTransaction[];
-      }>(
-        `/shopify_payments/balance/transactions.json?payout_id=${pendingPayouts[0].id}&limit=100`
-      ).catch(() => null);
+    const relevantPayouts = pendingPayouts.length > 0 ? pendingPayouts : payouts.slice(0, 3);
 
-      if (txnResult) {
-        pendingTransactions = txnResult.balance_transactions || [];
+    if (relevantPayouts.length > 0) {
+      const txnResults = await Promise.all(
+        relevantPayouts.map(async (payout) => {
+          const txnResult = await shopifyApiFetch<{
+            balance_transactions: ShopifyBalanceTransaction[];
+          }>(
+            `/shopify_payments/balance/transactions.json?payout_id=${payout.id}&limit=100`
+          ).catch(() => null);
+
+          return (txnResult?.balance_transactions || []).map((txn) => ({
+            ...txn,
+            payout_date: payout.date,
+            payout_amount: payout.amount,
+            payout_currency: payout.currency,
+          }));
+        })
+      );
+
+      pendingTransactions = txnResults
+        .flat()
+        .filter((txn) => Boolean(txn.source_order_id));
+
+      const orderIds = Array.from(
+        new Set(
+          pendingTransactions
+            .map((txn) => txn.source_order_id)
+            .filter((value): value is number => typeof value === "number" && value > 0)
+        )
+      );
+
+      const orderMap = new Map<number, ShopifyOrder>();
+      if (orderIds.length > 0) {
+        const chunks: number[][] = [];
+        for (let i = 0; i < orderIds.length; i += 50) {
+          chunks.push(orderIds.slice(i, i + 50));
+        }
+
+        const orderResults = await Promise.all(
+          chunks.map((chunk) =>
+            shopifyApiFetch<{ orders: ShopifyOrder[] }>(
+              `/orders.json?ids=${chunk.join(",")}&status=any&fields=id,name,created_at,total_price,financial_status,fulfillment_status,customer`
+            ).catch(() => null)
+          )
+        );
+
+        orderResults.forEach((result) => {
+          (result?.orders || []).forEach((order) => {
+            orderMap.set(order.id, order);
+          });
+        });
       }
+
+      payoutOrders = pendingTransactions
+        .map((txn) => {
+          const order = txn.source_order_id ? orderMap.get(txn.source_order_id) : undefined;
+          const fallbackOrderName = txn.source_order_id ? `Order ${txn.source_order_id}` : `Txn ${txn.id}`;
+
+          return {
+            id: order?.id || txn.source_order_id || txn.id,
+            name: order?.name || fallbackOrderName,
+            created_at: order?.created_at || txn.processed_at || "",
+            total_price: order?.total_price || txn.amount || "0",
+            financial_status: order?.financial_status || "paid",
+            fulfillment_status: order?.fulfillment_status ?? null,
+            customer: order?.customer,
+            pendingDepositId: txn.payout_id ?? null,
+            pendingDepositStatus: txn.payout_status ?? null,
+            netAmount: txn.net ?? null,
+            fee: txn.fee ?? null,
+            processedAt: txn.processed_at ?? null,
+            payoutDate: txn.payout_date || null,
+            payoutAmount: txn.payout_amount || null,
+            payoutCurrency: txn.payout_currency || null,
+            transactionType: txn.type || null,
+          };
+        })
+        .sort((a, b) => {
+          const dateA = a.payoutDate || a.processedAt || a.created_at || "";
+          const dateB = b.payoutDate || b.processedAt || b.created_at || "";
+          return dateB.localeCompare(dateA);
+        });
     }
 
     // Get account balance
@@ -115,24 +202,6 @@ export async function GET(req: NextRequest) {
     if (balanceResult?.balance) {
       balance = balanceResult.balance;
     }
-
-    // Build a map from source_order_id to transaction for enriching order info
-    const orderTxnMap = new Map<number, ShopifyBalanceTransaction>();
-    pendingTransactions.forEach((txn) => {
-      if (txn.source_order_id) {
-        orderTxnMap.set(txn.source_order_id, txn);
-      }
-    });
-
-    // Mark which recent orders are in the pending deposit
-    const enrichedOrders = recentOrders.map((order) => ({
-      ...order,
-      pendingDepositId: orderTxnMap.get(order.id)?.payout_id ?? null,
-      pendingDepositStatus: orderTxnMap.get(order.id)?.payout_status ?? null,
-      netAmount: orderTxnMap.get(order.id)?.net ?? null,
-      fee: orderTxnMap.get(order.id)?.fee ?? null,
-      processedAt: orderTxnMap.get(order.id)?.processed_at ?? null,
-    }));
 
     // Categorize payouts
     const scheduledPayouts = payouts.filter((p) => p.status === "scheduled" || p.status === "in_transit");
@@ -145,7 +214,7 @@ export async function GET(req: NextRequest) {
       completedPayouts,
       allPayouts: payouts,
       pendingTransactions,
-      recentOrders: enrichedOrders,
+      recentOrders: payoutOrders,
     });
   } catch (error: any) {
     // Shopify Payments may not be enabled on this store

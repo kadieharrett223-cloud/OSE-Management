@@ -106,6 +106,10 @@ interface ShopifyOrderWithDeposit {
   netAmount: string | null;
   fee: string | null;
   processedAt: string | null;
+  payoutDate: string | null;
+  payoutAmount: string | null;
+  payoutCurrency: string | null;
+  transactionType: string | null;
 }
 
 const mockReps = [
@@ -1193,6 +1197,119 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Undeposited Funds + QBO Deposits Feed */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {/* QBO Undeposited Funds */}
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Undeposited Funds</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">
+                      Payments in QBO awaiting bank deposit
+                    </p>
+                    {!loadingUndepositedFunds && (
+                      <p className="mt-1 text-lg font-bold text-amber-600">
+                        ${money(undepositedFunds)}
+                      </p>
+                    )}
+                  </div>
+                  {undepositedPayments.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowUndepositedModal(true)}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                    >
+                      View all →
+                    </button>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
+                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {loadingUndepositedFunds ? (
+                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
+                      ) : undepositedPayments.length === 0 ? (
+                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">
+                          {undepositedFunds > 0
+                            ? `$${money(undepositedFunds)} in Undeposited Funds — no itemized payments found`
+                            : "No undeposited funds"}
+                        </td></tr>
+                      ) : (
+                        undepositedPayments.slice(0, 5).map((p) => (
+                          <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{p.customerName}</td>
+                            <td className="px-5 py-3 text-sm text-slate-600">{p.txnDate}</td>
+                            <td className="px-5 py-3 text-right text-sm font-semibold text-amber-700">
+                              ${money(p.appliedAmt || p.totalAmt)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* QBO Deposits Feed */}
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Recent QBO Deposits</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">Bank deposits recorded in QuickBooks (last 30 days)</p>
+                    {!loadingQboDeposits && qboDeposits.length > 0 && (
+                      <p className="mt-1 text-sm font-medium text-slate-700">
+                        Total: ${money(qboDeposits.reduce((s, d) => s + d.totalAmt, 0))}
+                      </p>
+                    )}
+                  </div>
+                  {qboDeposits.length > 5 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDepositsModal(true)}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                    >
+                      View all →
+                    </button>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Bank Account</th>
+                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {loadingQboDeposits ? (
+                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
+                      ) : qboDeposits.length === 0 ? (
+                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">No deposits in last 30 days</td></tr>
+                      ) : (
+                        qboDeposits.slice(0, 6).map((dep) => (
+                          <tr key={dep.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{dep.txnDate}</td>
+                            <td className="px-5 py-3 text-sm text-slate-600 truncate max-w-[160px]">{dep.depositToAccount}</td>
+                            <td className="px-5 py-3 text-right text-sm font-semibold text-emerald-700">
+                              ${money(dep.totalAmt)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
             {/* Overview */}
             <div className="space-y-6">
               <div className="bg-white border border-slate-200 rounded-lg p-5">
@@ -1578,119 +1695,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Undeposited Funds + QBO Deposits Feed */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* QBO Undeposited Funds */}
-              <div className="bg-white border border-slate-200 rounded-lg">
-                <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Undeposited Funds</h2>
-                    <p className="mt-0.5 text-sm text-slate-600">
-                      Payments in QBO awaiting bank deposit
-                    </p>
-                    {!loadingUndepositedFunds && (
-                      <p className="mt-1 text-lg font-bold text-amber-600">
-                        ${money(undepositedFunds)}
-                      </p>
-                    )}
-                  </div>
-                  {undepositedPayments.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowUndepositedModal(true)}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                    >
-                      View all →
-                    </button>
-                  )}
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-slate-100">
-                      <tr>
-                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
-                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
-                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {loadingUndepositedFunds ? (
-                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
-                      ) : undepositedPayments.length === 0 ? (
-                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">
-                          {undepositedFunds > 0
-                            ? `$${money(undepositedFunds)} in Undeposited Funds — no itemized payments found`
-                            : "No undeposited funds"}
-                        </td></tr>
-                      ) : (
-                        undepositedPayments.slice(0, 5).map((p) => (
-                          <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{p.customerName}</td>
-                            <td className="px-5 py-3 text-sm text-slate-600">{p.txnDate}</td>
-                            <td className="px-5 py-3 text-right text-sm font-semibold text-amber-700">
-                              ${money(p.appliedAmt || p.totalAmt)}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* QBO Deposits Feed */}
-              <div className="bg-white border border-slate-200 rounded-lg">
-                <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Recent QBO Deposits</h2>
-                    <p className="mt-0.5 text-sm text-slate-600">Bank deposits recorded in QuickBooks (last 30 days)</p>
-                    {!loadingQboDeposits && qboDeposits.length > 0 && (
-                      <p className="mt-1 text-sm font-medium text-slate-700">
-                        Total: ${money(qboDeposits.reduce((s, d) => s + d.totalAmt, 0))}
-                      </p>
-                    )}
-                  </div>
-                  {qboDeposits.length > 5 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowDepositsModal(true)}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                    >
-                      View all →
-                    </button>
-                  )}
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-slate-100">
-                      <tr>
-                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
-                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Bank Account</th>
-                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {loadingQboDeposits ? (
-                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
-                      ) : qboDeposits.length === 0 ? (
-                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">No deposits in last 30 days</td></tr>
-                      ) : (
-                        qboDeposits.slice(0, 6).map((dep) => (
-                          <tr key={dep.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{dep.txnDate}</td>
-                            <td className="px-5 py-3 text-sm text-slate-600 truncate max-w-[160px]">{dep.depositToAccount}</td>
-                            <td className="px-5 py-3 text-right text-sm font-semibold text-emerald-700">
-                              ${money(dep.totalAmt)}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
             {/* Shopify Payouts / Pending Deposits */}
             <div className="bg-white border border-slate-200 rounded-lg">
               <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
@@ -1698,7 +1702,7 @@ export default function Dashboard() {
                   <h2 className="text-lg font-semibold text-slate-900">Shopify Orders — Deposit Schedule</h2>
                   <p className="mt-0.5 text-sm text-slate-600">
                     {shopifyPaymentsEnabled
-                      ? "Shopify Payments payout dates and recent order status"
+                      ? "Itemized Shopify payout transactions grouped by payout schedule"
                       : "Connect Shopify Payments to see payout schedule"}
                   </p>
                   {shopifyBalance && (
@@ -1758,25 +1762,23 @@ export default function Dashboard() {
                   <thead className="bg-slate-50 border-b border-slate-100">
                     <tr>
                       <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Order</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
+                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Deposit Date</th>
+                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Order Date</th>
                       <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Order Total</th>
+                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Fee</th>
                       <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Net (after fees)</th>
                       <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Deposit Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {loadingShopifyPayouts ? (
-                      <tr><td colSpan={6} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
+                      <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
                     ) : !shopifyPaymentsEnabled ? (
-                      <tr><td colSpan={6} className="px-5 py-6 text-center text-slate-500">Shopify Payments not enabled — connect Shopify Payments to see payout data</td></tr>
+                      <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-500">Shopify Payments not enabled — connect Shopify Payments to see payout data</td></tr>
                     ) : shopifyOrders.length === 0 ? (
-                      <tr><td colSpan={6} className="px-5 py-6 text-center text-slate-500">No recent Shopify orders</td></tr>
+                      <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-500">No itemized Shopify payout transactions found</td></tr>
                     ) : (
                       shopifyOrders.slice(0, 8).map((order) => {
-                        const customerName = order.customer
-                          ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim() || order.customer.email || "Guest"
-                          : "Guest";
                         const depositLabel =
                           order.pendingDepositStatus === "paid"
                             ? "Deposited"
@@ -1798,10 +1800,15 @@ export default function Dashboard() {
                         return (
                           <tr key={order.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-5 py-3 font-mono text-sm text-slate-700">{order.name}</td>
-                            <td className="px-5 py-3 text-sm text-slate-700 truncate max-w-[130px]">{customerName}</td>
-                            <td className="px-5 py-3 text-sm text-slate-600">{order.created_at?.slice(0, 10)}</td>
+                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{order.payoutDate || "—"}</td>
+                            <td className="px-5 py-3 text-sm text-slate-600">{order.created_at?.slice(0, 10) || "—"}</td>
                             <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">
                               ${Number(order.total_price).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-5 py-3 text-right text-sm text-slate-500">
+                              {order.fee
+                                ? `$${Number(order.fee).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                                : "—"}
                             </td>
                             <td className="px-5 py-3 text-right text-sm text-slate-700">
                               {order.netAmount
@@ -2029,7 +2036,7 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
                       <h2 className="text-lg font-semibold text-slate-900">All Shopify Orders — Deposit Status</h2>
-                      <p className="mt-0.5 text-sm text-slate-600">Recent paid orders and their Shopify Payments payout status</p>
+                      <p className="mt-0.5 text-sm text-slate-600">Itemized Shopify payout transactions and their payout dates</p>
                     </div>
                     <button
                       type="button"
@@ -2061,19 +2068,16 @@ export default function Dashboard() {
                       <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
                           <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Order</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Deposit Date</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Order Date</th>
                           <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Total</th>
-                          <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Net</th>
                           <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Fee</th>
+                          <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Net</th>
                           <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Deposit Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {shopifyOrders.map((order) => {
-                          const customerName = order.customer
-                            ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim() || order.customer.email || "Guest"
-                            : "Guest";
                           const depositLabel =
                             order.pendingDepositStatus === "paid" ? "Deposited"
                             : order.pendingDepositStatus === "in_transit" ? "In Transit"
@@ -2088,16 +2092,16 @@ export default function Dashboard() {
                           return (
                             <tr key={order.id} className="hover:bg-slate-50">
                               <td className="px-5 py-3 font-mono text-sm text-slate-700">{order.name}</td>
-                              <td className="px-5 py-3 text-sm text-slate-700 truncate max-w-[130px]">{customerName}</td>
-                              <td className="px-5 py-3 text-sm text-slate-600">{order.created_at?.slice(0, 10)}</td>
+                              <td className="px-5 py-3 text-sm font-medium text-slate-900">{order.payoutDate || "—"}</td>
+                              <td className="px-5 py-3 text-sm text-slate-600">{order.created_at?.slice(0, 10) || "—"}</td>
                               <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">
                                 ${Number(order.total_price).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                               </td>
-                              <td className="px-5 py-3 text-right text-sm text-slate-700">
-                                {order.netAmount ? `$${Number(order.netAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
-                              </td>
                               <td className="px-5 py-3 text-right text-sm text-slate-500">
                                 {order.fee ? `$${Number(order.fee).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
+                              </td>
+                              <td className="px-5 py-3 text-right text-sm text-slate-700">
+                                {order.netAmount ? `$${Number(order.netAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
                               </td>
                               <td className="px-5 py-3 text-right">
                                 <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${depositColor}`}>
