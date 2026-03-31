@@ -1,10 +1,9 @@
-import { withAuth } from "next-auth/middleware";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export default withAuth({
-  pages: {
-    signIn: "/auth/signin",
-  },
-});
+export default function middleware(req: NextRequest) {
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
