@@ -2,109 +2,143 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch, QboApiError } from "@/lib/qbo";
 import { getUserId } from "@/lib/auth";
 
+const normalizeStatus = (status: string | null) => (status || "").trim().toLowerCase();
+
 export async function GET(req: NextRequest) {
   try {
     const userId = await getUserId();
     const searchParams = req.nextUrl.searchParams;
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
-    const status = searchParams.get("status"); // "Paid", "Unpaid", etc.
+    const status = normalizeStatus(searchParams.get("status"));
     const allPages = searchParams.get("allPages") === "true";
     const totalsOnly = searchParams.get("totalsOnly") === "true";
 
-    // Build the QuickBooks query
-    let query = "SELECT * FROM Invoice";
-    const conditions: string[] = [];
+    const useBalanceFilter = status === "paid" || status === "unpaid";
 
+    const baseConditions: string[] = [];
     if (startDate) {
-      conditions.push(`TxnDate >= '${startDate}'`);
+      baseConditions.push(`TxnDate >= '${startDate}'`);
     }
     if (endDate) {
-      conditions.push(`TxnDate <= '${endDate}'`);
+      baseConditions.push(`TxnDate <= '${endDate}'`);
     }
-    if (status) {
-      // QuickBooks uses Balance = 0 for paid invoices
-      if (status.toLowerCase() === "paid") {
-        conditions.push("Balance = 0");
-      } else if (status.toLowerCase() === "unpaid") {
-        conditions.push("Balance > 0");
+
+    const queryWithOptionalBalance = (includeBalance: boolean) => {
+      const conditions = [...baseConditions];
+      if (includeBalance && useBalanceFilter) {
+        if (status === "paid") {
+          conditions.push("Balance = '0'");
+        } else {
+          conditions.push("Balance > '0'");
+        }
       }
-    }
 
-    if (conditions.length > 0) {
-      query += " WHERE " + conditions.join(" AND ");
-    }
-
-    query += " ORDERBY TxnDate DESC";
-
-    console.log(`[invoice/query] Final query: ${query}`);
-
-    const maxResults = 1000;
-    const invoices: any[] = [];
-    let totalAmount = 0;
-    let totalPaid = 0;
-
-    const accumulateTotals = (pageInvoices: any[]) => {
-      totalAmount += pageInvoices.reduce((sum: number, inv: any) => {
-        return sum + (Number(inv.TotalAmt) || 0);
-      }, 0);
-
-      totalPaid += pageInvoices.reduce((sum: number, inv: any) => {
-        const balance = Number(inv.Balance) || 0;
-        const total = Number(inv.TotalAmt) || 0;
-        return sum + (total - balance);
-      }, 0);
+      let query = "SELECT * FROM Invoice";
+      if (conditions.length > 0) {
+        query += ` WHERE ${conditions.join(" AND ")}`;
+      }
+      query += " ORDERBY TxnDate DESC";
+      return query;
     };
 
-    if (allPages) {
-      let startPosition = 1;
-      while (true) {
-        const pagedQuery = `${query} STARTPOSITION ${startPosition} MAXRESULTS ${maxResults}`;
+    const applyInMemoryStatusFilter = (rows: any[]) => {
+      if (!useBalanceFilter) return rows;
+      if (status === "paid") {
+        return rows.filter((inv: any) => (Number(inv?.Balance) || 0) <= 0);
+      }
+      return rows.filter((inv: any) => (Number(inv?.Balance) || 0) > 0);
+    };
+
+    const maxResults = 1000;
+
+    const runQuery = async (query: string, filterInMemory: boolean) => {
+      const invoices: any[] = [];
+      let totalAmount = 0;
+      let totalPaid = 0;
+
+      const accumulate = (pageInvoices: any[]) => {
+        totalAmount += pageInvoices.reduce((sum: number, inv: any) => sum + (Number(inv.TotalAmt) || 0), 0);
+        totalPaid += pageInvoices.reduce((sum: number, inv: any) => {
+          const balance = Number(inv.Balance) || 0;
+          const total = Number(inv.TotalAmt) || 0;
+          return sum + (total - balance);
+        }, 0);
+      };
+
+      if (allPages) {
+        let startPosition = 1;
+        while (true) {
+          const pagedQuery = `${query} STARTPOSITION ${startPosition} MAXRESULTS ${maxResults}`;
+          const data = await authorizedQboFetch<any>(
+            `/query?query=${encodeURIComponent(pagedQuery)}&minorversion=65`,
+            {},
+            userId || undefined
+          );
+
+          const rawPageInvoices = data?.QueryResponse?.Invoice || [];
+          const pageInvoices = filterInMemory ? applyInMemoryStatusFilter(rawPageInvoices) : rawPageInvoices;
+
+          if (!totalsOnly) {
+            invoices.push(...pageInvoices);
+          }
+          accumulate(pageInvoices);
+
+          if (rawPageInvoices.length < maxResults) {
+            break;
+          }
+          startPosition += maxResults;
+        }
+      } else {
         const data = await authorizedQboFetch<any>(
-          `/query?query=${encodeURIComponent(pagedQuery)}&minorversion=65`,
+          `/query?query=${encodeURIComponent(query)}&minorversion=65`,
           {},
           userId || undefined
         );
 
-        const pageInvoices = data?.QueryResponse?.Invoice || [];
-        console.log(`[invoice/query] Page ${startPosition}: fetched ${pageInvoices.length} invoices`);
-        accumulateTotals(pageInvoices);
+        const rawPageInvoices = data?.QueryResponse?.Invoice || [];
+        const pageInvoices = filterInMemory ? applyInMemoryStatusFilter(rawPageInvoices) : rawPageInvoices;
 
         if (!totalsOnly) {
           invoices.push(...pageInvoices);
         }
-
-        if (pageInvoices.length < maxResults) {
-          console.log(`[invoice/query] Final totals: totalPaid=${totalPaid}, totalAmount=${totalAmount}`);
-          break;
-        }
-
-        startPosition += maxResults;
+        accumulate(pageInvoices);
       }
-    } else {
-      const data = await authorizedQboFetch<any>(
-        `/query?query=${encodeURIComponent(query)}&minorversion=65`,
-        {},
-        userId || undefined
-      );
 
-      const pageInvoices = data?.QueryResponse?.Invoice || [];
-      console.log(`[invoice/query] Fetched ${pageInvoices.length} invoices, totalPaid: ${totalPaid}`, {
-        query,
-        firstInvoice: pageInvoices[0],
+      return { invoices, totalAmount, totalPaid };
+    };
+
+    const primaryQuery = queryWithOptionalBalance(true);
+    console.log(`[invoice/query] Primary query: ${primaryQuery}`);
+
+    let result;
+    try {
+      result = await runQuery(primaryQuery, false);
+    } catch (error: any) {
+      const canFallback =
+        useBalanceFilter &&
+        error instanceof QboApiError &&
+        (error.status === 400 || error.status === 500);
+
+      if (!canFallback) {
+        throw error;
+      }
+
+      const fallbackQuery = queryWithOptionalBalance(false);
+      console.warn("[invoice/query] Primary query failed; retrying with fallback query", {
+        primaryQuery,
+        fallbackQuery,
+        errorStatus: error.status,
       });
-      accumulateTotals(pageInvoices);
-      if (!totalsOnly) {
-        invoices.push(...pageInvoices);
-      }
+      result = await runQuery(fallbackQuery, true);
     }
 
     return NextResponse.json({
       ok: true,
-      invoices,
-      count: invoices.length,
-      totalAmount,
-      totalPaid,
+      invoices: result.invoices,
+      count: result.invoices.length,
+      totalAmount: result.totalAmount,
+      totalPaid: result.totalPaid,
     });
   } catch (error: any) {
     if (error instanceof QboApiError) {
