@@ -1,8 +1,33 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-export default function middleware(req: NextRequest) {
-  return NextResponse.next();
+const SIGN_IN_PATH = "/auth/signin";
+const AUTH_SECRET = process.env.NEXTAUTH_SECRET || "development-secret-do-not-use-in-production";
+
+export default async function middleware(req: NextRequest) {
+  const { pathname, search } = req.nextUrl;
+
+  const isPublicPath =
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/icon.svg" ||
+    pathname.startsWith("/auth/");
+
+  if (isPublicPath) {
+    return NextResponse.next();
+  }
+
+  const token = await getToken({ req, secret: AUTH_SECRET });
+  if (token) {
+    return NextResponse.next();
+  }
+
+  const signInUrl = req.nextUrl.clone();
+  signInUrl.pathname = SIGN_IN_PATH;
+  signInUrl.search = `?callbackUrl=${encodeURIComponent(pathname + search)}`;
+  return NextResponse.redirect(signInUrl);
 }
 
 export const config = {
