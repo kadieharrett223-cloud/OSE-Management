@@ -97,13 +97,32 @@ export async function GET(req: NextRequest) {
     let payoutOrders: ShopifyOrderWithDeposit[] = [];
     let pendingTransactions: Array<ShopifyBalanceTransaction & { payout_date?: string; payout_amount?: string; payout_currency?: string }> = [];
 
-    const payoutsResult = await Promise.allSettled([
+    const [allPayoutsResult, scheduledResult, inTransitResult] = await Promise.allSettled([
       shopifyApiFetch<{ payouts: ShopifyPayout[] }>(payoutsUrl),
+      shopifyApiFetch<{ payouts: ShopifyPayout[] }>("/shopify_payments/payouts.json?status=scheduled&limit=25"),
+      shopifyApiFetch<{ payouts: ShopifyPayout[] }>("/shopify_payments/payouts.json?status=in_transit&limit=25"),
     ]);
 
-    if (payoutsResult[0].status === "fulfilled") {
-      payouts = payoutsResult[0].value?.payouts || [];
+    const payoutMap = new Map<number, ShopifyPayout>();
+    const mergePayouts = (list: ShopifyPayout[]) => {
+      list.forEach((payout) => payoutMap.set(payout.id, payout));
+    };
+
+    if (allPayoutsResult.status === "fulfilled") {
+      mergePayouts(allPayoutsResult.value?.payouts || []);
     }
+    if (scheduledResult.status === "fulfilled") {
+      mergePayouts(scheduledResult.value?.payouts || []);
+    }
+    if (inTransitResult.status === "fulfilled") {
+      mergePayouts(inTransitResult.value?.payouts || []);
+    }
+
+    payouts = Array.from(payoutMap.values()).sort((a, b) => {
+      const dateCompare = (b.date || "").localeCompare(a.date || "");
+      if (dateCompare !== 0) return dateCompare;
+      return b.id - a.id;
+    });
 
     const pendingPayouts = payouts.filter(
       (p) => p.status === "scheduled" || p.status === "in_transit"

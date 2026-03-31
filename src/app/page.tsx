@@ -71,20 +71,6 @@ interface UndepositedPayment {
   invoiceNums: string[];
 }
 
-interface QboDeposit {
-  id: string;
-  txnDate: string;
-  depositToAccount: string;
-  totalAmt: number;
-  memo: string;
-  lines: Array<{
-    account: string;
-    amount: number;
-    entityName: string;
-    description: string;
-  }>;
-}
-
 interface ShopifyPayout {
   id: number;
   date: string;
@@ -286,9 +272,6 @@ export default function Dashboard() {
   const [loadingUndepositedFunds, setLoadingUndepositedFunds] = useState(true);
   const [showUndepositedModal, setShowUndepositedModal] = useState(false);
 
-  // QBO deposits feed state
-  const [qboDeposits, setQboDeposits] = useState<QboDeposit[]>([]);
-  const [loadingQboDeposits, setLoadingQboDeposits] = useState(true);
   const [showDepositsModal, setShowDepositsModal] = useState(false);
 
   // Shopify payouts state
@@ -298,6 +281,10 @@ export default function Dashboard() {
   const [shopifyPaymentsEnabled, setShopifyPaymentsEnabled] = useState(true);
   const [loadingShopifyPayouts, setLoadingShopifyPayouts] = useState(true);
   const [showShopifyPayoutsModal, setShowShopifyPayoutsModal] = useState(false);
+
+  const scheduledShopifyPayouts = shopifyPayouts.filter(
+    (payout) => payout.status === "scheduled" || payout.status === "in_transit"
+  );
 
   // Compute derived values first (needed for animated count-ups)
   const totalExpenses = paidExpensesTotal + payrollExpenseTotal;
@@ -1061,35 +1048,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Fetch QBO deposits feed (last 30 days)
-  useEffect(() => {
-    let isMounted = true;
-    const fetchQboDeposits = async () => {
-      setLoadingQboDeposits(true);
-      try {
-        const endDate = new Date().toISOString().slice(0, 10);
-        const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-        const res = await fetch(`/api/qbo/deposits?startDate=${startDate}&endDate=${endDate}&limit=30&_=${Date.now()}`);
-        if (!res.ok) throw new Error("Failed to fetch QBO deposits");
-        const data = await res.json();
-        if (isMounted) {
-          setQboDeposits(data.deposits || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch QBO deposits:", err);
-        if (isMounted) setQboDeposits([]);
-      } finally {
-        if (isMounted) setLoadingQboDeposits(false);
-      }
-    };
-    fetchQboDeposits();
-    const interval = setInterval(fetchQboDeposits, 120000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
   // Fetch Shopify payouts + recent orders with deposit linkage
   useEffect(() => {
     let isMounted = true;
@@ -1197,7 +1155,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Undeposited Funds + QBO Deposits Feed */}
+            {/* Undeposited Funds + Shopify Scheduled Deposits */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {/* QBO Undeposited Funds */}
               <div className="bg-white border border-slate-200 rounded-lg">
@@ -1257,19 +1215,21 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* QBO Deposits Feed */}
+              {/* Shopify Scheduled Deposits */}
               <div className="bg-white border border-slate-200 rounded-lg">
                 <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Recent QBO Deposits</h2>
-                    <p className="mt-0.5 text-sm text-slate-600">Bank deposits recorded in QuickBooks (last 30 days)</p>
-                    {!loadingQboDeposits && qboDeposits.length > 0 && (
+                    <h2 className="text-lg font-semibold text-slate-900">Shopify Deposits Scheduled</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">Upcoming Shopify payouts by deposit date</p>
+                    {!loadingShopifyPayouts && scheduledShopifyPayouts.length > 0 && (
                       <p className="mt-1 text-sm font-medium text-slate-700">
-                        Total: ${money(qboDeposits.reduce((s, d) => s + d.totalAmt, 0))}
+                        Total scheduled: ${money(
+                          scheduledShopifyPayouts.reduce((sum, payout) => sum + (Number(payout.amount) || 0), 0)
+                        )}
                       </p>
                     )}
                   </div>
-                  {qboDeposits.length > 5 && (
+                  {scheduledShopifyPayouts.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setShowDepositsModal(true)}
@@ -1283,23 +1243,25 @@ export default function Dashboard() {
                   <table className="w-full">
                     <thead className="bg-slate-50 border-b border-slate-100">
                       <tr>
-                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
-                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Bank Account</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Deposit Date</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Status</th>
                         <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {loadingQboDeposits ? (
+                      {loadingShopifyPayouts ? (
                         <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
-                      ) : qboDeposits.length === 0 ? (
-                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">No deposits in last 30 days</td></tr>
+                      ) : !shopifyPaymentsEnabled ? (
+                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Shopify Payments not enabled</td></tr>
+                      ) : scheduledShopifyPayouts.length === 0 ? (
+                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">No scheduled Shopify deposits</td></tr>
                       ) : (
-                        qboDeposits.slice(0, 6).map((dep) => (
-                          <tr key={dep.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{dep.txnDate}</td>
-                            <td className="px-5 py-3 text-sm text-slate-600 truncate max-w-[160px]">{dep.depositToAccount}</td>
+                        scheduledShopifyPayouts.slice(0, 6).map((payout) => (
+                          <tr key={payout.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{payout.date}</td>
+                            <td className="px-5 py-3 text-sm text-slate-600 capitalize">{payout.status.replace("_", " ")}</td>
                             <td className="px-5 py-3 text-right text-sm font-semibold text-emerald-700">
-                              ${money(dep.totalAmt)}
+                              ${money(Number(payout.amount) || 0)} {payout.currency}
                             </td>
                           </tr>
                         ))
@@ -1978,15 +1940,17 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* QBO Deposits Modal */}
+            {/* Shopify Scheduled Deposits Modal */}
             {showDepositsModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
                 <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg">
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900">All QBO Deposits (Last 30 Days)</h2>
+                      <h2 className="text-lg font-semibold text-slate-900">All Shopify Scheduled Deposits</h2>
                       <p className="mt-0.5 text-sm text-slate-600">
-                        Total deposited: ${money(qboDeposits.reduce((s, d) => s + d.totalAmt, 0))}
+                        Total scheduled: ${money(
+                          scheduledShopifyPayouts.reduce((sum, payout) => sum + (Number(payout.amount) || 0), 0)
+                        )}
                       </p>
                     </div>
                     <button
@@ -2001,24 +1965,24 @@ export default function Dashboard() {
                     <table className="w-full">
                       <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Bank Account</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Memo</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Deposit Date</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Status</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Payout ID</th>
                           <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
-                          <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Lines</th>
+                          <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Currency</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {qboDeposits.length === 0 ? (
-                          <tr><td colSpan={5} className="px-5 py-6 text-center text-slate-500">No deposits found</td></tr>
+                        {scheduledShopifyPayouts.length === 0 ? (
+                          <tr><td colSpan={5} className="px-5 py-6 text-center text-slate-500">No scheduled deposits found</td></tr>
                         ) : (
-                          qboDeposits.map((dep) => (
-                            <tr key={dep.id} className="hover:bg-slate-50">
-                              <td className="px-5 py-3 text-sm font-medium text-slate-900">{dep.txnDate}</td>
-                              <td className="px-5 py-3 text-sm text-slate-700">{dep.depositToAccount}</td>
-                              <td className="px-5 py-3 text-sm text-slate-500 truncate max-w-[180px]">{dep.memo || "—"}</td>
-                              <td className="px-5 py-3 text-right font-semibold text-emerald-700">${money(dep.totalAmt)}</td>
-                              <td className="px-5 py-3 text-right text-sm text-slate-500">{dep.lines.length}</td>
+                          scheduledShopifyPayouts.map((payout) => (
+                            <tr key={payout.id} className="hover:bg-slate-50">
+                              <td className="px-5 py-3 text-sm font-medium text-slate-900">{payout.date}</td>
+                              <td className="px-5 py-3 text-sm text-slate-700 capitalize">{payout.status.replace("_", " ")}</td>
+                              <td className="px-5 py-3 text-sm text-slate-500 font-mono">{payout.id}</td>
+                              <td className="px-5 py-3 text-right font-semibold text-emerald-700">${money(Number(payout.amount) || 0)}</td>
+                              <td className="px-5 py-3 text-right text-sm text-slate-500">{payout.currency}</td>
                             </tr>
                           ))
                         )}
