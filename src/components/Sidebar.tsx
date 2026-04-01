@@ -89,7 +89,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
         </div>
       </div>
 
-      <nav className="mt-6 space-y-2">
+      <nav className="mt-6 space-y-0">
         {navGroups.map((group) => {
           const isExpanded = expandedGroup === group.title;
           return (
@@ -110,25 +110,27 @@ export function Sidebar({ activePage }: { activePage: string }) {
                 </span>
               </button>
 
-              {/* Submenu */}
-              <div className={`absolute left-0 right-0 top-full mt-1 bg-slate-700 rounded-lg shadow-xl border border-slate-600 overflow-hidden z-50 transition-all origin-top ${
-                isExpanded ? 'scale-y-100 opacity-100 visible' : 'scale-y-95 opacity-0 invisible'
+              {/* Submenu - now part of document flow */}
+              <div className={`overflow-hidden transition-all duration-200 ease-out origin-top ${
+                isExpanded ? 'max-h-96' : 'max-h-0'
               }`}>
-                {group.items.map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    onClick={() => setIsOpen(false)}
-                    className={`block w-full px-4 py-3 text-left text-sm transition-colors ${
-                      item.label === activePage
-                        ? "border-l-2 border-l-blue-400 bg-slate-600/60 text-white font-medium"
-                        : "border-l-2 border-l-transparent text-slate-200 hover:bg-slate-600/40 hover:text-white"
-                    }`}
-                  >
-                    <p className="font-medium">{item.label}</p>
-                    <p className="text-xs text-slate-400">{item.hint}</p>
-                  </a>
-                ))}
+                <div className="bg-slate-700 rounded-lg shadow-lg border border-slate-600 mx-1 mb-2">
+                  {group.items.map((item, index) => (
+                    <a
+                      key={item.label}
+                      href={item.href}
+                      onClick={() => setIsOpen(false)}
+                      className={`block w-full px-4 py-3 text-left text-sm transition-colors ${
+                        item.label === activePage
+                          ? "border-l-2 border-l-blue-400 bg-slate-600/60 text-white font-medium"
+                          : "border-l-2 border-l-transparent text-slate-200 hover:bg-slate-600/40 hover:text-white"
+                      } ${index !== group.items.length - 1 ? 'border-b border-b-slate-600/40' : ''}`}
+                    >
+                      <p className="font-medium">{item.label}</p>
+                      <p className="text-xs text-slate-400">{item.hint}</p>
+                    </a>
+                  ))}
+                </div>
               </div>
             </div>
           );
