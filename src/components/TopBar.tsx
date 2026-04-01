@@ -137,18 +137,18 @@ export function TopBar() {
         <div className="min-w-0 flex flex-nowrap items-center gap-2 overflow-x-auto text-xs sm:gap-4 sm:text-sm">
           <span className="font-bold text-white">QBO:</span>
           {qboStatus === "ok" ? (
-            <span className="inline-flex items-center gap-1 text-emerald-100 sm:gap-2">
+            <span className="inline-flex items-center gap-1 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-3 py-1 rounded-full font-semibold sm:gap-2">
               Synced ✅
               {lastChecked && (
-                <span className="hidden text-xs text-slate-200 sm:inline">Checked {lastChecked.toLocaleTimeString()}</span>
+                <span className="hidden text-xs text-emerald-100 sm:inline">Checked {lastChecked.toLocaleTimeString()}</span>
               )}
             </span>
           ) : qboStatus === "error" ? (
-            <span className="inline-flex items-center gap-1 text-red-200 sm:gap-2">
-              Not connected
+            <span className="inline-flex items-center gap-1 text-white sm:gap-2">
+              <span>Not connected</span>
               <a
                 href="/api/qbo/connect"
-                className="rounded-full bg-red-700/40 px-2 py-0.5 text-xs font-semibold text-red-100"
+                className="rounded-full bg-gradient-to-r from-red-600 to-red-700 px-3 py-1 text-xs font-semibold text-white hover:shadow-lg transition"
               >
                 Connect
               </a>
@@ -156,14 +156,14 @@ export function TopBar() {
           ) : (
             <span className="text-slate-200">Checking…</span>
           )}
-          <div className="flex items-center gap-1 rounded-full border border-slate-400 bg-slate-700 px-2 py-1 text-xs font-semibold text-white sm:ml-2 sm:gap-2 sm:px-3">
+          <div className="flex items-center gap-1 rounded-full border border-emerald-400 bg-gradient-to-r from-emerald-600 to-emerald-700 px-3 py-1.5 text-xs font-semibold text-white sm:ml-2 sm:gap-2 sm:px-4 hover:shadow-lg transition">
             <span className="hidden sm:inline">Payments Received:</span>
             <span className="sm:hidden">Received:</span>
             <span className="text-xs font-bold text-white sm:text-sm">
               {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
             </span>
           </div>
-          <div className="flex items-center gap-1 rounded-full border border-slate-400 bg-slate-700 px-2 py-1 text-xs font-semibold text-white sm:gap-2 sm:px-3">
+          <div className="flex items-center gap-1 rounded-full border border-amber-400 bg-gradient-to-r from-amber-600 to-amber-700 px-3 py-1.5 text-xs font-semibold text-white sm:gap-2 sm:px-4 hover:shadow-lg transition">
             <span className="hidden sm:inline">Undeposited:</span>
             <span className="sm:hidden">Undeposited:</span>
             <span className="text-xs font-bold text-white sm:text-sm">
@@ -171,9 +171,9 @@ export function TopBar() {
             </span>
           </div>
         </div>
-        <div className="hidden lg:flex lg:flex-col lg:items-center lg:gap-0.5">
+        <div className="hidden lg:flex lg:flex-col lg:items-center lg:gap-0.5 bg-gradient-to-r from-slate-500 to-slate-600 rounded-lg px-4 py-2">
           <span className="text-lg font-bold text-white tracking-wide">Olympic Shop Equipment</span>
-          <span className="text-[10px] text-slate-200">brought to you by kadie ☺</span>
+          <span className="text-[10px] text-slate-100">brought to you by kadie ☺</span>
         </div>
         <div className="relative w-full min-w-0 sm:flex-1 sm:max-w-sm">
           <input
@@ -181,11 +181,11 @@ export function TopBar() {
             placeholder="Search..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full rounded-full border border-slate-400 bg-slate-700 px-4 py-1.5 text-sm text-white placeholder:text-slate-300 focus:border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-300"
+            className="w-full rounded-full border-2 border-slate-400 bg-slate-700 px-4 py-1.5 text-sm text-white placeholder:text-slate-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/30 transition"
           />
           {normalizedQuery && (
-            <div className="absolute left-0 right-0 mt-2 rounded-xl border border-slate-500 bg-slate-700 shadow-lg">
-              <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200">Pages</div>
+            <div className="absolute left-0 right-0 mt-2 rounded-xl border-2 border-blue-400 bg-slate-700 shadow-xl">
+              <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">Search Results</div>
               <div className="max-h-64 overflow-y-auto">
                 {filteredPages.length === 0 ? (
                   <div className="px-4 py-3 text-sm text-slate-400">No pages found.</div>
@@ -194,7 +194,7 @@ export function TopBar() {
                     <a
                       key={page.href}
                       href={page.href}
-                      className="block px-4 py-2 text-sm text-white hover:bg-slate-600"
+                      className="block px-4 py-2 text-sm text-white hover:bg-blue-600/30 border-l-4 border-l-transparent hover:border-l-blue-400 transition"
                     >
                       {page.label}
                     </a>
