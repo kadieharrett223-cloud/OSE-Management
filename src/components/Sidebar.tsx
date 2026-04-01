@@ -5,8 +5,6 @@ import { useState } from "react";
 const navGroups = [
   {
     title: "Operations",
-    icon: "📊",
-    color: "from-blue-600 to-blue-700",
     items: [
       { label: "Dashboard", hint: "Company overview", href: "/" },
       { label: "Calendar", hint: "Sales & notifications", href: "/calendar" },
@@ -16,8 +14,6 @@ const navGroups = [
   },
   {
     title: "Finance",
-    icon: "💰",
-    color: "from-emerald-600 to-emerald-700",
     items: [
       { label: "Expenses", hint: "Bills & payroll", href: "/expenses" },
       { label: "Payroll", hint: "Payroll costs & team", href: "/payroll" },
@@ -25,8 +21,6 @@ const navGroups = [
   },
   {
     title: "Inventory",
-    icon: "📦",
-    color: "from-purple-600 to-purple-700",
     items: [
       { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
       { label: "Purchasing", hint: "POs and payments", href: "/admin/purchasing" },
@@ -35,8 +29,6 @@ const navGroups = [
   },
   {
     title: "Admin",
-    icon: "⚙️",
-    color: "from-orange-600 to-orange-700",
     items: [
       { label: "Shopify Reconcile", hint: "Match orders to QBO invoices", href: "/admin/shopify-reconcile" },
       { label: "Settings", hint: "QBO & Shopify config", href: "/settings" },
@@ -44,8 +36,6 @@ const navGroups = [
   },
   {
     title: "Settings Menu",
-    icon: "👤",
-    color: "from-pink-600 to-pink-700",
     items: [
       { label: "Users", hint: "Manage team & permissions", href: "/settings/users" },
     ],
@@ -61,7 +51,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
       {/* Mobile hamburger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed left-4 top-16 z-50 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 p-2 text-white shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-blue-800 transition lg:hidden"
+        className="fixed left-4 top-16 z-50 rounded-lg bg-slate-600 p-2 text-white shadow-lg hover:bg-slate-500 transition lg:hidden"
         aria-label="Toggle menu"
       >
         <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,11 +102,10 @@ export function Sidebar({ activePage }: { activePage: string }) {
               {/* Group Header */}
               <button
                 onClick={() => setExpandedGroup(isExpanded ? null : group.title)}
-                className={`w-full px-3 py-2.5 rounded-lg transition-all font-semibold text-white flex items-center gap-2 bg-gradient-to-r ${group.color} hover:shadow-lg`}
+                className={`w-full px-3 py-2 rounded-lg transition-colors font-semibold text-slate-100 flex items-center gap-2 hover:bg-slate-500/40`}
               >
-                <span className="text-lg">{(group as any).icon}</span>
                 <span className="text-sm">{group.title}</span>
-                <span className={`ml-auto text-sm transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                <span className={`ml-auto text-xs transition-transform opacity-60 ${isExpanded ? 'rotate-180' : ''}`}>
                   ▼
                 </span>
               </button>
@@ -130,14 +119,14 @@ export function Sidebar({ activePage }: { activePage: string }) {
                     key={item.label}
                     href={item.href}
                     onClick={() => setIsOpen(false)}
-                    className={`block w-full px-4 py-3 text-left text-sm transition border-l-2 ${
+                    className={`block w-full px-4 py-3 text-left text-sm transition-colors ${
                       item.label === activePage
-                        ? "border-l-white bg-slate-600 text-white font-semibold"
-                        : "border-l-transparent bg-transparent text-slate-100 hover:border-l-slate-300 hover:bg-slate-600/60 hover:text-white"
+                        ? "border-l-2 border-l-blue-400 bg-slate-600/60 text-white font-medium"
+                        : "border-l-2 border-l-transparent text-slate-200 hover:bg-slate-600/40 hover:text-white"
                     }`}
                   >
                     <p className="font-medium">{item.label}</p>
-                    <p className="text-xs text-slate-300">{item.hint}</p>
+                    <p className="text-xs text-slate-400">{item.hint}</p>
                   </a>
                 ))}
               </div>
