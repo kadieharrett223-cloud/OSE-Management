@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { usePathname } from "next/navigation";
 
 type PayrollMeta = {
   payFrequency: string;
@@ -68,12 +67,6 @@ export default function PayrollPage() {
   const [error, setError] = useState<string | null>(null);
   const [payrollMeta, setPayrollMeta] = useState<PayrollMeta | null>(null);
   const [team, setTeam] = useState<PayrollMember[]>([]);
-  const pathname = usePathname();
-  const tabs = [
-    { label: "Payroll", href: "/payroll" },
-    { label: "Commissions", href: "/commissions" },
-    { label: "Terminated", href: "/payroll/terminated" },
-  ];
 
   useEffect(() => {
     const fetchPayroll = async () => {
@@ -143,25 +136,6 @@ export default function PayrollPage() {
         <Sidebar activePage="Payroll" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          <div className="bg-slate-200 border-b border-slate-300 overflow-x-auto">
-            <div className="mx-auto max-w-7xl px-4 md:px-8">
-              <div className="flex gap-1 min-w-max">
-                {tabs.map((tab) => (
-                  <a
-                    key={tab.href}
-                    href={tab.href}
-                    className={`px-4 md:px-6 py-3 text-sm font-medium transition relative whitespace-nowrap ${
-                      pathname === tab.href
-                        ? "bg-slate-500 text-white rounded-t-lg"
-                        : "text-slate-200 hover:text-white hover:bg-slate-700/50"
-                    }`}
-                  >
-                    {tab.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
           <div className="mx-auto max-w-7xl px-4 md:px-8 py-6 md:py-8 space-y-6 md:space-y-10">
             <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { usePathname } from "next/navigation";
 
 type PayrollMember = {
   id: string;
@@ -25,13 +24,6 @@ const formatCurrency = (value: number) =>
 const getFirstName = (fullName: string) => fullName.split(" ")[0] || fullName;
 
 export default function TerminatedPayrollPage() {
-  const pathname = usePathname();
-  const tabs = [
-    { label: "Payroll", href: "/payroll" },
-    { label: "Commissions", href: "/commissions" },
-    { label: "Terminated", href: "/payroll/terminated" },
-  ];
-
   const [terminated, setTerminated] = useState<PayrollMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,27 +56,7 @@ export default function TerminatedPayrollPage() {
         <Sidebar activePage="Payroll" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          <div className="bg-slate-200 border-b border-slate-300">
-            <div className="mx-auto max-w-6xl px-6">
-              <div className="flex gap-1">
-                {tabs.map((tab) => (
-                  <a
-                    key={tab.href}
-                    href={tab.href}
-                    className={`px-6 py-3 text-sm font-medium transition relative ${
-                      pathname === tab.href
-                        ? "bg-slate-500 text-white rounded-t-lg"
-                        : "text-slate-200 hover:text-white hover:bg-slate-700/50"
-                    }`}
-                  >
-                    {tab.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
           <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
-
             <header>
               <h1 className="text-2xl font-semibold text-slate-900">Terminated Team</h1>
               <p className="text-sm text-slate-600">Archived staff removed from current payroll.</p>
@@ -96,21 +68,12 @@ export default function TerminatedPayrollPage() {
               </div>
             )}
 
-            <section className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Terminated Employees</h2>
-                  <p className="text-xs text-slate-500">First names only • not on active payroll</p>
-                </div>
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {terminated.length} people
-                </span>
-              </div>
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 border-b border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Member</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Name</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Role</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Type</th>
                       <th className="px-6 py-3 text-right text-xs font-semibold text-slate-600">Rate</th>
