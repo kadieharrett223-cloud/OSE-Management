@@ -30,6 +30,7 @@ const navGroups = [
   {
     title: "Admin",
     items: [
+      { label: "Shopify Reconcile", hint: "Match orders to QBO invoices", href: "/admin/shopify-reconcile" },
       { label: "Settings", hint: "QBO & Shopify config", href: "/settings" },
     ],
   },
