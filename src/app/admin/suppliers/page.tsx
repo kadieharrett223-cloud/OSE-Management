@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { usePathname } from "next/navigation";
 
 const formatDate = (value?: string) => {
   if (!value) return "—";
@@ -87,37 +86,11 @@ export default function SuppliersPage() {
 
   function editSupplier(s: Supplier) { setForm({ ...s }); }
 
-  const pathname = usePathname();
-  const tabs = [
-    { label: "Purchase Orders", href: "/admin/purchasing" },
-    { label: "Suppliers", href: "/admin/suppliers" },
-  ];
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
         <Sidebar activePage="Purchasing" />
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
-          {/* Chrome-style Tabs */}
-          <div className="bg-slate-200 border-b border-slate-300">
-            <div className="mx-auto max-w-5xl px-4 md:px-6">
-              <div className="flex gap-1 overflow-x-auto min-w-max">
-                {tabs.map((tab) => (
-                  <a
-                    key={tab.href}
-                    href={tab.href}
-                    className={`px-4 md:px-6 py-3 text-sm font-medium transition relative whitespace-nowrap ${
-                      pathname === tab.href
-                        ? "bg-slate-500 text-white rounded-t-lg"
-                        : "text-slate-200 hover:text-white hover:bg-slate-700/50"
-                    }`}
-                  >
-                    {tab.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
 
           <div className="mx-auto max-w-5xl px-4 md:px-6 py-4 md:py-6 space-y-4 md:space-y-8">
             <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

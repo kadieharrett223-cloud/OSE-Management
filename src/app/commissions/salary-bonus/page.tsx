@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { usePathname } from "next/navigation";
 import { SALARY_BONUS_THRESHOLD } from "@/lib/repTypes";
 import { getCommissionDateRange, getCurrentCommissionMonth } from "@/lib/commission-dates";
 
@@ -60,38 +59,12 @@ export default function SalaryBonusPage() {
     month: "long",
   });
 
-  const pathname = usePathname();
-  const tabs = [
-    { label: "Payroll", href: "/payroll" },
-    { label: "Commissions", href: "/commissions" },
-    { label: "Salary Bonus", href: "/commissions/salary-bonus" },
-    { label: "Wholesalers", href: "/admin/wholesalers" },
-  ];
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
         <Sidebar activePage="Commissions" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          {/* Chrome-style Tabs */}
-          <div className="bg-slate-200 border-b border-slate-300 px-8">
-            <div className="flex gap-1">
-              {tabs.map((tab) => (
-                <a
-                  key={tab.href}
-                  href={tab.href}
-                  className={`px-6 py-3 text-sm font-medium transition relative ${
-                    pathname === tab.href
-                      ? "bg-slate-500 text-white rounded-t-lg"
-                      : "text-slate-200 hover:text-white hover:bg-slate-700/50"
-                  }`}
-                >
-                  {tab.label}
-                </a>
-              ))}
-            </div>
-          </div>
 
           <div className="mx-auto max-w-7xl px-8 py-8 space-y-6">
             {/* Header */}
