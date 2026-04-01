@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const navGroups = [
+const navGroups: { title: string; items: { label: string; hint: string; href: string }[] }[] = [
   {
     title: "Operations",
     items: [
@@ -44,7 +44,6 @@ const navGroups = [
 
 export function Sidebar({ activePage }: { activePage: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   return (
     <>
@@ -73,12 +72,11 @@ export function Sidebar({ activePage }: { activePage: string }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-30 flex min-h-screen w-64 flex-col bg-slate-700 px-4 py-6 shadow-md border-r border-slate-600 transition-transform duration-300 lg:static lg:min-h-full lg:w-72 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-30 flex min-h-screen w-64 flex-col bg-slate-700 px-4 py-6 shadow-md border-r border-slate-600 transition-transform duration-300 lg:static lg:min-h-full lg:w-64 lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-6">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-600 text-sm font-semibold text-white border border-slate-500">
             OSE
           </div>
@@ -87,57 +85,36 @@ export function Sidebar({ activePage }: { activePage: string }) {
             <p className="text-lg font-bold text-white">Performance Hub</p>
           </div>
         </div>
-      </div>
 
-      <nav className="mt-6 space-y-0">
-        {navGroups.map((group) => {
-          const isExpanded = expandedGroup === group.title;
-          return (
-            <div 
-              key={group.title}
-              onMouseEnter={() => setExpandedGroup(group.title)}
-              onMouseLeave={() => setExpandedGroup(null)}
-              className="group relative"
-            >
-              {/* Group Header */}
-              <button
-                onClick={() => setExpandedGroup(isExpanded ? null : group.title)}
-                className={`w-full px-3 py-2 rounded-lg transition-colors font-semibold text-slate-100 flex items-center gap-2 hover:bg-slate-600/50`}
-              >
-                <span className="text-sm">{group.title}</span>
-                <span className={`ml-auto text-xs transition-transform opacity-60 ${isExpanded ? 'rotate-180' : ''}`}>
-                  ▼
-                </span>
-              </button>
-
-              {/* Submenu - now part of document flow */}
-              <div className={`overflow-hidden transition-all duration-200 ease-out origin-top ${
-                isExpanded ? 'max-h-96' : 'max-h-0'
-              }`}>
-                <div className="mx-1 mb-2 rounded-lg border border-slate-600 bg-slate-800/40 shadow-lg">
-                  {group.items.map((item, index) => (
-                    <a
-                      key={item.label}
-                      href={item.href}
-                      onClick={() => setIsOpen(false)}
-                      className={`block w-full px-4 py-3 text-left text-sm transition-colors ${
-                        item.label === activePage
-                          ? "border-l-2 border-l-blue-400 bg-slate-600/70 text-white font-medium"
-                          : "border-l-2 border-l-transparent text-slate-200 hover:bg-slate-600/40 hover:text-white"
-                      } ${index !== group.items.length - 1 ? 'border-b border-b-slate-600/60' : ''}`}
-                    >
-                      <p className="font-medium">{item.label}</p>
-                      <p className="text-xs text-slate-400">{item.hint}</p>
-                    </a>
-                  ))}
-                </div>
+        <nav className="space-y-4">
+          {navGroups.map((group) => (
+            <div key={group.title}>
+              {/* Section label */}
+              <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                {group.title}
+              </p>
+              {/* Items always visible */}
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className={`block px-3 py-2 rounded-md text-sm transition-colors ${
+                      item.label === activePage
+                        ? "border-l-2 border-blue-400 bg-slate-600/70 pl-2.5 text-white font-medium"
+                        : "border-l-2 border-transparent pl-2.5 text-slate-200 hover:bg-slate-600/40 hover:text-white"
+                    }`}
+                  >
+                    {item.label}
+                  </a>
+                ))}
               </div>
             </div>
-          );
-        })}
-      </nav>
+          ))}
+        </nav>
 
-      <div className="flex-1" />
+        <div className="flex-1" />
       </aside>
     </>
   );
