@@ -329,7 +329,6 @@ export default function ShopifyReconcilePage() {
   const [endDate, setEndDate] = useState(defaultEnd);
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
-  const [showUnmatchedQbo, setShowUnmatchedQbo] = useState(false);
 
   const [shopifyOrders, setShopifyOrders] = useState<ShopifyOrder[]>([]);
   const [qboInvoices, setQboInvoices] = useState<QboInvoice[]>([]);
@@ -397,7 +396,7 @@ export default function ShopifyReconcilePage() {
   }, [load, loadMappings]);
 
   // â”€â”€ Matching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const { rows, unmatchedQbo } = useMemo(
+  const { rows } = useMemo(
     () => buildMatchedRows(shopifyOrders, qboInvoices, manualMappings),
     [shopifyOrders, qboInvoices, manualMappings]
   );
@@ -698,56 +697,6 @@ export default function ShopifyReconcilePage() {
                 </table>
               </div>
             </div>
-
-            {/* Unmatched QBO invoices */}
-            {!loading && unmatchedQbo.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowUnmatchedQbo((v) => !v)}
-                  className="w-full border-b border-slate-200 px-5 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
-                >
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-800">
-                      QBO Invoices Without a Shopify Order ({unmatchedQbo.length})
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      These may be manually entered invoices, phone/email orders, or outside the date range.
-                    </p>
-                  </div>
-                  <span className="text-slate-400 text-lg">{showUnmatchedQbo ? "â–²" : "â–¼"}</span>
-                </button>
-
-                {showUnmatchedQbo && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[600px] text-sm">
-                      <thead className="bg-slate-50 border-b border-slate-100">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">QBO Invoice #</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">PO #</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Date</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">Amount</th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {unmatchedQbo.map((inv) => (
-                          <tr key={inv.id} className="hover:bg-slate-50">
-                            <td className="px-4 py-3 font-mono text-slate-700">#{inv.docNumber}</td>
-                            <td className="px-4 py-3 text-slate-600">{inv.poNumber || "â€”"}</td>
-                            <td className="px-4 py-3 text-slate-800">{inv.customerName}</td>
-                            <td className="px-4 py-3 text-slate-600">{inv.txnDate}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-slate-800">{money(inv.totalAmt)}</td>
-                            <td className="px-4 py-3 text-center"><StatusBadge status={inv.status} /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
 
           </div>
         </main>
