@@ -42,6 +42,60 @@ const deriveTotalFromLines = (po: any): number => {
   }, 0);
 };
 
+const enrichPurchaseOrderWithFobCosts = async (supabase: any, po: any) => {
+  const lines = Array.isArray(po?.lines) ? po.lines : [];
+  const skus = Array.from(new Set(lines.map((line: any) => String(line?.sku || "").trim()).filter(Boolean)));
+
+  if (skus.length === 0) {
+    return {
+      ...po,
+      total_amount: deriveTotalFromLines(po),
+    };
+  }
+
+  const { data: priceItems, error } = await supabase
+    .from("price_list_items")
+    .select("item_no, fob_cost")
+    .in("item_no", skus)
+    .eq("is_active", true);
+
+  if (error) {
+    console.warn("Unable to enrich purchase order with FOB costs:", error.message);
+    return {
+      ...po,
+      total_amount: deriveTotalFromLines(po),
+    };
+  }
+
+  const fobBySku = new Map<string, number>();
+  for (const item of priceItems || []) {
+    const sku = String(item.item_no || "").trim().toLowerCase();
+    const fob = Number(item.fob_cost);
+    if (sku && Number.isFinite(fob) && fob > 0) {
+      fobBySku.set(sku, fob);
+    }
+  }
+
+  const enrichedLines = lines.map((line: any) => {
+    const skuKey = String(line?.sku || "").trim().toLowerCase();
+    const fobCost = fobBySku.get(skuKey);
+    if (!fobCost) return line;
+
+    const quantity = normalizeCurrency(line?.quantity);
+    return {
+      ...line,
+      unit_price: fobCost,
+      line_total: quantity * fobCost,
+    };
+  });
+
+  return {
+    ...po,
+    lines: enrichedLines,
+    total_amount: deriveTotalFromLines({ ...po, lines: enrichedLines }),
+  };
+};
+
 const normalizeLine = (line: any) => ({
   lineNumber: Number(line?.line_number ?? 0),
   sku: stringifyValue(line?.sku),
@@ -204,10 +258,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       .single();
 
     if (error) throw error;
-    const normalizedData = {
-      ...data,
-      total_amount: deriveTotalFromLines(data),
-    };
+    const normalizedData = await enrichPurchaseOrderWithFobCosts(supabase, data);
 
     return NextResponse.json({ ok: true, data: normalizedData });
   } catch (error: any) {
@@ -342,10 +393,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
     }
 
-    const normalizedPO = {
-      ...updatedPO,
-      total_amount: deriveTotalFromLines(updatedPO),
-    };
+    const normalizedPO = await enrichPurchaseOrderWithFobCosts(supabase, updatedPO);
 
     return NextResponse.json({ ok: true, data: normalizedPO });
   } catch (error: any) {

@@ -34,6 +34,68 @@ export async function GET(req: NextRequest) {
       }, 0);
     };
 
+    const enrichPurchaseOrdersWithFobCosts = async (purchaseOrders: any[]) => {
+      const allSkus = Array.from(
+        new Set(
+          (purchaseOrders || [])
+            .flatMap((po: any) => (Array.isArray(po?.lines) ? po.lines : []))
+            .map((line: any) => String(line?.sku || "").trim())
+            .filter(Boolean)
+        )
+      );
+
+      if (allSkus.length === 0) {
+        return (purchaseOrders || []).map((po: any) => ({
+          ...po,
+          total_amount: deriveTotalFromLines(po),
+        }));
+      }
+
+      const { data: priceItems, error: priceError } = await supabase
+        .from("price_list_items")
+        .select("item_no, fob_cost")
+        .in("item_no", allSkus)
+        .eq("is_active", true);
+
+      if (priceError) {
+        console.warn("Unable to enrich purchase orders with FOB costs:", priceError.message);
+        return (purchaseOrders || []).map((po: any) => ({
+          ...po,
+          total_amount: deriveTotalFromLines(po),
+        }));
+      }
+
+      const fobBySku = new Map<string, number>();
+      for (const item of priceItems || []) {
+        const sku = String(item.item_no || "").trim().toLowerCase();
+        const fob = Number(item.fob_cost);
+        if (sku && Number.isFinite(fob) && fob > 0) {
+          fobBySku.set(sku, fob);
+        }
+      }
+
+      return (purchaseOrders || []).map((po: any) => {
+        const lines = (Array.isArray(po?.lines) ? po.lines : []).map((line: any) => {
+          const skuKey = String(line?.sku || "").trim().toLowerCase();
+          const fobCost = fobBySku.get(skuKey);
+          if (!fobCost) return line;
+
+          const quantity = normalizeCurrency(line?.quantity);
+          return {
+            ...line,
+            unit_price: fobCost,
+            line_total: quantity * fobCost,
+          };
+        });
+
+        return {
+          ...po,
+          lines,
+          total_amount: deriveTotalFromLines({ ...po, lines }),
+        };
+      });
+    };
+
     let query = supabase
       .from("purchase_orders")
       .select(`
@@ -54,10 +116,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
     if (error) throw error;
 
-    const normalizedData = (data || []).map((po: any) => ({
-      ...po,
-      total_amount: deriveTotalFromLines(po),
-    }));
+    const normalizedData = await enrichPurchaseOrdersWithFobCosts(data || []);
 
     return NextResponse.json({ ok: true, data: normalizedData });
   } catch (error: any) {
