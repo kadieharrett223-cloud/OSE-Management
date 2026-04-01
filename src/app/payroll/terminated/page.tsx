@@ -64,7 +64,7 @@ export default function TerminatedPayrollPage() {
         <Sidebar activePage="Payroll" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          <div className="bg-slate-600 border-b border-slate-500">
+          <div className="bg-slate-200 border-b border-slate-300">
             <div className="mx-auto max-w-6xl px-6">
               <div className="flex gap-1">
                 {tabs.map((tab) => (

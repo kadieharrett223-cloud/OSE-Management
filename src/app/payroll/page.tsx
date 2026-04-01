@@ -143,7 +143,7 @@ export default function PayrollPage() {
         <Sidebar activePage="Payroll" />
 
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
-          <div className="bg-slate-600 border-b border-slate-500 overflow-x-auto">
+          <div className="bg-slate-200 border-b border-slate-300 overflow-x-auto">
             <div className="mx-auto max-w-7xl px-4 md:px-8">
               <div className="flex gap-1 min-w-max">
                 {tabs.map((tab) => (

@@ -164,7 +164,7 @@ export default function QboItemMappingPage() {
         <Sidebar activePage="Price List" />
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200">
           {/* Chrome-style Tabs */}
-          <div className="bg-slate-600 border-b border-slate-500 px-8">
+          <div className="bg-slate-200 border-b border-slate-300 px-8">
             <div className="flex gap-1">
               {tabs.map((tab: { label: string; href: string }) => (
                 <a

@@ -73,7 +73,6 @@ export function TopBar() {
 
     const fetchPaymentsToday = async () => {
       try {
-        setLoadingPaymentsToday(true);
         const today = getLocalDateYmd();
         const paymentRes = await fetch(
           `/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`
@@ -87,12 +86,13 @@ export function TopBar() {
         const totalApplied = Number(paymentData?.totalApplied || 0);
         if (isMounted) setPaymentsTodayTotal(totalApplied);
       } catch (error) {
-        if (isMounted) setPaymentsTodayTotal(0);
+        // Keep previous value on error
       } finally {
         if (isMounted) setLoadingPaymentsToday(false);
       }
     };
 
+    setLoadingPaymentsToday(true);
     fetchPaymentsToday();
     const interval = setInterval(fetchPaymentsToday, 30000);
     return () => {
@@ -106,7 +106,6 @@ export function TopBar() {
 
     const fetchUndepositedFunds = async () => {
       try {
-        setLoadingUndepositedFunds(true);
         const res = await fetch(`/api/qbo/undeposited-funds?_=${Date.now()}`);
 
         if (!res.ok) {
@@ -117,12 +116,13 @@ export function TopBar() {
         const totalUndeposited = Number(data?.undeposited || 0);
         if (isMounted) setUndepositedFunds(totalUndeposited);
       } catch (error) {
-        if (isMounted) setUndepositedFunds(0);
+        // Keep previous value on error
       } finally {
         if (isMounted) setLoadingUndepositedFunds(false);
       }
     };
 
+    setLoadingUndepositedFunds(true);
     fetchUndepositedFunds();
     const interval = setInterval(fetchUndepositedFunds, 30000);
     return () => {
@@ -132,10 +132,10 @@ export function TopBar() {
   }, []);
 
   return (
-    <div className="sticky top-0 z-40 w-full border-b border-slate-500 bg-slate-600 pt-[env(safe-area-inset-top)] text-white print:hidden">
+    <div className="sticky top-0 z-40 w-full border-b border-slate-300 bg-slate-200 pt-[env(safe-area-inset-top)] text-slate-700 print:hidden">
       <div className="mx-auto flex w-full flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
         <div className="min-w-0 flex flex-nowrap items-center gap-2 overflow-x-auto text-xs sm:gap-4 sm:text-sm">
-          <span className="font-bold text-white">QBO:</span>
+          <span className="font-bold text-slate-700">QBO:</span>
           {qboStatus === "ok" ? (
             <span className="inline-flex items-center gap-1 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-3 py-1 rounded-full font-semibold sm:gap-2">
               Synced ✅
@@ -144,7 +144,7 @@ export function TopBar() {
               )}
             </span>
           ) : qboStatus === "error" ? (
-            <span className="inline-flex items-center gap-1 text-white sm:gap-2">
+            <span className="inline-flex items-center gap-1 text-slate-700 sm:gap-2">
               <span>Not connected</span>
               <a
                 href="/api/qbo/connect"
@@ -154,7 +154,7 @@ export function TopBar() {
               </a>
             </span>
           ) : (
-            <span className="text-slate-200">Checking…</span>
+            <span className="text-slate-500">Checking…</span>
           )}
           <div className="flex items-center gap-1 rounded-full border border-emerald-400 bg-gradient-to-r from-emerald-600 to-emerald-700 px-3 py-1.5 text-xs font-semibold text-white sm:ml-2 sm:gap-2 sm:px-4 hover:shadow-lg transition">
             <span className="hidden sm:inline">Payments Received:</span>
@@ -171,9 +171,9 @@ export function TopBar() {
             </span>
           </div>
         </div>
-        <div className="hidden lg:flex lg:flex-col lg:items-center lg:gap-0.5 bg-gradient-to-r from-slate-500 to-slate-600 rounded-lg px-4 py-2">
-          <span className="text-lg font-bold text-white tracking-wide">Olympic Shop Equipment</span>
-          <span className="text-[10px] text-slate-100">brought to you by kadie ☺</span>
+        <div className="hidden lg:flex lg:flex-col lg:items-center lg:gap-0.5 bg-slate-300 rounded-lg px-4 py-2">
+          <span className="text-lg font-bold text-slate-800 tracking-wide">Olympic Shop Equipment</span>
+          <span className="text-[10px] text-slate-600">brought to you by kadie ☺</span>
         </div>
         <div className="relative w-full min-w-0 sm:flex-1 sm:max-w-sm">
           <input
@@ -181,20 +181,20 @@ export function TopBar() {
             placeholder="Search..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full rounded-full border-2 border-slate-400 bg-slate-700 px-4 py-1.5 text-sm text-white placeholder:text-slate-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/30 transition"
+            className="w-full rounded-full border-2 border-slate-300 bg-white px-4 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/30 transition"
           />
           {normalizedQuery && (
-            <div className="absolute left-0 right-0 mt-2 rounded-xl border-2 border-blue-400 bg-slate-700 shadow-xl">
+            <div className="absolute left-0 right-0 mt-2 rounded-xl border-2 border-blue-400 bg-white shadow-xl">
               <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">Search Results</div>
               <div className="max-h-64 overflow-y-auto">
                 {filteredPages.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-slate-400">No pages found.</div>
+                  <div className="px-4 py-3 text-sm text-slate-500">No pages found.</div>
                 ) : (
                   filteredPages.map((page) => (
                     <a
                       key={page.href}
                       href={page.href}
-                      className="block px-4 py-2 text-sm text-white hover:bg-blue-600/30 border-l-4 border-l-transparent hover:border-l-blue-400 transition"
+                      className="block px-4 py-2 text-sm text-slate-700 hover:bg-blue-100 border-l-4 border-l-transparent hover:border-l-blue-400 transition"
                     >
                       {page.label}
                     </a>
