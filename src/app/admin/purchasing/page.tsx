@@ -68,6 +68,7 @@ const formatDate = (value?: string | null) => {
 
 const statusLabel = (status: string) => {
   if (status === "TO_BE_PAID") return "To Be Paid";
+  if (status === "PAID") return "Paid";
   return status ? status.charAt(0) + status.slice(1).toLowerCase() : "";
 };
 
@@ -475,21 +476,6 @@ export default function PurchasingPage() {
     }
   }
 
-  async function updatePoStatus(poId: string, status: string) {
-    try {
-      const res = await fetch(`/api/purchase-orders/${poId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error("Failed to update status");
-      await fetchPOs();
-    } catch (error) {
-      console.error("Failed to update PO status:", error);
-      alert("Failed to update status");
-    }
-  }
-
   async function handleSaveSupplier() {
     try {
       const isEdit = supplierModal.mode === "edit" && supplierModal.supplier?.id;
@@ -709,7 +695,6 @@ export default function PurchasingPage() {
   const pathname = usePathname();
   const tabs = [
     { label: "Purchase Orders", href: "/admin/purchasing" },
-    { label: "Shipment Tracking", href: "/admin/purchasing/shipment-tracking" },
     { label: "China Docs", href: "/admin/purchasing/china-docs" },
     { label: "Suppliers", href: "/admin/suppliers" },
   ];
@@ -759,8 +744,7 @@ export default function PurchasingPage() {
                 >
                   <option value="all">All Status</option>
                   <option value="to_be_paid">To Be Paid</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="received">Received</option>
+                  <option value="paid">Paid</option>
                 </select>
                 <div className="flex items-center gap-2">
                   <input
@@ -1419,10 +1403,8 @@ export default function PurchasingPage() {
                           <td className="px-6 py-3 text-center">
                             <span
                               className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
-                                po.status === "RECEIVED"
+                                po.status === "PAID"
                                   ? "bg-emerald-100 text-emerald-800"
-                                  : po.status === "SHIPPED"
-                                  ? "bg-blue-100 text-blue-800"
                                   : "bg-amber-100 text-amber-800"
                               }`}
                             >
@@ -1443,22 +1425,6 @@ export default function PurchasingPage() {
                               >
                                 Add Payment
                               </button>
-                              {po.status === "TO_BE_PAID" && (
-                                <button
-                                  onClick={() => updatePoStatus(po.id, "SHIPPED")}
-                                  className="text-sm font-semibold text-blue-600 hover:text-blue-700"
-                                >
-                                  Mark Shipped
-                                </button>
-                              )}
-                              {po.status === "SHIPPED" && (
-                                <button
-                                  onClick={() => updatePoStatus(po.id, "RECEIVED")}
-                                  className="text-sm font-semibold text-emerald-600 hover:text-emerald-700"
-                                >
-                                  Mark Received
-                                </button>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -1501,10 +1467,8 @@ export default function PurchasingPage() {
                         </div>
                         <span
                           className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
-                            po.status === "RECEIVED"
+                            po.status === "PAID"
                               ? "bg-emerald-100 text-emerald-800"
-                              : po.status === "SHIPPED"
-                              ? "bg-blue-100 text-blue-800"
                               : "bg-amber-100 text-amber-800"
                           }`}
                         >
@@ -1528,22 +1492,6 @@ export default function PurchasingPage() {
                         >
                           View
                         </button>
-                        {po.status === "TO_BE_PAID" && (
-                          <button
-                            onClick={() => updatePoStatus(po.id, "SHIPPED")}
-                            className="px-3 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
-                          >
-                            Mark Shipped
-                          </button>
-                        )}
-                        {po.status === "SHIPPED" && (
-                          <button
-                            onClick={() => updatePoStatus(po.id, "RECEIVED")}
-                            className="px-3 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 rounded hover:bg-emerald-100"
-                          >
-                            Mark Received
-                          </button>
-                        )}
                       </div>
                     </div>
                   ))

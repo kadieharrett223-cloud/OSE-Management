@@ -2,6 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
+const normalizeCurrency = (value: unknown): number => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const cleaned = value.replace(/[^0-9.-]/g, "");
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+async function syncPurchaseOrderPaymentStatus(supabase: any, purchaseOrderId: string) {
+  const { data: po, error } = await supabase
+    .from("purchase_orders")
+    .select(`
+      id,
+      payments:purchase_order_payments(amount)
+    `)
+    .eq("id", purchaseOrderId)
+    .single();
+
+  if (error) throw error;
+
+  const paidAmount = (po?.payments || []).reduce(
+    (sum: number, payment: any) => sum + normalizeCurrency(payment?.amount),
+    0
+  );
+  const nextStatus = paidAmount > 0 ? "PAID" : "TO_BE_PAID";
+
+  const { error: updateError } = await supabase
+    .from("purchase_orders")
+    .update({ status: nextStatus })
+    .eq("id", purchaseOrderId);
+
+  if (updateError) throw updateError;
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string; paymentId: string } }) {
   const session: any = await getSession();
   if (!session) {
@@ -35,6 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .single();
 
     if (error) throw error;
+    await syncPurchaseOrderPaymentStatus(supabase, params.id);
     return NextResponse.json({ ok: true, data });
   } catch (error: any) {
     console.error("Update payment error:", error);
@@ -58,6 +95,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       .eq("purchase_order_id", params.id);
 
     if (error) throw error;
+    await syncPurchaseOrderPaymentStatus(supabase, params.id);
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("Delete payment error:", error);

@@ -34,6 +34,14 @@ export async function GET(req: NextRequest) {
       }, 0);
     };
 
+    const derivePaymentStatus = (po: any): string => {
+      const paidAmount = (Array.isArray(po?.payments) ? po.payments : []).reduce(
+        (sum: number, payment: any) => sum + normalizeCurrency(payment?.amount),
+        0
+      );
+      return paidAmount > 0 ? "PAID" : "TO_BE_PAID";
+    };
+
     const enrichPurchaseOrdersWithFobCosts = async (purchaseOrders: any[]) => {
       const allSkus = Array.from(
         new Set(
@@ -91,6 +99,7 @@ export async function GET(req: NextRequest) {
         return {
           ...po,
           lines,
+          status: derivePaymentStatus({ ...po, lines }),
           total_amount: deriveTotalFromLines({ ...po, lines }),
         };
       });

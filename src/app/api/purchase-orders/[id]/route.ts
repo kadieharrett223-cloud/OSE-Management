@@ -42,6 +42,14 @@ const deriveTotalFromLines = (po: any): number => {
   }, 0);
 };
 
+const derivePaymentStatus = (po: any): string => {
+  const paidAmount = (Array.isArray(po?.payments) ? po.payments : []).reduce(
+    (sum: number, payment: any) => sum + normalizeCurrency(payment?.amount),
+    0
+  );
+  return paidAmount > 0 ? "PAID" : "TO_BE_PAID";
+};
+
 const enrichPurchaseOrderWithFobCosts = async (supabase: any, po: any) => {
   const lines = Array.isArray(po?.lines) ? po.lines : [];
   const skus = Array.from(new Set(lines.map((line: any) => String(line?.sku || "").trim()).filter(Boolean)));
@@ -92,6 +100,7 @@ const enrichPurchaseOrderWithFobCosts = async (supabase: any, po: any) => {
   return {
     ...po,
     lines: enrichedLines,
+    status: derivePaymentStatus({ ...po, lines: enrichedLines }),
     total_amount: deriveTotalFromLines({ ...po, lines: enrichedLines }),
   };
 };
