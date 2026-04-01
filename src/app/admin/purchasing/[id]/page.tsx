@@ -699,7 +699,7 @@ export default function ViewPO() {
     }
   };
 
-  const containerMaxLbs = 44000;
+  const containerMaxLbs = 45000;
   const totalWeightLbs = (po?.lines || []).reduce((sum, line) => {
     const weightEach = Number(line.weight_lbs) || 0;
     const qty = Number(line.quantity) || 0;

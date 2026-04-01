@@ -52,7 +52,7 @@ type Supplier = {
   notes?: string;
 };
 
-const WEIGHT_LIMIT_LBS = 44000;
+const WEIGHT_LIMIT_LBS = 45000;
 
 const money = (value: number | undefined) => {
   if (value === undefined || value === null || isNaN(value)) return "0.00";
@@ -1034,7 +1034,7 @@ export default function PurchasingPage() {
                           weightPercentage > 90 ? 'text-yellow-600 font-semibold' : 
                           'text-slate-700'
                         }`}>
-                          {(totalWeight || 0).toLocaleString()} / 44,000 lbs
+                          {(totalWeight || 0).toLocaleString()} / 45,000 lbs
                         </span>
                         {totalWeight > WEIGHT_LIMIT_LBS && (
                           <span className="ml-2 text-red-600 font-bold">⚠ OVER</span>

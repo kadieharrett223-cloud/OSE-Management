@@ -213,7 +213,7 @@ async function generatePDFFromPO(po: any): Promise<Buffer> {
     const qty = Number(line.quantity) || 0;
     return sum + weightEach * qty;
   }, 0);
-  const containerMaxLbs = 44000;
+  const containerMaxLbs = 45000;
   const remainingWeight = Math.max(containerMaxLbs - totalWeight, 0);
 
   (po.lines || []).forEach((line: any, idx: number) => {
