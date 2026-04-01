@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ShopifyOrder {
   id: number;
@@ -29,7 +29,16 @@ interface QboInvoice {
   status: "Open" | "Paid";
 }
 
-type MatchType = "po" | "name" | "none";
+interface ManualMapping {
+  shopify_order_id: string;
+  shopify_order_number: string;
+  qbo_invoice_id: string;
+  qbo_doc_number: string | null;
+  qbo_customer_name: string | null;
+  note: string | null;
+}
+
+type MatchType = "manual" | "po" | "name" | "none";
 
 interface MatchedRow {
   shopify: ShopifyOrder;
@@ -37,11 +46,7 @@ interface MatchedRow {
   matchType: MatchType;
 }
 
-interface UnmatchedQbo {
-  qbo: QboInvoice;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const money = (v: number | string) =>
   Number(v).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -55,13 +60,19 @@ const normName = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-function matchInvoices(shopifyOrders: ShopifyOrder[], qboInvoices: QboInvoice[]): {
-  rows: MatchedRow[];
-  unmatchedQbo: UnmatchedQbo[];
-} {
+function buildMatchedRows(
+  shopifyOrders: ShopifyOrder[],
+  qboInvoices: QboInvoice[],
+  manualMappings: ManualMapping[]
+): { rows: MatchedRow[]; unmatchedQbo: QboInvoice[] } {
   const usedQboIds = new Set<string>();
+  const manualMap = new Map<string, string>(); // shopify_order_id â†’ qbo_invoice_id
+  const qboById = new Map<string, QboInvoice>();
 
-  // Build lookup maps for O(1) matching
+  for (const inv of qboInvoices) qboById.set(inv.id, inv);
+  for (const m of manualMappings) manualMap.set(m.shopify_order_id, m.qbo_invoice_id);
+
+  // Build lookup maps for auto-matching
   const qboByPo = new Map<string, QboInvoice>();
   const qboByName = new Map<string, QboInvoice[]>();
 
@@ -78,16 +89,27 @@ function matchInvoices(shopifyOrders: ShopifyOrder[], qboInvoices: QboInvoice[])
   }
 
   const rows: MatchedRow[] = shopifyOrders.map((order) => {
+    const shopifyIdStr = String(order.id);
     const orderNum = order.orderNumber.toLowerCase();
 
-    // 1. Try PO match first
+    // 1. Manual mapping â€” highest priority
+    const manualQboId = manualMap.get(shopifyIdStr);
+    if (manualQboId) {
+      const inv = qboById.get(manualQboId);
+      if (inv) {
+        usedQboIds.add(inv.id);
+        return { shopify: order, qbo: inv, matchType: "manual" };
+      }
+    }
+
+    // 2. Try PO match
     const poMatch = qboByPo.get(orderNum);
     if (poMatch && !usedQboIds.has(poMatch.id)) {
       usedQboIds.add(poMatch.id);
       return { shopify: order, qbo: poMatch, matchType: "po" };
     }
 
-    // 2. Try customer name match — pick closest date match
+    // 3. Try customer name match â€” pick closest date match
     const normCustomer = normName(order.customerName);
     const nameMatches = (qboByName.get(normCustomer) || []).filter(
       (inv) => !usedQboIds.has(inv.id)
@@ -107,20 +129,21 @@ function matchInvoices(shopifyOrders: ShopifyOrder[], qboInvoices: QboInvoice[])
     return { shopify: order, qbo: null, matchType: "none" };
   });
 
-  const unmatchedQbo: UnmatchedQbo[] = qboInvoices
-    .filter((inv) => !usedQboIds.has(inv.id))
-    .map((inv) => ({ qbo: inv }));
-
+  const unmatchedQbo = qboInvoices.filter((inv) => !usedQboIds.has(inv.id));
   return { rows, unmatchedQbo };
 }
 
-// ─── Badge components ─────────────────────────────────────────────────────────
-
 function MatchBadge({ type }: { type: MatchType }) {
+  if (type === "manual")
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+        â˜… Manual
+      </span>
+    );
   if (type === "po")
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-        ✓ PO Match
+        âœ“ PO Match
       </span>
     );
   if (type === "name")
@@ -131,10 +154,140 @@ function MatchBadge({ type }: { type: MatchType }) {
     );
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-      ✗ No Match
+      âœ— No Match
     </span>
   );
 }
+
+// â”€â”€â”€ Link Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+interface LinkModalProps {
+  shopifyOrder: ShopifyOrder;
+  qboInvoices: QboInvoice[];
+  currentQboId: string | null;
+  onSave: (qboInvoice: QboInvoice, note: string) => Promise<void>;
+  onUnlink: () => Promise<void>;
+  onClose: () => void;
+}
+
+function LinkModal({ shopifyOrder, qboInvoices, currentQboId, onSave, onUnlink, onClose }: LinkModalProps) {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<QboInvoice | null>(
+    currentQboId ? (qboInvoices.find((inv) => inv.id === currentQboId) ?? null) : null
+  );
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return qboInvoices.slice(0, 50);
+    const q = search.toLowerCase();
+    return qboInvoices.filter(
+      (inv) =>
+        inv.docNumber.toLowerCase().includes(q) ||
+        inv.customerName.toLowerCase().includes(q) ||
+        inv.poNumber.toLowerCase().includes(q)
+    ).slice(0, 50);
+  }, [search, qboInvoices]);
+
+  const handleSave = async () => {
+    if (!selected) return;
+    setSaving(true);
+    try { await onSave(selected, note); onClose(); } finally { setSaving(false); }
+  };
+
+  const handleUnlink = async () => {
+    setUnlinking(true);
+    try { await onUnlink(); onClose(); } finally { setUnlinking(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Link {shopifyOrder.name} to QBO Invoice</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Customer: <strong>{shopifyOrder.customerName}</strong> Â· {money(shopifyOrder.total_price)}</p>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">Ã—</button>
+          </div>
+        </div>
+        <div className="px-5 pt-4">
+          <input
+            ref={inputRef}
+            type="search"
+            placeholder="Search by invoice #, customer, or PO #â€¦"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+        <div className="mt-2 max-h-64 overflow-y-auto divide-y divide-slate-50 px-2 pb-2">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-slate-400">No invoices found.</p>
+          ) : (
+            filtered.map((inv) => {
+              const isSel = selected?.id === inv.id;
+              return (
+                <button
+                  key={inv.id}
+                  type="button"
+                  onClick={() => setSelected(inv)}
+                  className={`w-full text-left rounded-lg px-3 py-2.5 transition-colors ${isSel ? "bg-blue-50 border border-blue-200" : "hover:bg-slate-50 border border-transparent"}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-sm font-semibold text-slate-800">#{inv.docNumber}</span>
+                        {inv.poNumber && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">PO: {inv.poNumber}</span>}
+                        <StatusBadge status={inv.status} />
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-slate-600">{inv.customerName}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-semibold text-slate-800">{money(inv.totalAmt)}</div>
+                      <div className="text-[11px] text-slate-500">{inv.txnDate}</div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+        <div className="border-t border-slate-100 px-5 py-3">
+          <label className="block text-xs font-medium text-slate-500 mb-1">Note (optional â€” e.g. "Ordered under maiden name")</label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+        <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 flex items-center justify-between gap-3">
+          <div>
+            {currentQboId && (
+              <button type="button" onClick={handleUnlink} disabled={unlinking} className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50">
+                {unlinking ? "Removingâ€¦" : "Remove manual link"}
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Cancel</button>
+            <button type="button" onClick={handleSave} disabled={!selected || saving} className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40">
+              {saving ? "Savingâ€¦" : "Save Link"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// â”€â”€â”€ Badge components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatusBadge({ status }: { status: string }) {
   const s = (status || "").toLowerCase();
@@ -157,12 +310,12 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-type FilterTab = "all" | "po" | "name" | "none";
+type FilterTab = "all" | "manual" | "po" | "name" | "none";
 
 export default function ShopifyReconcilePage() {
-  // Date range — default last 90 days
+  // Date range â€” default last 90 days
   const defaultEnd = toYmd(new Date());
   const defaultStart = toYmd(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000));
 
@@ -174,10 +327,22 @@ export default function ShopifyReconcilePage() {
 
   const [shopifyOrders, setShopifyOrders] = useState<ShopifyOrder[]>([]);
   const [qboInvoices, setQboInvoices] = useState<QboInvoice[]>([]);
+  const [manualMappings, setManualMappings] = useState<ManualMapping[]>([]);
   const [loadingShopify, setLoadingShopify] = useState(false);
   const [loadingQbo, setLoadingQbo] = useState(false);
+  const [loadingMappings, setLoadingMappings] = useState(false);
   const [errorShopify, setErrorShopify] = useState<string | null>(null);
   const [errorQbo, setErrorQbo] = useState<string | null>(null);
+
+  const [linkTarget, setLinkTarget] = useState<ShopifyOrder | null>(null);
+
+  const loadMappings = useCallback(async () => {
+    setLoadingMappings(true);
+    try {
+      const res = await fetch("/api/shopify/reconcile-mappings");
+      if (res.ok) { const d = await res.json(); setManualMappings(d.mappings || []); }
+    } finally { setLoadingMappings(false); }
+  }, []);
 
   const load = useCallback(async () => {
     setLoadingShopify(true);
@@ -222,20 +387,48 @@ export default function ShopifyReconcilePage() {
   }, [startDate, endDate]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    load(); loadMappings();
+  }, [load, loadMappings]);
 
-  // ── Matching ──────────────────────────────────────────────────────────────
+  // â”€â”€ Matching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { rows, unmatchedQbo } = useMemo(
-    () => matchInvoices(shopifyOrders, qboInvoices),
-    [shopifyOrders, qboInvoices]
+    () => buildMatchedRows(shopifyOrders, qboInvoices, manualMappings),
+    [shopifyOrders, qboInvoices, manualMappings]
   );
 
+  const countManual = rows.filter((r) => r.matchType === "manual").length;
   const countPo = rows.filter((r) => r.matchType === "po").length;
   const countName = rows.filter((r) => r.matchType === "name").length;
   const countNone = rows.filter((r) => r.matchType === "none").length;
 
-  // ── Filtering ─────────────────────────────────────────────────────────────
+  const manualMapById = useMemo(() => {
+    const m = new Map<string, ManualMapping>();
+    for (const map of manualMappings) m.set(map.shopify_order_id, map);
+    return m;
+  }, [manualMappings]);
+
+  const handleSaveLink = async (shopifyOrder: ShopifyOrder, qboInvoice: QboInvoice, note: string) => {
+    await fetch("/api/shopify/reconcile-mappings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shopify_order_id: String(shopifyOrder.id),
+        shopify_order_number: shopifyOrder.orderNumber,
+        qbo_invoice_id: qboInvoice.id,
+        qbo_doc_number: qboInvoice.docNumber,
+        qbo_customer_name: qboInvoice.customerName,
+        note,
+      }),
+    });
+    await loadMappings();
+  };
+
+  const handleUnlink = async (shopifyOrderId: number) => {
+    await fetch(`/api/shopify/reconcile-mappings?shopify_order_id=${shopifyOrderId}`, { method: "DELETE" });
+    await loadMappings();
+  };
+
+  // â”€â”€ Filtering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filtered = useMemo(() => {
     let base = rows;
     if (filterTab !== "all") base = base.filter((r) => r.matchType === filterTab);
@@ -252,7 +445,7 @@ export default function ShopifyReconcilePage() {
     return base;
   }, [rows, filterTab, search]);
 
-  const loading = loadingShopify || loadingQbo;
+  const loading = loadingShopify || loadingQbo || loadingMappings;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -265,10 +458,10 @@ export default function ShopifyReconcilePage() {
             {/* Header */}
             <header>
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">Admin</p>
-              <h1 className="text-2xl font-semibold text-slate-900">Shopify ↔ QuickBooks Reconciliation</h1>
+              <h1 className="text-2xl font-semibold text-slate-900">Shopify â†” QuickBooks Reconciliation</h1>
               <p className="mt-1 text-sm text-slate-500">
-                Auto-matches Shopify orders to QBO invoices by <strong>PO number</strong> (primary) or{" "}
-                <strong>customer name</strong> (secondary). Unmatched orders are highlighted in red so nothing is missed.
+                Auto-matches by <strong>PO #</strong> or <strong>customer name</strong>. Use{" "}
+                <strong className="text-blue-700">Link Invoice</strong> to manually connect any order to a QBO invoice when names differ.
               </p>
             </header>
 
@@ -296,7 +489,7 @@ export default function ShopifyReconcilePage() {
                 <label className="block text-xs font-medium text-slate-500 mb-1">Search</label>
                 <input
                   type="search"
-                  placeholder="Order #, customer, invoice…"
+                  placeholder="Order #, customer, invoiceâ€¦"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -307,7 +500,7 @@ export default function ShopifyReconcilePage() {
                 disabled={loading}
                 className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
-                {loading ? "Loading…" : "Refresh"}
+                {loading ? "Loadingâ€¦" : "Refresh"}
               </button>
             </div>
 
@@ -324,33 +517,26 @@ export default function ShopifyReconcilePage() {
             )}
 
             {/* Summary cards */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
               <div className="bg-white border border-slate-200 rounded-lg p-4">
                 <p className="text-xs font-medium text-slate-500">Shopify Orders</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">
-                  {loading ? "…" : rows.length}
-                </p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? "â€¦" : rows.length}</p>
+              </div>
+              <div className="bg-white border border-blue-200 rounded-lg p-4">
+                <p className="text-xs font-medium text-blue-600">Manually Linked</p>
+                <p className="mt-1 text-2xl font-bold text-blue-700">{loading ? "â€¦" : countManual}</p>
               </div>
               <div className="bg-white border border-emerald-200 rounded-lg p-4">
                 <p className="text-xs font-medium text-emerald-600">PO Matched</p>
-                <p className="mt-1 text-2xl font-bold text-emerald-700">
-                  {loading ? "…" : countPo}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">QBO has PO # = order #</p>
+                <p className="mt-1 text-2xl font-bold text-emerald-700">{loading ? "â€¦" : countPo}</p>
               </div>
               <div className="bg-white border border-amber-200 rounded-lg p-4">
                 <p className="text-xs font-medium text-amber-600">Name Matched</p>
-                <p className="mt-1 text-2xl font-bold text-amber-600">
-                  {loading ? "…" : countName}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Matched by customer name</p>
+                <p className="mt-1 text-2xl font-bold text-amber-600">{loading ? "â€¦" : countName}</p>
               </div>
               <div className="bg-white border border-red-200 rounded-lg p-4">
                 <p className="text-xs font-medium text-red-600">Not in QBO</p>
-                <p className="mt-1 text-2xl font-bold text-red-600">
-                  {loading ? "…" : countNone}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Need to enter invoice</p>
+                <p className="mt-1 text-2xl font-bold text-red-600">{loading ? "â€¦" : countNone}</p>
               </div>
             </div>
 
@@ -359,8 +545,9 @@ export default function ShopifyReconcilePage() {
               {(
                 [
                   { key: "all", label: `All (${rows.length})` },
-                  { key: "none", label: `⚠ Unmatched (${countNone})` },
-                  { key: "po", label: `✓ PO Match (${countPo})` },
+                  { key: "none", label: `âš  Unmatched (${countNone})` },
+                  { key: "manual", label: `â˜… Manual (${countManual})` },
+                  { key: "po", label: `âœ“ PO Match (${countPo})` },
                   { key: "name", label: `~ Name Match (${countName})` },
                 ] as { key: FilterTab; label: string }[]
               ).map((tab) => (
@@ -378,22 +565,6 @@ export default function ShopifyReconcilePage() {
               ))}
             </div>
 
-            {/* Legend */}
-            <div className="flex flex-wrap gap-4 text-xs text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm bg-emerald-100 border border-emerald-300" />
-                PO # in QBO matches Shopify order # (strongest match)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm bg-amber-50 border border-amber-300" />
-                Customer name matches (verify manually)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm bg-red-50 border border-red-200" />
-                No matching QBO invoice found
-              </span>
-            </div>
-
             {/* Main table */}
             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
               <div className="border-b border-slate-200 px-5 py-3 flex items-center justify-between">
@@ -401,12 +572,12 @@ export default function ShopifyReconcilePage() {
                   Shopify Orders {filtered.length !== rows.length && `(${filtered.length} shown)`}
                 </h2>
                 {loading && (
-                  <span className="text-xs text-slate-500 animate-pulse">Loading data…</span>
+                  <span className="text-xs text-slate-500 animate-pulse">Loading dataâ€¦</span>
                 )}
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-sm">
+                <table className="w-full min-w-[1050px] text-sm">
                   <thead className="bg-slate-50 border-b border-slate-100">
                     <tr>
                       {/* Shopify side */}
@@ -432,25 +603,18 @@ export default function ShopifyReconcilePage() {
                       </th>
 
                       {/* QBO side */}
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500 w-28">
-                        QBO Invoice
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                        QBO Customer
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500 w-28">
-                        QBO Amount
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500 w-24">
-                        QBO Status
-                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500 w-28">QBO Invoice</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">QBO Customer</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500 w-28">QBO Amount</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500 w-24">QBO Status</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500 w-28">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {loading ? (
                       Array.from({ length: 8 }).map((_, i) => (
                         <tr key={i}>
-                          {Array.from({ length: 10 }).map((__, j) => (
+                          {Array.from({ length: 11 }).map((__, j) => (
                             <td key={j} className="px-4 py-3">
                               <div className="h-4 rounded bg-slate-100 animate-pulse" />
                             </td>
@@ -459,14 +623,16 @@ export default function ShopifyReconcilePage() {
                       ))
                     ) : filtered.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="px-4 py-10 text-center text-slate-400">
+                        <td colSpan={11} className="px-4 py-10 text-center text-slate-400">
                           No orders found for this date range and filter.
                         </td>
                       </tr>
                     ) : (
                       filtered.map((row) => {
                         const rowBg =
-                          row.matchType === "po"
+                          row.matchType === "manual"
+                            ? "bg-blue-50/50"
+                            : row.matchType === "po"
                             ? "bg-emerald-50/60"
                             : row.matchType === "name"
                             ? "bg-amber-50/60"
@@ -477,50 +643,44 @@ export default function ShopifyReconcilePage() {
                             key={row.shopify.id}
                             className={`${rowBg} hover:brightness-95 transition-all`}
                           >
-                            {/* Shopify side */}
-                            <td className="px-4 py-3 font-mono font-semibold text-slate-800">
-                              {row.shopify.name}
+                            <td className="px-4 py-3 font-mono font-semibold text-slate-800">{row.shopify.name}</td>
+                            <td className="px-4 py-3 text-slate-800">
+                              {row.shopify.customerName}
+                              {manualMapById.get(String(row.shopify.id))?.note && (
+                                <div className="text-[10px] text-blue-600 mt-0.5 italic">
+                                  Note: {manualMapById.get(String(row.shopify.id))?.note}
+                                </div>
+                              )}
                             </td>
-                            <td className="px-4 py-3 text-slate-800">{row.shopify.customerName}</td>
-                            <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                              {row.shopify.created_at?.slice(0, 10)}
-                            </td>
-                            <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                              {money(row.shopify.total_price)}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <StatusBadge status={row.shopify.financial_status} />
-                            </td>
-
-                            {/* Match */}
-                            <td className="px-4 py-3 text-center">
-                              <MatchBadge type={row.matchType} />
-                            </td>
-
-                            {/* QBO side */}
+                            <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{row.shopify.created_at?.slice(0, 10)}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-slate-800">{money(row.shopify.total_price)}</td>
+                            <td className="px-4 py-3 text-center"><StatusBadge status={row.shopify.financial_status} /></td>
+                            <td className="px-4 py-3 text-center"><MatchBadge type={row.matchType} /></td>
                             {row.qbo ? (
                               <>
                                 <td className="px-4 py-3 font-mono text-slate-700">
-                                  {row.qbo.poNumber
-                                    ? `PO: ${row.qbo.poNumber}`
-                                    : `#${row.qbo.docNumber}`}
+                                  {row.qbo.poNumber ? `PO: ${row.qbo.poNumber}` : `#${row.qbo.docNumber}`}
                                 </td>
                                 <td className="px-4 py-3 text-slate-700">{row.qbo.customerName}</td>
-                                <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                                  {money(row.qbo.totalAmt)}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <StatusBadge status={row.qbo.status} />
-                                </td>
+                                <td className="px-4 py-3 text-right font-semibold text-slate-800">{money(row.qbo.totalAmt)}</td>
+                                <td className="px-4 py-3 text-center"><StatusBadge status={row.qbo.status} /></td>
                               </>
                             ) : (
                               <td
                                 colSpan={4}
-                                className="px-4 py-3 text-center text-sm text-red-500 font-medium"
-                              >
-                                — Invoice not found in QuickBooks —
+                                className="px-4 py-3 text-center text-sm text-red-500 font-medium">
+                                â€” Invoice not found in QuickBooks â€”
                               </td>
                             )}
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setLinkTarget(row.shopify)}
+                                className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                              >
+                                {row.matchType === "manual" ? "Edit Link" : "Link Invoice"}
+                              </button>
+                            </td>
                           </tr>
                         );
                       })
@@ -530,7 +690,7 @@ export default function ShopifyReconcilePage() {
               </div>
             </div>
 
-            {/* Unmatched QBO invoices section */}
+            {/* Unmatched QBO invoices */}
             {!loading && unmatchedQbo.length > 0 && (
               <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
                 <button
@@ -546,7 +706,7 @@ export default function ShopifyReconcilePage() {
                       These may be manually entered invoices, phone/email orders, or outside the date range.
                     </p>
                   </div>
-                  <span className="text-slate-400 text-lg">{showUnmatchedQbo ? "▲" : "▼"}</span>
+                  <span className="text-slate-400 text-lg">{showUnmatchedQbo ? "â–²" : "â–¼"}</span>
                 </button>
 
                 {showUnmatchedQbo && (
@@ -554,39 +714,23 @@ export default function ShopifyReconcilePage() {
                     <table className="w-full min-w-[600px] text-sm">
                       <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                            QBO Invoice #
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                            PO #
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                            Customer
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                            Date
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">
-                            Amount
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500">
-                            Status
-                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">QBO Invoice #</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">PO #</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Date</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">Amount</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500">Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {unmatchedQbo.map(({ qbo }) => (
-                          <tr key={qbo.id} className="hover:bg-slate-50">
-                            <td className="px-4 py-3 font-mono text-slate-700">#{qbo.docNumber}</td>
-                            <td className="px-4 py-3 text-slate-600">{qbo.poNumber || "—"}</td>
-                            <td className="px-4 py-3 text-slate-800">{qbo.customerName}</td>
-                            <td className="px-4 py-3 text-slate-600">{qbo.txnDate}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-slate-800">
-                              {money(qbo.totalAmt)}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <StatusBadge status={qbo.status} />
-                            </td>
+                        {unmatchedQbo.map((inv) => (
+                          <tr key={inv.id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3 font-mono text-slate-700">#{inv.docNumber}</td>
+                            <td className="px-4 py-3 text-slate-600">{inv.poNumber || "â€”"}</td>
+                            <td className="px-4 py-3 text-slate-800">{inv.customerName}</td>
+                            <td className="px-4 py-3 text-slate-600">{inv.txnDate}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-slate-800">{money(inv.totalAmt)}</td>
+                            <td className="px-4 py-3 text-center"><StatusBadge status={inv.status} /></td>
                           </tr>
                         ))}
                       </tbody>
@@ -599,6 +743,16 @@ export default function ShopifyReconcilePage() {
           </div>
         </main>
       </div>
+      {linkTarget && (
+        <LinkModal
+          shopifyOrder={linkTarget}
+          qboInvoices={qboInvoices}
+          currentQboId={manualMapById.get(String(linkTarget.id))?.qbo_invoice_id ?? null}
+          onSave={(inv, note) => handleSaveLink(linkTarget, inv, note)}
+          onUnlink={() => handleUnlink(linkTarget.id)}
+          onClose={() => setLinkTarget(null)}
+        />
+      )}
     </div>
   );
 }
