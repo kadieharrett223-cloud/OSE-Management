@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import { Sidebar } from "@/components/Sidebar";
 import { PriceCalculator } from "@/components/PriceCalculator";
 import { supabase } from "@/lib/supabase";
-import { usePathname } from "next/navigation";
+
 import { canonicalizeRep } from "@/lib/repAliases";
 
 type PriceListItem = {
@@ -873,11 +873,6 @@ export default function AdminPriceListPage() {
     .sort((a, b) => (a.category.display_order ?? 0) - (b.category.display_order ?? 0))
     .map(({ category, items }) => ({ category, items }));
 
-  const pathname = usePathname();
-  const tabs = [
-    { label: "Price List", href: "/admin/price-list" },
-  ];
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
@@ -885,24 +880,6 @@ export default function AdminPriceListPage() {
 
         {/* Main Content */}
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 hide-scrollbar overflow-x-hidden">
-            {/* Chrome-style Tabs */}
-            <div className="bg-slate-200 border-b border-slate-300 px-8">
-              <div className="flex gap-1">
-                {tabs.map((tab) => (
-                  <a
-                    key={tab.href}
-                    href={tab.href}
-                    className={`px-6 py-3 text-sm font-medium transition relative ${
-                      pathname === tab.href
-                        ? "bg-slate-500 text-white rounded-t-lg"
-                        : "text-slate-200 hover:text-white hover:bg-slate-700/50"
-                    }`}
-                  >
-                    {tab.label}
-                  </a>
-                ))}
-              </div>
-            </div>
 
             <div className="mx-auto px-8 py-10 space-y-6">
             {/* Header */}
