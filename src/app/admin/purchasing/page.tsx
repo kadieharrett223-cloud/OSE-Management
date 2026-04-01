@@ -92,7 +92,7 @@ export default function PurchasingPage() {
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = 25;
   const [paymentsTodayTotal, setPaymentsTodayTotal] = useState(0);
   const [loadingPaymentsToday, setLoadingPaymentsToday] = useState(true);
   const formatCurrency = (value: number) =>
