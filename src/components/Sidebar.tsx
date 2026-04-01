@@ -51,7 +51,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
       {/* Mobile hamburger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed left-4 top-16 z-50 rounded-lg bg-slate-200 p-2 text-slate-700 shadow-lg hover:bg-slate-300 transition lg:hidden"
+        className="fixed left-4 top-16 z-50 rounded-lg bg-slate-700 p-2 text-white shadow-lg hover:bg-slate-600 transition lg:hidden"
         aria-label="Toggle menu"
       >
         <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,18 +73,18 @@ export function Sidebar({ activePage }: { activePage: string }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-30 flex min-h-screen w-64 flex-col bg-slate-200 px-4 py-6 shadow-md border-r border-slate-300 transition-transform duration-300 lg:static lg:min-h-full lg:w-72 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-30 flex min-h-screen w-64 flex-col bg-slate-700 px-4 py-6 shadow-md border-r border-slate-600 transition-transform duration-300 lg:static lg:min-h-full lg:w-72 lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-300 text-sm font-semibold text-slate-700 border border-slate-400">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-600 text-sm font-semibold text-white border border-slate-500">
             OSE
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-600">Management</p>
-            <p className="text-lg font-bold text-slate-800">Performance Hub</p>
+            <p className="text-xs uppercase tracking-wide text-slate-300">Management</p>
+            <p className="text-lg font-bold text-white">Performance Hub</p>
           </div>
         </div>
       </div>
@@ -102,7 +102,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
               {/* Group Header */}
               <button
                 onClick={() => setExpandedGroup(isExpanded ? null : group.title)}
-                className={`w-full px-3 py-2 rounded-lg transition-colors font-semibold text-slate-700 flex items-center gap-2 hover:bg-slate-300`}
+                className={`w-full px-3 py-2 rounded-lg transition-colors font-semibold text-slate-100 flex items-center gap-2 hover:bg-slate-600/50`}
               >
                 <span className="text-sm">{group.title}</span>
                 <span className={`ml-auto text-xs transition-transform opacity-60 ${isExpanded ? 'rotate-180' : ''}`}>
@@ -114,7 +114,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
               <div className={`overflow-hidden transition-all duration-200 ease-out origin-top ${
                 isExpanded ? 'max-h-96' : 'max-h-0'
               }`}>
-                <div className="bg-slate-100 rounded-lg shadow-lg border border-slate-300 mx-1 mb-2">
+                <div className="mx-1 mb-2 rounded-lg border border-slate-600 bg-slate-800/40 shadow-lg">
                   {group.items.map((item, index) => (
                     <a
                       key={item.label}
@@ -122,12 +122,12 @@ export function Sidebar({ activePage }: { activePage: string }) {
                       onClick={() => setIsOpen(false)}
                       className={`block w-full px-4 py-3 text-left text-sm transition-colors ${
                         item.label === activePage
-                          ? "border-l-2 border-l-blue-600 bg-slate-200 text-blue-600 font-medium"
-                          : "border-l-2 border-l-transparent text-slate-700 hover:bg-slate-200 hover:text-slate-700"
-                      } ${index !== group.items.length - 1 ? 'border-b border-b-slate-300' : ''}`}
+                          ? "border-l-2 border-l-blue-400 bg-slate-600/70 text-white font-medium"
+                          : "border-l-2 border-l-transparent text-slate-200 hover:bg-slate-600/40 hover:text-white"
+                      } ${index !== group.items.length - 1 ? 'border-b border-b-slate-600/60' : ''}`}
                     >
                       <p className="font-medium">{item.label}</p>
-                      <p className="text-xs text-slate-500">{item.hint}</p>
+                      <p className="text-xs text-slate-400">{item.hint}</p>
                     </a>
                   ))}
                 </div>
