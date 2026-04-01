@@ -70,36 +70,40 @@ export async function GET(req: NextRequest) {
     }
 
     const allChecks: any[] = [];
-    let checkStartPosition = 1;
+    try {
+      let checkStartPosition = 1;
 
-    while (true) {
-      const checkQuery = `SELECT * FROM Check${whereClause} ORDERBY TxnDate DESC STARTPOSITION ${checkStartPosition} MAXRESULTS ${maxResults}`;
-      let checkData: any;
+      while (true) {
+        const checkQuery = `SELECT * FROM Check${whereClause} ORDERBY TxnDate DESC STARTPOSITION ${checkStartPosition} MAXRESULTS ${maxResults}`;
+        let checkData: any;
 
-      try {
-        checkData = await authorizedQboFetch<any>(
-          `/query?query=${encodeURIComponent(checkQuery)}&minorversion=65`,
-          {},
-          userId || undefined
-        );
-      } catch (err) {
-        if (err instanceof QboApiError && (err.status === 400 || err.status === 500)) {
-          const checkFallbackQuery = `SELECT * FROM Check ORDERBY TxnDate DESC STARTPOSITION ${checkStartPosition} MAXRESULTS ${maxResults}`;
+        try {
           checkData = await authorizedQboFetch<any>(
-            `/query?query=${encodeURIComponent(checkFallbackQuery)}&minorversion=65`,
+            `/query?query=${encodeURIComponent(checkQuery)}&minorversion=65`,
             {},
             userId || undefined
           );
-        } else {
-          throw err;
+        } catch (err) {
+          if (err instanceof QboApiError && (err.status === 400 || err.status === 500)) {
+            const checkFallbackQuery = `SELECT * FROM Check ORDERBY TxnDate DESC STARTPOSITION ${checkStartPosition} MAXRESULTS ${maxResults}`;
+            checkData = await authorizedQboFetch<any>(
+              `/query?query=${encodeURIComponent(checkFallbackQuery)}&minorversion=65`,
+              {},
+              userId || undefined
+            );
+          } else {
+            throw err;
+          }
         }
+
+        const checkPage: any[] = checkData?.QueryResponse?.Check || [];
+        allChecks.push(...checkPage);
+
+        if (checkPage.length < maxResults) break;
+        checkStartPosition += maxResults;
       }
-
-      const checkPage: any[] = checkData?.QueryResponse?.Check || [];
-      allChecks.push(...checkPage);
-
-      if (checkPage.length < maxResults) break;
-      checkStartPosition += maxResults;
+    } catch (err) {
+      console.warn("[qbo/invoice/shopify-match] Unable to load QBO checks; continuing without cancellation-by-check logic", err);
     }
 
     const checkKeys = new Set<string>();
