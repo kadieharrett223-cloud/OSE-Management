@@ -17,6 +17,7 @@ async function syncPurchaseOrderPaymentStatus(supabase: any, purchaseOrderId: st
     .from("purchase_orders")
     .select(`
       id,
+      total_amount,
       payments:purchase_order_payments(amount)
     `)
     .eq("id", purchaseOrderId)
@@ -28,7 +29,14 @@ async function syncPurchaseOrderPaymentStatus(supabase: any, purchaseOrderId: st
     (sum: number, payment: any) => sum + normalizeCurrency(payment?.amount),
     0
   );
-  const nextStatus = paidAmount > 0 ? "PAID" : "TO_BE_PAID";
+  const totalAmount = normalizeCurrency(po?.total_amount);
+
+  let nextStatus = "TO_BE_PAID";
+  if (paidAmount > 0 && (totalAmount <= 0 || paidAmount >= totalAmount - 0.01)) {
+    nextStatus = "PAID";
+  } else if (paidAmount > 0) {
+    nextStatus = "DEPOSIT_DOWN";
+  }
 
   const { error: updateError } = await supabase
     .from("purchase_orders")

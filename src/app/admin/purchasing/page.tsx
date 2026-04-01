@@ -68,8 +68,15 @@ const formatDate = (value?: string | null) => {
 
 const statusLabel = (status: string) => {
   if (status === "TO_BE_PAID") return "To Be Paid";
+  if (status === "DEPOSIT_DOWN") return "Deposit Down";
   if (status === "PAID") return "Paid";
   return status ? status.charAt(0) + status.slice(1).toLowerCase() : "";
+};
+
+const statusBadgeClass = (status: string) => {
+  if (status === "PAID") return "bg-emerald-100 text-emerald-800";
+  if (status === "DEPOSIT_DOWN") return "bg-blue-100 text-blue-800";
+  return "bg-amber-100 text-amber-800";
 };
 
 function titleCase(value: string) {
@@ -744,6 +751,7 @@ export default function PurchasingPage() {
                 >
                   <option value="all">All Status</option>
                   <option value="to_be_paid">To Be Paid</option>
+                  <option value="deposit_down">Deposit Down</option>
                   <option value="paid">Paid</option>
                 </select>
                 <div className="flex items-center gap-2">
@@ -1402,11 +1410,7 @@ export default function PurchasingPage() {
                           <td className="px-6 py-3 text-right font-semibold text-amber-700">${money(balance(po))}</td>
                           <td className="px-6 py-3 text-center">
                             <span
-                              className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
-                                po.status === "PAID"
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-amber-100 text-amber-800"
-                              }`}
+                              className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${statusBadgeClass(po.status)}`}
                             >
                               {statusLabel(po.status)}
                             </span>
@@ -1466,11 +1470,7 @@ export default function PurchasingPage() {
                           <div className="text-xs text-slate-600 mt-0.5">{po.vendor_name}</div>
                         </div>
                         <span
-                          className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
-                            po.status === "PAID"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}
+                          className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${statusBadgeClass(po.status)}`}
                         >
                           {statusLabel(po.status)}
                         </span>

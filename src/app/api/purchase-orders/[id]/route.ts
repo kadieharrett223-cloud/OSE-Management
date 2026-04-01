@@ -47,7 +47,11 @@ const derivePaymentStatus = (po: any): string => {
     (sum: number, payment: any) => sum + normalizeCurrency(payment?.amount),
     0
   );
-  return paidAmount > 0 ? "PAID" : "TO_BE_PAID";
+  const totalAmount = deriveTotalFromLines(po);
+
+  if (paidAmount <= 0) return "TO_BE_PAID";
+  if (totalAmount <= 0 || paidAmount >= totalAmount - 0.01) return "PAID";
+  return "DEPOSIT_DOWN";
 };
 
 const enrichPurchaseOrderWithFobCosts = async (supabase: any, po: any) => {
