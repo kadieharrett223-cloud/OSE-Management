@@ -132,38 +132,38 @@ export function TopBar() {
   }, []);
 
   return (
-    <div className="sticky top-0 z-40 w-full border-b border-slate-900/60 bg-gradient-to-r from-slate-950 via-blue-900 to-blue-700 pt-[env(safe-area-inset-top)] text-slate-100 print:hidden">
+    <div className="sticky top-0 z-40 w-full border-b border-slate-500 bg-slate-600 pt-[env(safe-area-inset-top)] text-white print:hidden">
       <div className="mx-auto flex w-full flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
         <div className="min-w-0 flex flex-nowrap items-center gap-2 overflow-x-auto text-xs sm:gap-4 sm:text-sm">
-          <span className="font-semibold text-blue-100">QBO:</span>
+          <span className="font-bold text-white">QBO:</span>
           {qboStatus === "ok" ? (
-            <span className="inline-flex items-center gap-1 text-emerald-300 sm:gap-2">
+            <span className="inline-flex items-center gap-1 text-emerald-100 sm:gap-2">
               Synced ✅
               {lastChecked && (
-                <span className="hidden text-xs text-blue-100/70 sm:inline">Checked {lastChecked.toLocaleTimeString()}</span>
+                <span className="hidden text-xs text-slate-200 sm:inline">Checked {lastChecked.toLocaleTimeString()}</span>
               )}
             </span>
           ) : qboStatus === "error" ? (
-            <span className="inline-flex items-center gap-1 text-red-300 sm:gap-2">
+            <span className="inline-flex items-center gap-1 text-red-200 sm:gap-2">
               Not connected
               <a
                 href="/api/qbo/connect"
-                className="rounded-full bg-red-900/40 px-2 py-0.5 text-xs font-semibold text-red-200"
+                className="rounded-full bg-red-700/40 px-2 py-0.5 text-xs font-semibold text-red-100"
               >
                 Connect
               </a>
             </span>
           ) : (
-            <span className="text-blue-100/70">Checking…</span>
+            <span className="text-slate-200">Checking…</span>
           )}
-          <div className="flex items-center gap-1 rounded-full border border-blue-400/30 bg-blue-900/30 px-2 py-1 text-xs font-semibold text-blue-100 sm:ml-2 sm:gap-2 sm:px-3">
+          <div className="flex items-center gap-1 rounded-full border border-slate-400 bg-slate-700 px-2 py-1 text-xs font-semibold text-white sm:ml-2 sm:gap-2 sm:px-3">
             <span className="hidden sm:inline">Payments Received:</span>
             <span className="sm:hidden">Received:</span>
             <span className="text-xs font-bold text-white sm:text-sm">
               {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
             </span>
           </div>
-          <div className="flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-900/30 px-2 py-1 text-xs font-semibold text-amber-100 sm:gap-2 sm:px-3">
+          <div className="flex items-center gap-1 rounded-full border border-slate-400 bg-slate-700 px-2 py-1 text-xs font-semibold text-white sm:gap-2 sm:px-3">
             <span className="hidden sm:inline">Undeposited:</span>
             <span className="sm:hidden">Undeposited:</span>
             <span className="text-xs font-bold text-white sm:text-sm">
@@ -173,7 +173,7 @@ export function TopBar() {
         </div>
         <div className="hidden lg:flex lg:flex-col lg:items-center lg:gap-0.5">
           <span className="text-lg font-bold text-white tracking-wide">Olympic Shop Equipment</span>
-          <span className="text-[10px] text-blue-200/60">brought to you by kadie ☺</span>
+          <span className="text-[10px] text-slate-200">brought to you by kadie ☺</span>
         </div>
         <div className="relative w-full min-w-0 sm:flex-1 sm:max-w-sm">
           <input
@@ -181,11 +181,11 @@ export function TopBar() {
             placeholder="Search..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-full rounded-full border border-slate-700 bg-slate-800/60 px-4 py-1.5 text-sm text-slate-100 placeholder:text-slate-300 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="w-full rounded-full border border-slate-400 bg-slate-700 px-4 py-1.5 text-sm text-white placeholder:text-slate-300 focus:border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-300"
           />
           {normalizedQuery && (
-            <div className="absolute left-0 right-0 mt-2 rounded-xl border border-slate-800 bg-slate-950 shadow-lg">
-              <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-blue-200/70">Pages</div>
+            <div className="absolute left-0 right-0 mt-2 rounded-xl border border-slate-500 bg-slate-700 shadow-lg">
+              <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-200">Pages</div>
               <div className="max-h-64 overflow-y-auto">
                 {filteredPages.length === 0 ? (
                   <div className="px-4 py-3 text-sm text-slate-400">No pages found.</div>
@@ -194,7 +194,7 @@ export function TopBar() {
                     <a
                       key={page.href}
                       href={page.href}
-                      className="block px-4 py-2 text-sm text-slate-100 hover:bg-slate-900/60"
+                      className="block px-4 py-2 text-sm text-white hover:bg-slate-600"
                     >
                       {page.label}
                     </a>

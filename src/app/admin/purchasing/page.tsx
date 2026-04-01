@@ -712,7 +712,7 @@ export default function PurchasingPage() {
         <Sidebar activePage="Purchasing" />
         <main className="flex-1 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900">
           {/* Chrome-style Tabs */}
-          <div className="bg-slate-800 border-b border-slate-700 px-4 md:px-8 overflow-x-auto">
+          <div className="bg-slate-600 border-b border-slate-500 px-4 md:px-8 overflow-x-auto">
             <div className="flex gap-1 min-w-max">
               {tabs.map((tab) => (
                 <a
@@ -720,8 +720,8 @@ export default function PurchasingPage() {
                   href={tab.href}
                   className={`px-4 md:px-6 py-3 text-sm font-medium transition relative whitespace-nowrap ${
                     pathname === tab.href
-                      ? "bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 text-slate-900 rounded-t-lg"
-                      : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                      ? "bg-slate-500 text-white rounded-t-lg"
+                      : "text-slate-200 hover:text-white hover:bg-slate-700/50"
                   }`}
                 >
                   {tab.label}

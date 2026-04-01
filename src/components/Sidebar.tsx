@@ -72,18 +72,18 @@ export function Sidebar({ activePage }: { activePage: string }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-30 flex min-h-screen w-64 flex-col bg-slate-900 px-4 py-6 shadow-md border-r border-slate-800 transition-transform duration-300 lg:static lg:min-h-full lg:w-72 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-30 flex min-h-screen w-64 flex-col bg-slate-600 px-4 py-6 shadow-md border-r border-slate-500 transition-transform duration-300 lg:static lg:min-h-full lg:w-72 lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-800 text-sm font-semibold text-slate-100 border border-slate-700">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-700 text-sm font-semibold text-white border border-slate-500">
             OSE
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">Management</p>
-            <p className="text-lg font-semibold text-white">Performance Hub</p>
+            <p className="text-xs uppercase tracking-wide text-slate-200">Management</p>
+            <p className="text-lg font-bold text-white">Performance Hub</p>
           </div>
         </div>
       </div>
@@ -91,7 +91,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
       <nav className="mt-6 space-y-4">
         {navGroups.map((group) => (
           <div key={group.title} className="space-y-2">
-            <p className="px-2 text-[10px] uppercase tracking-wider text-slate-500">
+            <p className="px-2 text-[10px] uppercase tracking-wider text-slate-200 font-semibold">
               {group.title}
             </p>
             {group.items.map((item) => (
@@ -101,15 +101,15 @@ export function Sidebar({ activePage }: { activePage: string }) {
                 onClick={() => setIsOpen(false)}
                 className={`block w-full rounded-lg px-3 py-3 text-left text-sm transition border-l-2 ${
                   item.label === activePage
-                    ? "border-l-blue-600 bg-slate-800/60 text-white"
-                    : "border-l-transparent bg-transparent text-slate-300 hover:border-l-blue-600 hover:bg-slate-800/40 hover:text-white"
+                    ? "border-l-white bg-slate-700 text-white font-semibold"
+                    : "border-l-transparent bg-transparent text-slate-100 hover:border-l-slate-300 hover:bg-slate-700/40 hover:text-white"
                 }`}
                 title={item.label}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{item.label}</span>
                 </div>
-                <p className="text-xs text-slate-400">{item.hint}</p>
+                <p className="text-xs text-slate-200">{item.hint}</p>
               </a>
             ))}
           </div>
