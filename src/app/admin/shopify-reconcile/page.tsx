@@ -334,7 +334,7 @@ export default function ShopifyReconcilePage() {
   const [errorShopify, setErrorShopify] = useState<string | null>(null);
   const [errorQbo, setErrorQbo] = useState<string | null>(null);
 
-  const [linkTarget, setLinkTarget] = useState<ShopifyOrder | null>(null);
+  const [linkTarget, setLinkTarget] = useState<MatchedRow | null>(null);
 
   const loadMappings = useCallback(async () => {
     setLoadingMappings(true);
@@ -659,7 +659,10 @@ export default function ShopifyReconcilePage() {
                             {row.qbo ? (
                               <>
                                 <td className="px-4 py-3 font-mono text-slate-700">
-                                  {row.qbo.poNumber ? `PO: ${row.qbo.poNumber}` : `#${row.qbo.docNumber}`}
+                                  <div>#{row.qbo.docNumber}</div>
+                                  {row.qbo.poNumber && (
+                                    <div className="text-[10px] text-slate-500">PO: {row.qbo.poNumber}</div>
+                                  )}
                                 </td>
                                 <td className="px-4 py-3 text-slate-700">{row.qbo.customerName}</td>
                                 <td className="px-4 py-3 text-right font-semibold text-slate-800">{money(row.qbo.totalAmt)}</td>
@@ -675,10 +678,10 @@ export default function ShopifyReconcilePage() {
                             <td className="px-4 py-3 text-center">
                               <button
                                 type="button"
-                                onClick={() => setLinkTarget(row.shopify)}
+                                onClick={() => setLinkTarget(row)}
                                 className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
                               >
-                                {row.matchType === "manual" ? "Edit Link" : "Link Invoice"}
+                                {row.qbo ? "Linked" : "Link Invoice"}
                               </button>
                             </td>
                           </tr>
@@ -745,11 +748,13 @@ export default function ShopifyReconcilePage() {
       </div>
       {linkTarget && (
         <LinkModal
-          shopifyOrder={linkTarget}
+          shopifyOrder={linkTarget.shopify}
           qboInvoices={qboInvoices}
-          currentQboId={manualMapById.get(String(linkTarget.id))?.qbo_invoice_id ?? null}
-          onSave={(inv, note) => handleSaveLink(linkTarget, inv, note)}
-          onUnlink={() => handleUnlink(linkTarget.id)}
+          currentQboId={
+            manualMapById.get(String(linkTarget.shopify.id))?.qbo_invoice_id ?? linkTarget.qbo?.id ?? null
+          }
+          onSave={(inv, note) => handleSaveLink(linkTarget.shopify, inv, note)}
+          onUnlink={() => handleUnlink(linkTarget.shopify.id)}
           onClose={() => setLinkTarget(null)}
         />
       )}
