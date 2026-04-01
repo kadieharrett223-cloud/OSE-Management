@@ -169,10 +169,6 @@ export function TopBar() {
             </span>
           </div>
         </div>
-        <div className="hidden lg:flex lg:flex-col lg:items-center lg:gap-0.5 rounded-md bg-slate-600/60 px-4 py-2">
-          <span className="text-lg font-bold tracking-wide text-white">Olympic Shop Equipment</span>
-          <span className="text-[10px] text-slate-300">brought to you by kadie ☺</span>
-        </div>
         <div className="relative w-full min-w-0 sm:flex-1 sm:max-w-sm">
           <input
             type="search"
