@@ -32,11 +32,19 @@ export async function POST(req: NextRequest) {
       qbo_doc_number,
       qbo_customer_name,
       note,
+      is_cancelled,
     } = body;
 
-    if (!shopify_order_id || !qbo_invoice_id) {
+    if (!shopify_order_id) {
       return NextResponse.json(
-        { error: "shopify_order_id and qbo_invoice_id are required" },
+        { error: "shopify_order_id is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!is_cancelled && !qbo_invoice_id) {
+      return NextResponse.json(
+        { error: "qbo_invoice_id is required unless marking as cancelled" },
         { status: 400 }
       );
     }
@@ -47,10 +55,11 @@ export async function POST(req: NextRequest) {
         {
           shopify_order_id: String(shopify_order_id),
           shopify_order_number: String(shopify_order_number || ""),
-          qbo_invoice_id: String(qbo_invoice_id),
+          qbo_invoice_id: qbo_invoice_id ? String(qbo_invoice_id) : null,
           qbo_doc_number: qbo_doc_number || null,
           qbo_customer_name: qbo_customer_name || null,
           note: note || null,
+          is_cancelled: Boolean(is_cancelled),
           updated_at: new Date().toISOString(),
         },
         { onConflict: "shopify_order_id" }

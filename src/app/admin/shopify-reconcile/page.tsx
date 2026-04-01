@@ -32,13 +32,14 @@ interface QboInvoice {
 interface ManualMapping {
   shopify_order_id: string;
   shopify_order_number: string;
-  qbo_invoice_id: string;
+  qbo_invoice_id: string | null;
   qbo_doc_number: string | null;
   qbo_customer_name: string | null;
   note: string | null;
+  is_cancelled?: boolean;
 }
 
-type MatchType = "manual" | "po" | "name" | "none";
+type MatchType = "cancelled" | "manual" | "po" | "name" | "none";
 
 interface MatchedRow {
   shopify: ShopifyOrder;
@@ -66,11 +67,11 @@ function buildMatchedRows(
   manualMappings: ManualMapping[]
 ): { rows: MatchedRow[]; unmatchedQbo: QboInvoice[] } {
   const usedQboIds = new Set<string>();
-  const manualMap = new Map<string, string>(); // shopify_order_id â†’ qbo_invoice_id
+  const manualMap = new Map<string, ManualMapping>();
   const qboById = new Map<string, QboInvoice>();
 
   for (const inv of qboInvoices) qboById.set(inv.id, inv);
-  for (const m of manualMappings) manualMap.set(m.shopify_order_id, m.qbo_invoice_id);
+  for (const m of manualMappings) manualMap.set(m.shopify_order_id, m);
 
   // Build lookup maps for auto-matching
   const qboByPo = new Map<string, QboInvoice>();
@@ -93,7 +94,12 @@ function buildMatchedRows(
     const orderNum = order.orderNumber.toLowerCase();
 
     // 1. Manual mapping â€” highest priority
-    const manualQboId = manualMap.get(shopifyIdStr);
+    const manualEntry = manualMap.get(shopifyIdStr);
+    if (manualEntry?.is_cancelled) {
+      return { shopify: order, qbo: null, matchType: "cancelled" };
+    }
+
+    const manualQboId = manualEntry?.qbo_invoice_id;
     if (manualQboId) {
       const inv = qboById.get(manualQboId);
       if (inv) {
@@ -134,6 +140,12 @@ function buildMatchedRows(
 }
 
 function MatchBadge({ type }: { type: MatchType }) {
+  if (type === "cancelled")
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700">
+        Cancelled
+      </span>
+    );
   if (type === "manual")
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
@@ -318,7 +330,7 @@ function StatusBadge({ status }: { status: string }) {
 
 // â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-type FilterTab = "all" | "manual" | "po" | "name" | "none";
+type FilterTab = "all" | "cancelled" | "manual" | "po" | "name" | "none";
 
 export default function ShopifyReconcilePage() {
   // Date range â€” default last 90 days
@@ -402,6 +414,7 @@ export default function ShopifyReconcilePage() {
   );
 
   const countManual = rows.filter((r) => r.matchType === "manual").length;
+  const countCancelled = rows.filter((r) => r.matchType === "cancelled").length;
   const countPo = rows.filter((r) => r.matchType === "po").length;
   const countName = rows.filter((r) => r.matchType === "name").length;
   const countNone = rows.filter((r) => r.matchType === "none").length;
@@ -430,6 +443,19 @@ export default function ShopifyReconcilePage() {
 
   const handleUnlink = async (shopifyOrderId: number) => {
     await fetch(`/api/shopify/reconcile-mappings?shopify_order_id=${shopifyOrderId}`, { method: "DELETE" });
+    await loadMappings();
+  };
+
+  const handleMarkCancelled = async (shopifyOrder: ShopifyOrder) => {
+    await fetch("/api/shopify/reconcile-mappings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shopify_order_id: String(shopifyOrder.id),
+        shopify_order_number: shopifyOrder.orderNumber,
+        is_cancelled: true,
+      }),
+    });
     await loadMappings();
   };
 
@@ -522,10 +548,14 @@ export default function ShopifyReconcilePage() {
             )}
 
             {/* Summary cards */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-6">
               <div className="bg-white border border-slate-200 rounded-lg p-4">
                 <p className="text-xs font-medium text-slate-500">Shopify Orders</p>
                 <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? "â€¦" : rows.length}</p>
+              </div>
+              <div className="bg-white border border-slate-300 rounded-lg p-4">
+                <p className="text-xs font-medium text-slate-600">Cancelled</p>
+                <p className="mt-1 text-2xl font-bold text-slate-700">{loading ? "â€¦" : countCancelled}</p>
               </div>
               <div className="bg-white border border-blue-200 rounded-lg p-4">
                 <p className="text-xs font-medium text-blue-600">Manually Linked</p>
@@ -550,6 +580,7 @@ export default function ShopifyReconcilePage() {
               {(
                 [
                   { key: "all", label: `All (${rows.length})` },
+                  { key: "cancelled", label: `Cancelled (${countCancelled})` },
                   { key: "none", label: `âš  Unmatched (${countNone})` },
                   { key: "manual", label: `â˜… Manual (${countManual})` },
                   { key: "po", label: `âœ“ PO Match (${countPo})` },
@@ -635,7 +666,9 @@ export default function ShopifyReconcilePage() {
                     ) : (
                       filtered.map((row) => {
                         const rowBg =
-                          row.matchType === "manual"
+                          row.matchType === "cancelled"
+                            ? "bg-slate-100"
+                            : row.matchType === "manual"
                             ? "bg-blue-50/50"
                             : row.matchType === "po"
                             ? "bg-emerald-50/60"
@@ -676,18 +709,31 @@ export default function ShopifyReconcilePage() {
                             ) : (
                               <td
                                 colSpan={4}
-                                className="px-4 py-3 text-center text-sm text-red-500 font-medium">
-                                â€” Invoice not found in QuickBooks â€”
+                                className={`px-4 py-3 text-center text-sm font-medium ${row.matchType === "cancelled" ? "text-slate-500" : "text-red-500"}`}>
+                                {row.matchType === "cancelled" ? "Marked as cancelled" : "â€” Invoice not found in QuickBooks â€”"}
                               </td>
                             )}
                             <td className="px-4 py-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => setLinkTarget(row)}
-                                className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
-                              >
-                                {row.qbo ? "Linked" : "Link Invoice"}
-                              </button>
+                              <div className="flex flex-col items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setLinkTarget(row)}
+                                  className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                                >
+                                  {row.qbo ? "Linked" : "Link Invoice"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    row.matchType === "cancelled"
+                                      ? handleUnlink(row.shopify.id)
+                                      : handleMarkCancelled(row.shopify)
+                                  }
+                                  className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                                >
+                                  {row.matchType === "cancelled" ? "Undo Cancel" : "Mark Cancelled"}
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
