@@ -187,7 +187,7 @@ async function generatePDFFromPO(po: any): Promise<Buffer> {
 
   // Line Items Table Header
   const lineColWidths = [0.35, 0.85, 2.2, 0.65, 0.85, 0.9, 0.95];
-  const lineHeaders = ["N#", "Part Number", "Description", "QTY", "Weight (lbs)", "Unit Price", "Amount"];
+  const lineHeaders = ["N#", "Part Number", "Description", "QTY", "Weight (lbs)", "FOB Cost", "Amount"];
 
   doc.setFillColor(240, 240, 240);
   doc.setFont("helvetica", "bold");

@@ -101,7 +101,7 @@ async function generatePOPDF(po: any): Promise<Buffer> {
       doc.text("SKU", col1, tableTop);
       doc.text("Description", col2, tableTop);
       doc.text("QTY", col3, tableTop);
-      doc.text("Unit Price", col4, tableTop);
+      doc.text("FOB Cost", col4, tableTop);
 
       doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
       let yPosition = tableTop + 20;

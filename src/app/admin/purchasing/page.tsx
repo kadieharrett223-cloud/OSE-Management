@@ -275,6 +275,8 @@ export default function PurchasingPage() {
 
   const resolveUnitPrice = (item: any) => {
     const candidates = [
+      Number(item?.fob_port_cost),
+      Number(item?.fob_cost),
       Number(item?.cost_with_shipping),
       Number(item?.shippingIncludedPerUnit),
       Number(item?.shipping_included_per_unit),
@@ -282,7 +284,6 @@ export default function PurchasingPage() {
       Number(item?.sell_price),
       Number(item?.currentSalePricePerUnit),
       Number(item?.list_price),
-      Number(item?.fob_cost),
       Number(item?.zone5_shipping),
     ];
 
@@ -1055,7 +1056,7 @@ export default function PurchasingPage() {
                       <div className="col-span-3 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
                       <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">QTY</div>
                       <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">Weight</div>
-                      <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">Rate</div>
+                      <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">FOB Cost</div>
                       <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right">Amount</div>
                     </div>
                     {formData.lines.map((line, index) => (

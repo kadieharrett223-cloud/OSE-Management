@@ -122,7 +122,7 @@ const buildLineItemChanges = (oldLinesRaw: any[], newLinesRaw: any[]): ChangeEnt
 
     if (oldLine.unitPrice !== newLine.unitPrice) {
       changes.push({
-        field: `${lineLabel} Unit Price`,
+        field: `${lineLabel} FOB Cost`,
         oldValue: String(oldLine.unitPrice),
         newValue: String(newLine.unitPrice),
       });
