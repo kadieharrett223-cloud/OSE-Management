@@ -264,9 +264,9 @@ async function generatePDFFromPO(po: any): Promise<Buffer> {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(fs(7));
-  doc.text("Container Weight Remaining", 3.5, yPos, { align: "right" });
+  doc.text("Container Weight Total", 3.5, yPos, { align: "right" });
   doc.text(
-    remainingWeight.toLocaleString() + " lbs (of " + containerMaxLbs.toLocaleString() + " lbs)",
+    totalWeight.toLocaleString() + " lbs / " + containerMaxLbs.toLocaleString() + " lbs",
     pageWidth - 0.6,
     yPos,
     { align: "right" }

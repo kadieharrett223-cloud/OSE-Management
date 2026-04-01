@@ -1336,10 +1336,10 @@ export default function ViewPO() {
                   )}
                   <tr className="border-t border-gray-300">
                     <td colSpan={6} className="px-2 py-2 text-right text-[10px] font-semibold text-slate-700 uppercase tracking-wide">
-                      Container Weight Remaining
+                      Container Weight Total
                     </td>
                     <td className="px-2 py-2 text-right text-[10px] font-semibold text-slate-900">
-                      {remainingWeightLbs.toLocaleString()} lbs (of {containerMaxLbs.toLocaleString()} lbs)
+                      {totalWeightLbs.toLocaleString()} lbs / {containerMaxLbs.toLocaleString()} lbs
                     </td>
                   </tr>
                 </tbody>
