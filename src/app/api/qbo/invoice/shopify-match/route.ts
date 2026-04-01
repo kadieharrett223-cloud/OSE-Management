@@ -11,8 +11,15 @@ export interface QboInvoiceForMatch {
   txnDate: string;
   totalAmt: number;
   balance: number;
-  status: "Open" | "Paid";
+  status: "Open" | "Paid" | "Cancelled";
 }
+
+const normName = (value: string) =>
+  (value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 export async function GET(req: NextRequest) {
   try {
@@ -62,17 +69,62 @@ export async function GET(req: NextRequest) {
       startPosition += maxResults;
     }
 
+    const allChecks: any[] = [];
+    let checkStartPosition = 1;
+
+    while (true) {
+      const checkQuery = `SELECT * FROM Check${whereClause} ORDERBY TxnDate DESC STARTPOSITION ${checkStartPosition} MAXRESULTS ${maxResults}`;
+      let checkData: any;
+
+      try {
+        checkData = await authorizedQboFetch<any>(
+          `/query?query=${encodeURIComponent(checkQuery)}&minorversion=65`,
+          {},
+          userId || undefined
+        );
+      } catch (err) {
+        if (err instanceof QboApiError && (err.status === 400 || err.status === 500)) {
+          const checkFallbackQuery = `SELECT * FROM Check ORDERBY TxnDate DESC STARTPOSITION ${checkStartPosition} MAXRESULTS ${maxResults}`;
+          checkData = await authorizedQboFetch<any>(
+            `/query?query=${encodeURIComponent(checkFallbackQuery)}&minorversion=65`,
+            {},
+            userId || undefined
+          );
+        } else {
+          throw err;
+        }
+      }
+
+      const checkPage: any[] = checkData?.QueryResponse?.Check || [];
+      allChecks.push(...checkPage);
+
+      if (checkPage.length < maxResults) break;
+      checkStartPosition += maxResults;
+    }
+
+    const checkKeys = new Set<string>();
+    for (const check of allChecks) {
+      const payeeName = normName(check.PayeeRef?.name || "");
+      const amount = Number(check.TotalAmt) || 0;
+      if (!payeeName || amount <= 0) continue;
+      checkKeys.add(`${payeeName}|${amount.toFixed(2)}`);
+    }
+
     const invoices: QboInvoiceForMatch[] = allInvoices.map((inv: any) => {
       const balance = Number(inv.Balance) || 0;
+      const totalAmt = Number(inv.TotalAmt) || 0;
+      const customerName = inv.CustomerRef?.name || "";
+      const hasMatchingCheck = checkKeys.has(`${normName(customerName)}|${totalAmt.toFixed(2)}`);
+      const isCancelled = balance <= 0 || hasMatchingCheck;
       return {
         id: inv.Id,
         docNumber: inv.DocNumber || "",
         poNumber: (inv.PONumber || inv.PONum || inv.CustomField?.find((f: any) => f.Name === "P.O. Number")?.StringValue || "").trim(),
-        customerName: inv.CustomerRef?.name || "",
+        customerName,
         txnDate: inv.TxnDate || "",
-        totalAmt: Number(inv.TotalAmt) || 0,
+        totalAmt,
         balance,
-        status: balance <= 0 ? "Paid" : "Open",
+        status: isCancelled ? "Cancelled" : balance <= 0 ? "Paid" : "Open",
       };
     });
 

@@ -26,7 +26,7 @@ interface QboInvoice {
   txnDate: string;
   totalAmt: number;
   balance: number;
-  status: "Open" | "Paid";
+  status: "Open" | "Paid" | "Cancelled";
 }
 
 interface ManualMapping {
@@ -291,6 +291,12 @@ function LinkModal({ shopifyOrder, qboInvoices, currentQboId, onSave, onUnlink, 
 
 function StatusBadge({ status }: { status: string }) {
   const s = (status || "").toLowerCase();
+  if (s === "cancelled")
+    return (
+      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
+        Cancelled
+      </span>
+    );
   if (s === "paid")
     return (
       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
