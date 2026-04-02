@@ -737,6 +737,13 @@ export default function PurchasingPage() {
           <section class="group">
             <h2>${escapeHtml(manufacturer)}</h2>
             <table>
+              <colgroup>
+                <col style="width: 18%;" />
+                <col style="width: 20%;" />
+                <col style="width: 20%;" />
+                <col style="width: 22%;" />
+                <col style="width: 20%;" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Order #</th>
@@ -775,7 +782,7 @@ export default function PurchasingPage() {
             body {
               font-family: "Segoe UI", Arial, sans-serif;
               margin: 0;
-              padding: 28px;
+              padding: 34px 42px;
               color: #0f172a;
               background: #ffffff;
             }
@@ -785,49 +792,54 @@ export default function PurchasingPage() {
               font-size: 42px;
               color: #1e3a5f;
               line-height: 1.05;
+              letter-spacing: 0.02em;
             }
             .meta {
-              margin: 8px 0 22px;
+              margin: 12px 0 28px;
               text-align: center;
-              font-size: 12px;
+              font-size: 13px;
               color: #475569;
             }
             .rule {
               border-top: 2px solid #3b82f6;
-              margin-bottom: 16px;
+              margin-bottom: 24px;
             }
             .group {
-              margin: 0 0 24px;
+              margin: 0 0 34px;
             }
             .group h2 {
-              margin: 0 0 4px;
-              font-size: 28px;
+              margin: 0 0 10px;
+              font-size: 30px;
               color: #1e3a8a;
             }
             table {
               width: 100%;
               border-collapse: collapse;
               table-layout: fixed;
+              margin-top: 4px;
             }
             thead th {
               text-align: left;
               background: #c7dbef;
               color: #111827;
-              padding: 8px 10px;
+              padding: 11px 12px;
               border-bottom: 1px solid #9eb8d2;
               font-size: 14px;
+              line-height: 1.3;
             }
             tbody td {
-              padding: 8px 10px;
+              padding: 12px 12px;
               vertical-align: top;
               border-bottom: 1px solid #e2e8f0;
-              font-size: 14px;
+              font-size: 15px;
+              line-height: 1.45;
             }
             .num {
               text-align: right;
+              white-space: nowrap;
             }
             @media print {
-              body { padding: 14px; }
+              body { padding: 20px 24px; }
               .group { break-inside: avoid; }
             }
           </style>
