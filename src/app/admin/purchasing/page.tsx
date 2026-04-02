@@ -698,6 +698,157 @@ export default function PurchasingPage() {
   const safePage = Math.min(currentPage, totalPages);
   const pagedPos = sortedFilteredPos.slice((safePage - 1) * pageSize, safePage * pageSize);
 
+  const printContainerPaymentReport = () => {
+    const rows = sortedFilteredPos;
+    if (rows.length === 0) return;
+
+    const escapeHtml = (value: string) =>
+      String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const groupedByManufacturer = rows.reduce((acc, po) => {
+      const manufacturer = po.vendor_name || "Unknown";
+      if (!acc[manufacturer]) acc[manufacturer] = [];
+      acc[manufacturer].push(po);
+      return acc;
+    }, {} as Record<string, PurchaseOrder[]>);
+
+    const groupsHtml = Object.entries(groupedByManufacturer)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([manufacturer, manufacturerOrders]) => {
+        const tableRows = manufacturerOrders
+          .map((po) => {
+            const total = computedTotal(po);
+            const paid = totalPaid(po);
+            const remaining = balance(po);
+            return `
+              <tr>
+                <td>${escapeHtml(po.po_number || "-")}</td>
+                <td class="num">$${money(total)}</td>
+                <td class="num">$${money(paid)}</td>
+                <td class="num">$${money(remaining)}</td>
+                <td>${escapeHtml(statusLabel(po.status || ""))}</td>
+              </tr>
+            `;
+          })
+          .join("");
+
+        return `
+          <section class="group">
+            <h2>${escapeHtml(manufacturer)}</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Order #</th>
+                  <th class="num">Total</th>
+                  <th class="num">Paid</th>
+                  <th class="num">Balance</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </section>
+        `;
+      })
+      .join("");
+
+    const reportGeneratedAt = new Date().toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    const reportWindow = window.open("", "_blank", "width=1200,height=900,noopener,noreferrer");
+    if (!reportWindow) return;
+
+    reportWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Manufacturer Orders & Payment Tracker</title>
+          <style>
+            body {
+              font-family: "Segoe UI", Arial, sans-serif;
+              margin: 0;
+              padding: 28px;
+              color: #0f172a;
+              background: #ffffff;
+            }
+            h1 {
+              margin: 0;
+              text-align: center;
+              font-size: 42px;
+              color: #1e3a5f;
+              line-height: 1.05;
+            }
+            .meta {
+              margin: 8px 0 22px;
+              text-align: center;
+              font-size: 12px;
+              color: #475569;
+            }
+            .rule {
+              border-top: 2px solid #3b82f6;
+              margin-bottom: 16px;
+            }
+            .group {
+              margin: 0 0 24px;
+            }
+            .group h2 {
+              margin: 0 0 4px;
+              font-size: 28px;
+              color: #1e3a8a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              table-layout: fixed;
+            }
+            thead th {
+              text-align: left;
+              background: #c7dbef;
+              color: #111827;
+              padding: 8px 10px;
+              border-bottom: 1px solid #9eb8d2;
+              font-size: 14px;
+            }
+            tbody td {
+              padding: 8px 10px;
+              vertical-align: top;
+              border-bottom: 1px solid #e2e8f0;
+              font-size: 14px;
+            }
+            .num {
+              text-align: right;
+            }
+            @media print {
+              body { padding: 14px; }
+              .group { break-inside: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Manufacturer Orders &amp; Payment Tracker</h1>
+          <div class="meta">Generated ${escapeHtml(reportGeneratedAt)}</div>
+          <div class="rule"></div>
+          ${groupsHtml}
+        </body>
+      </html>
+    `);
+
+    reportWindow.document.close();
+    reportWindow.focus();
+    reportWindow.print();
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
@@ -742,6 +893,14 @@ export default function PurchasingPage() {
                     className="flex-1 sm:flex-initial rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={printContainerPaymentReport}
+                  disabled={sortedFilteredPos.length === 0}
+                  className="w-full sm:w-auto rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Print Report
+                </button>
                 {!showForm && (
                   <button
                     onClick={() => setShowForm(true)}
