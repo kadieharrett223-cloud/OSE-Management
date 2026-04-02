@@ -96,8 +96,6 @@ export default function PurchasingPage() {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [rangeStart, setRangeStart] = useState("");
-  const [rangeEnd, setRangeEnd] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 25;
   const [paymentsTodayTotal, setPaymentsTodayTotal] = useState(0);
@@ -224,7 +222,7 @@ export default function PurchasingPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, statusFilter, rangeStart, rangeEnd]);
+  }, [searchQuery, statusFilter]);
 
   async function fetchPriceList() {
     try {
@@ -673,11 +671,7 @@ export default function PurchasingPage() {
 
     const matchesStatus = statusFilter === "all" || po.status.toLowerCase() === statusFilter;
 
-    const poDate = po.order_date ? new Date(po.order_date).toISOString().slice(0, 10) : "";
-    const matchesStart = !rangeStart || (poDate && poDate >= rangeStart);
-    const matchesEnd = !rangeEnd || (poDate && poDate <= rangeEnd);
-
-    return matchesQuery && matchesStatus && matchesStart && matchesEnd;
+    return matchesQuery && matchesStatus;
   });
 
   const sortedFilteredPos = [...filteredPos].sort((a, b) => {
@@ -765,9 +759,10 @@ export default function PurchasingPage() {
       minute: "2-digit",
     });
 
-    const reportWindow = window.open("", "_blank", "width=1200,height=900,noopener,noreferrer");
+    const reportWindow = window.open("about:blank", "_blank", "width=1200,height=900");
     if (!reportWindow) return;
 
+    reportWindow.document.open();
     reportWindow.document.write(`
       <!doctype html>
       <html>
@@ -845,8 +840,10 @@ export default function PurchasingPage() {
     `);
 
     reportWindow.document.close();
-    reportWindow.focus();
-    reportWindow.print();
+    window.setTimeout(() => {
+      reportWindow.focus();
+      reportWindow.print();
+    }, 200);
   };
 
   return (
@@ -878,37 +875,24 @@ export default function PurchasingPage() {
                   <option value="deposit_down">Deposit Down</option>
                   <option value="paid">Paid</option>
                 </select>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={rangeStart}
-                    onChange={(e) => setRangeStart(e.target.value)}
-                    className="flex-1 sm:flex-initial rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <span className="text-xs text-slate-500">to</span>
-                  <input
-                    type="date"
-                    value={rangeEnd}
-                    onChange={(e) => setRangeEnd(e.target.value)}
-                    className="flex-1 sm:flex-initial rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={printContainerPaymentReport}
-                  disabled={sortedFilteredPos.length === 0}
-                  className="w-full sm:w-auto rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Print Report
-                </button>
-                {!showForm && (
+                <div className="flex w-full sm:w-auto items-center gap-2">
                   <button
-                    onClick={() => setShowForm(true)}
-                    className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-blue-700"
+                    type="button"
+                    onClick={printContainerPaymentReport}
+                    disabled={sortedFilteredPos.length === 0}
+                    className="w-full sm:w-auto rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Create PO
+                    Print Report
                   </button>
-                )}
+                  {!showForm && (
+                    <button
+                      onClick={() => setShowForm(true)}
+                      className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-blue-700"
+                    >
+                      Create PO
+                    </button>
+                  )}
+                </div>
               </div>
             </header>
 
