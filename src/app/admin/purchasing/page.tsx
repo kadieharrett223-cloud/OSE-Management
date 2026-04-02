@@ -693,7 +693,9 @@ export default function PurchasingPage() {
   const pagedPos = sortedFilteredPos.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const printContainerPaymentReport = () => {
-    const rows = sortedFilteredPos;
+    const rows = sortedFilteredPos.filter(
+      (po) => po.status === "TO_BE_PAID" || po.status === "DEPOSIT_DOWN"
+    );
     if (rows.length === 0) return;
 
     const escapeHtml = (value: string) =>
