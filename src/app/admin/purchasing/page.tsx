@@ -713,22 +713,6 @@ export default function PurchasingPage() {
       return acc;
     }, {} as Record<string, PurchaseOrder[]>);
 
-    const productSummary = (po: PurchaseOrder) => {
-      const lines = Array.isArray(po.lines) ? po.lines : [];
-      if (lines.length === 0) return "—";
-
-      const firstLine = lines[0] || {};
-      const quantity = toNumber(firstLine.quantity);
-      const itemLabel = String(firstLine.description || firstLine.sku || "").trim() || "Item";
-
-      if (lines.length === 1) {
-        return `${quantity > 0 ? `${quantity} ` : ""}${itemLabel}`.trim();
-      }
-
-      const totalUnits = lines.reduce((sum, line) => sum + toNumber(line?.quantity), 0);
-      return `${totalUnits > 0 ? `${totalUnits} units` : `${lines.length} items`} - ${itemLabel}`;
-    };
-
     const reportNote = (po: PurchaseOrder) => {
       const remaining = balance(po);
       const paid = totalPaid(po);
@@ -748,7 +732,6 @@ export default function PurchasingPage() {
             return `
               <tr>
                 <td>${escapeHtml(po.po_number || "-")}</td>
-                <td>${escapeHtml(productSummary(po))}</td>
                 <td class="num">$${money(total)}</td>
                 <td class="num">$${money(paid)}</td>
                 <td class="num">$${money(remaining)}</td>
@@ -763,10 +746,17 @@ export default function PurchasingPage() {
           <section class="group">
             <h2>${escapeHtml(manufacturer)}</h2>
             <table>
+              <colgroup>
+                <col style="width: 15%;" />
+                <col style="width: 17%;" />
+                <col style="width: 17%;" />
+                <col style="width: 18%;" />
+                <col style="width: 17%;" />
+                <col style="width: 16%;" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Order #</th>
-                  <th>Product</th>
                   <th class="num">Total</th>
                   <th class="num">Paid</th>
                   <th class="num">Balance</th>
@@ -843,29 +833,47 @@ export default function PurchasingPage() {
             table {
               width: 100%;
               border-collapse: collapse;
-              table-layout: auto;
+              table-layout: fixed;
+              margin-top: 2px;
             }
             thead th {
               text-align: left;
-              background: #c1d8ee;
+              background: #bcd4eb;
               color: #111827;
-              padding: 6px 8px;
+              padding: 8px 10px;
               font-size: 12px;
               font-weight: 400;
               line-height: 1.2;
+              border-right: 8px solid #ffffff;
+            }
+            thead th:last-child {
+              border-right: none;
             }
             tbody td {
-              padding: 6px 8px 10px;
-              vertical-align: top;
+              padding: 10px 10px;
+              vertical-align: middle;
               font-size: 13px;
-              line-height: 1.5;
+              line-height: 1.35;
+              border-right: 8px solid #ffffff;
+            }
+            tbody td:last-child {
+              border-right: none;
+            }
+            tbody tr {
+              height: 44px;
             }
             .num {
               text-align: right;
               white-space: nowrap;
             }
-            tbody tr:last-child td {
-              padding-bottom: 4px;
+            thead th:nth-child(5),
+            tbody td:nth-child(5),
+            thead th:nth-child(6),
+            tbody td:nth-child(6) {
+              text-align: left;
+            }
+            tbody tr:nth-child(even) td {
+              background: #ffffff;
             }
             @media print {
               .page { max-width: none; padding: 0 18px 18px; }
