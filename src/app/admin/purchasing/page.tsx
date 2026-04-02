@@ -713,6 +713,30 @@ export default function PurchasingPage() {
       return acc;
     }, {} as Record<string, PurchaseOrder[]>);
 
+    const productSummary = (po: PurchaseOrder) => {
+      const lines = Array.isArray(po.lines) ? po.lines : [];
+      if (lines.length === 0) return "—";
+
+      const firstLine = lines[0] || {};
+      const quantity = toNumber(firstLine.quantity);
+      const itemLabel = String(firstLine.description || firstLine.sku || "").trim() || "Item";
+
+      if (lines.length === 1) {
+        return `${quantity > 0 ? `${quantity} ` : ""}${itemLabel}`.trim();
+      }
+
+      const totalUnits = lines.reduce((sum, line) => sum + toNumber(line?.quantity), 0);
+      return `${totalUnits > 0 ? `${totalUnits} units` : `${lines.length} items`} - ${itemLabel}`;
+    };
+
+    const reportNote = (po: PurchaseOrder) => {
+      const remaining = balance(po);
+      const paid = totalPaid(po);
+      if (remaining <= 0.01) return "Paid";
+      if (paid > 0) return "Balance due";
+      return "Awaiting deposit";
+    };
+
     const groupsHtml = Object.entries(groupedByManufacturer)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([manufacturer, manufacturerOrders]) => {
@@ -724,10 +748,12 @@ export default function PurchasingPage() {
             return `
               <tr>
                 <td>${escapeHtml(po.po_number || "-")}</td>
+                <td>${escapeHtml(productSummary(po))}</td>
                 <td class="num">$${money(total)}</td>
                 <td class="num">$${money(paid)}</td>
                 <td class="num">$${money(remaining)}</td>
                 <td>${escapeHtml(statusLabel(po.status || ""))}</td>
+                <td>${escapeHtml(reportNote(po))}</td>
               </tr>
             `;
           })
@@ -737,20 +763,15 @@ export default function PurchasingPage() {
           <section class="group">
             <h2>${escapeHtml(manufacturer)}</h2>
             <table>
-              <colgroup>
-                <col style="width: 18%;" />
-                <col style="width: 20%;" />
-                <col style="width: 20%;" />
-                <col style="width: 22%;" />
-                <col style="width: 20%;" />
-              </colgroup>
               <thead>
                 <tr>
                   <th>Order #</th>
+                  <th>Product</th>
                   <th class="num">Total</th>
                   <th class="num">Paid</th>
                   <th class="num">Balance</th>
                   <th>Status</th>
+                  <th>Notes</th>
                 </tr>
               </thead>
               <tbody>${tableRows}</tbody>
@@ -780,75 +801,85 @@ export default function PurchasingPage() {
           <title>Manufacturer Orders & Payment Tracker</title>
           <style>
             body {
-              font-family: "Segoe UI", Arial, sans-serif;
+              font-family: Cambria, "Times New Roman", serif;
               margin: 0;
-              padding: 34px 42px;
-              color: #0f172a;
+              padding: 0;
+              color: #111827;
               background: #ffffff;
             }
+            .page {
+              max-width: 1120px;
+              margin: 0 auto;
+              padding: 0 26px 28px;
+            }
             h1 {
-              margin: 0;
+              margin: 0 0 8px;
               text-align: center;
-              font-size: 42px;
+              font-size: 34px;
+              font-weight: 400;
               color: #1e3a5f;
-              line-height: 1.05;
-              letter-spacing: 0.02em;
+              line-height: 1.15;
             }
             .meta {
-              margin: 12px 0 28px;
+              margin: 0 0 14px;
               text-align: center;
-              font-size: 13px;
+              font-size: 12px;
               color: #475569;
             }
             .rule {
-              border-top: 2px solid #3b82f6;
-              margin-bottom: 24px;
+              border-top: 1px solid #3b82f6;
+              margin: 0 0 26px;
             }
             .group {
-              margin: 0 0 34px;
+              margin: 0 0 28px;
             }
             .group h2 {
-              margin: 0 0 10px;
-              font-size: 30px;
-              color: #1e3a8a;
+              margin: 0 0 6px;
+              font-family: Arial, sans-serif;
+              font-size: 18px;
+              font-weight: 700;
+              color: #284f82;
             }
             table {
               width: 100%;
               border-collapse: collapse;
-              table-layout: fixed;
-              margin-top: 4px;
+              table-layout: auto;
             }
             thead th {
               text-align: left;
-              background: #c7dbef;
+              background: #c1d8ee;
               color: #111827;
-              padding: 11px 12px;
-              border-bottom: 1px solid #9eb8d2;
-              font-size: 14px;
-              line-height: 1.3;
+              padding: 6px 8px;
+              font-size: 12px;
+              font-weight: 400;
+              line-height: 1.2;
             }
             tbody td {
-              padding: 12px 12px;
+              padding: 6px 8px 10px;
               vertical-align: top;
-              border-bottom: 1px solid #e2e8f0;
-              font-size: 15px;
-              line-height: 1.45;
+              font-size: 13px;
+              line-height: 1.5;
             }
             .num {
               text-align: right;
               white-space: nowrap;
             }
+            tbody tr:last-child td {
+              padding-bottom: 4px;
+            }
             @media print {
-              body { padding: 20px 24px; }
+              .page { max-width: none; padding: 0 18px 18px; }
               .group { break-inside: avoid; }
             }
           </style>
         </head>
         <body>
-          <h1>Manufacturer Orders &amp; Payment Tracker</h1>
-          <div class="meta">Generated ${escapeHtml(reportGeneratedAt)}</div>
-          <div class="rule"></div>
-          ${groupsHtml}
+          <div class="page">
+            <h1>Manufacturer Orders &amp; Payment<br />Tracker</h1>
+            <div class="meta">Generated ${escapeHtml(reportGeneratedAt)}</div>
+            <div class="rule"></div>
+            ${groupsHtml}
+          </div>
         </body>
       </html>
     `);
