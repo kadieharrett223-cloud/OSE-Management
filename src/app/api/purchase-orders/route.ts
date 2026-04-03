@@ -21,9 +21,12 @@ export async function GET(req: NextRequest) {
       return 0;
     };
 
-    const deriveTotalFromLines = (po: any): number => {
+    const deriveTotalAmount = (po: any): number => {
+      const storedTotal = normalizeCurrency(po?.total_amount);
+      if (storedTotal > 0) return storedTotal;
+
       const lines = Array.isArray(po?.lines) ? po.lines : [];
-      if (lines.length === 0) return normalizeCurrency(po?.total_amount);
+      if (lines.length === 0) return storedTotal;
 
       return lines.reduce((sum: number, line: any) => {
         const quantity = normalizeCurrency(line?.quantity);
@@ -39,7 +42,7 @@ export async function GET(req: NextRequest) {
         (sum: number, payment: any) => sum + normalizeCurrency(payment?.amount),
         0
       );
-      const totalAmount = deriveTotalFromLines(po);
+      const totalAmount = deriveTotalAmount(po);
 
       if (paidAmount <= 0) return "TO_BE_PAID";
       if (totalAmount <= 0 || paidAmount >= totalAmount - 0.01) return "PAID";
@@ -59,7 +62,7 @@ export async function GET(req: NextRequest) {
       if (allSkus.length === 0) {
         return (purchaseOrders || []).map((po: any) => ({
           ...po,
-          total_amount: deriveTotalFromLines(po),
+          total_amount: deriveTotalAmount(po),
         }));
       }
 
@@ -73,7 +76,7 @@ export async function GET(req: NextRequest) {
         console.warn("Unable to enrich purchase orders with FOB costs:", priceError.message);
         return (purchaseOrders || []).map((po: any) => ({
           ...po,
-          total_amount: deriveTotalFromLines(po),
+          total_amount: deriveTotalAmount(po),
         }));
       }
 
@@ -104,7 +107,7 @@ export async function GET(req: NextRequest) {
           ...po,
           lines,
           status: derivePaymentStatus({ ...po, lines }),
-          total_amount: deriveTotalFromLines({ ...po, lines }),
+          total_amount: deriveTotalAmount({ ...po, lines }),
         };
       });
     };

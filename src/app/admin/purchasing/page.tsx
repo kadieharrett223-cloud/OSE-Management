@@ -636,8 +636,11 @@ export default function PurchasingPage() {
   };
 
   const computedTotal = (po: PurchaseOrder) => {
+    const storedTotal = toNumber(po.total_amount);
+    if (storedTotal > 0) return storedTotal;
+
     const lines = po.lines || [];
-    if (lines.length === 0) return toNumber(po.total_amount);
+    if (lines.length === 0) return storedTotal;
     return lines.reduce((sum, line) => {
       const lineTotal = toNumber(line?.line_total);
       if (lineTotal !== 0) return sum + lineTotal;
@@ -649,7 +652,7 @@ export default function PurchasingPage() {
 
   const totalPaid = (po: PurchaseOrder) =>
     (po.payments || []).reduce((sum, p) => sum + toNumber(p?.amount), 0);
-  const balance = (po: PurchaseOrder) => computedTotal(po) - totalPaid(po);
+  const balance = (po: PurchaseOrder) => Math.max(computedTotal(po) - totalPaid(po), 0);
 
   const supplierBalanceRows = Object.entries(
     pos.reduce((acc, po) => {
