@@ -654,19 +654,33 @@ export default function PurchasingPage() {
     (po.payments || []).reduce((sum, p) => sum + toNumber(p?.amount), 0);
   const balance = (po: PurchaseOrder) => Math.max(computedTotal(po) - totalPaid(po), 0);
 
-  const supplierBalanceRows = Object.entries(
+  const supplierPaymentSnapshot = Object.values(
     pos.reduce((acc, po) => {
       const supplierName = (po.vendor_name || "Unknown Supplier").trim() || "Unknown Supplier";
-      const due = Math.max(balance(po), 0);
-      acc[supplierName] = (acc[supplierName] || 0) + due;
-      return acc;
-    }, {} as Record<string, number>)
-  )
-    .map(([supplier, balanceDue]) => ({ supplier, balanceDue }))
-    .sort((a, b) => b.balanceDue - a.balanceDue);
+      if (!acc[supplierName]) {
+        acc[supplierName] = {
+          supplier: supplierName,
+          depositsNeeded: 0,
+          finalPaymentsNeeded: 0,
+        };
+      }
 
-  const totalBalanceOwed = supplierBalanceRows.reduce((sum, row) => sum + row.balanceDue, 0);
-  const suppliersWithBalanceDue = supplierBalanceRows.filter((row) => row.balanceDue > 0).length;
+      if (po.status === "TO_BE_PAID") {
+        acc[supplierName].depositsNeeded += 1;
+      } else if (po.status === "DEPOSIT_DOWN") {
+        acc[supplierName].finalPaymentsNeeded += 1;
+      }
+
+      return acc;
+    }, {} as Record<string, { supplier: string; depositsNeeded: number; finalPaymentsNeeded: number }>)
+  )
+    .filter((row) => row.depositsNeeded > 0 || row.finalPaymentsNeeded > 0)
+    .sort((a, b) => {
+      const aTotal = a.depositsNeeded + a.finalPaymentsNeeded;
+      const bTotal = b.depositsNeeded + b.finalPaymentsNeeded;
+      if (bTotal !== aTotal) return bTotal - aTotal;
+      return a.supplier.localeCompare(b.supplier);
+    });
 
   // Calculate total weight from line items
   const calculateTotalWeight = () => {
@@ -966,57 +980,40 @@ export default function PurchasingPage() {
               </div>
             </header>
 
-            <section className="rounded-xl bg-white p-4 md:p-6 shadow-md ring-1 ring-slate-200 space-y-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <section className="rounded-xl bg-white p-4 md:p-5 shadow-md ring-1 ring-slate-200 space-y-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <h2 className="text-lg md:text-xl font-semibold text-slate-900">Supplier Balance Snapshot</h2>
-                  <p className="text-sm text-slate-600">Live summary of supplier balances across all purchase orders.</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                    <div className="text-xs uppercase tracking-wide text-slate-500">Suppliers</div>
-                    <div className="text-lg font-semibold text-slate-900">{supplierBalanceRows.length}</div>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                    <div className="text-xs uppercase tracking-wide text-slate-500">With Balance Due</div>
-                    <div className="text-lg font-semibold text-slate-900">{suppliersWithBalanceDue}</div>
-                  </div>
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                    <div className="text-xs uppercase tracking-wide text-amber-700">Total Owed</div>
-                    <div className="text-lg font-semibold text-amber-900">${money(totalBalanceOwed)}</div>
-                  </div>
+                  <h2 className="text-base md:text-lg font-semibold text-slate-900">Supplier Payment Snapshot</h2>
+                  <p className="text-xs md:text-sm text-slate-600">Small overview of payment actions still needed by supplier.</p>
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <table className="w-full">
-                  <thead className="bg-slate-50 border-b border-slate-200">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">Supplier</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-slate-500">Balance Due</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={2} className="px-4 py-3 text-sm text-slate-500">Loading suppliers...</td>
-                      </tr>
-                    ) : supplierBalanceRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={2} className="px-4 py-3 text-sm text-slate-500">No supplier balances available.</td>
-                      </tr>
-                    ) : (
-                      supplierBalanceRows.map((row) => (
-                        <tr key={row.supplier}>
-                          <td className="px-4 py-2 text-sm text-slate-700">{row.supplier}</td>
-                          <td className="px-4 py-2 text-sm text-right font-semibold text-slate-900">
-                            ${money(row.balanceDue)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {loading ? (
+                  <div className="min-w-[220px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                    Loading snapshot...
+                  </div>
+                ) : supplierPaymentSnapshot.length === 0 ? (
+                  <div className="min-w-[220px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                    No pending deposits or final payments.
+                  </div>
+                ) : (
+                  supplierPaymentSnapshot.map((row) => (
+                    <div key={row.supplier} className="min-w-[230px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                      <div className="truncate text-sm font-semibold text-slate-900">{row.supplier}</div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded bg-white px-2 py-1.5 ring-1 ring-slate-200">
+                          <div className="uppercase tracking-wide text-slate-500">Deposits</div>
+                          <div className="text-base font-semibold text-amber-700">{row.depositsNeeded}</div>
+                        </div>
+                        <div className="rounded bg-white px-2 py-1.5 ring-1 ring-slate-200">
+                          <div className="uppercase tracking-wide text-slate-500">Finals</div>
+                          <div className="text-base font-semibold text-blue-700">{row.finalPaymentsNeeded}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
 
