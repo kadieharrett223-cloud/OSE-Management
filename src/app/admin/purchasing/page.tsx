@@ -651,6 +651,20 @@ export default function PurchasingPage() {
     (po.payments || []).reduce((sum, p) => sum + toNumber(p?.amount), 0);
   const balance = (po: PurchaseOrder) => computedTotal(po) - totalPaid(po);
 
+  const supplierBalanceRows = Object.entries(
+    pos.reduce((acc, po) => {
+      const supplierName = (po.vendor_name || "Unknown Supplier").trim() || "Unknown Supplier";
+      const due = Math.max(balance(po), 0);
+      acc[supplierName] = (acc[supplierName] || 0) + due;
+      return acc;
+    }, {} as Record<string, number>)
+  )
+    .map(([supplier, balanceDue]) => ({ supplier, balanceDue }))
+    .sort((a, b) => b.balanceDue - a.balanceDue);
+
+  const totalBalanceOwed = supplierBalanceRows.reduce((sum, row) => sum + row.balanceDue, 0);
+  const suppliersWithBalanceDue = supplierBalanceRows.filter((row) => row.balanceDue > 0).length;
+
   // Calculate total weight from line items
   const calculateTotalWeight = () => {
     return formData.lines.reduce((sum, line) => {
@@ -948,6 +962,60 @@ export default function PurchasingPage() {
                 </div>
               </div>
             </header>
+
+            <section className="rounded-xl bg-white p-4 md:p-6 shadow-md ring-1 ring-slate-200 space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-lg md:text-xl font-semibold text-slate-900">Supplier Balance Snapshot</h2>
+                  <p className="text-sm text-slate-600">Live summary of supplier balances across all purchase orders.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div className="text-xs uppercase tracking-wide text-slate-500">Suppliers</div>
+                    <div className="text-lg font-semibold text-slate-900">{supplierBalanceRows.length}</div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div className="text-xs uppercase tracking-wide text-slate-500">With Balance Due</div>
+                    <div className="text-lg font-semibold text-slate-900">{suppliersWithBalanceDue}</div>
+                  </div>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <div className="text-xs uppercase tracking-wide text-amber-700">Total Owed</div>
+                    <div className="text-lg font-semibold text-amber-900">${money(totalBalanceOwed)}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="w-full">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">Supplier</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-slate-500">Balance Due</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={2} className="px-4 py-3 text-sm text-slate-500">Loading suppliers...</td>
+                      </tr>
+                    ) : supplierBalanceRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="px-4 py-3 text-sm text-slate-500">No supplier balances available.</td>
+                      </tr>
+                    ) : (
+                      supplierBalanceRows.map((row) => (
+                        <tr key={row.supplier}>
+                          <td className="px-4 py-2 text-sm text-slate-700">{row.supplier}</td>
+                          <td className="px-4 py-2 text-sm text-right font-semibold text-slate-900">
+                            ${money(row.balanceDue)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
             {showForm && (
               <form onSubmit={handleCreatePO} className="rounded-xl bg-white p-8 shadow-md ring-1 ring-slate-200 space-y-6">
