@@ -988,18 +988,18 @@ export default function PurchasingPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 overflow-x-auto pb-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                 {loading ? (
-                  <div className="min-w-[220px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
                     Loading snapshot...
                   </div>
                 ) : supplierPaymentSnapshot.length === 0 ? (
-                  <div className="min-w-[220px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
                     No pending deposits or final payments.
                   </div>
                 ) : (
                   supplierPaymentSnapshot.map((row) => (
-                    <div key={row.supplier} className="min-w-[230px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div key={row.supplier} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
                       <div className="truncate text-sm font-semibold text-slate-900">{row.supplier}</div>
                       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded bg-white px-2 py-1.5 ring-1 ring-slate-200">
