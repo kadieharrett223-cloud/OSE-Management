@@ -984,7 +984,6 @@ export default function PurchasingPage() {
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
                   <h2 className="text-base md:text-lg font-semibold text-slate-900">Supplier Payment Snapshot</h2>
-                  <p className="text-xs md:text-sm text-slate-600">Small overview of payment actions still needed by supplier.</p>
                 </div>
               </div>
 
