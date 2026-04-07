@@ -634,10 +634,11 @@ export default function AdminPriceListPage() {
 
     const activeCols = ALL_PRINT_COLUMNS.filter((c) => selectedCols.has(c.key));
 
-    // Build all items grouped by category using current derived data
-    const allCategories = [...categories]
+    // Build filtered items grouped by category using current UI filters
+    const filteredCategories = [...categories]
+      .filter((cat) => applyDiscountToAll || selectedGroups.includes(cat.category_name))
       .map((cat) => {
-        const catItems = items
+        const catItems = filteredItems
           .filter((item) => item.category_id === cat.id)
           .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
           .sort((a, b) => Number(a.sell_price || 0) - Number(b.sell_price || 0));
@@ -686,7 +687,7 @@ export default function AdminPriceListPage() {
       }
     };
 
-    const tableRows = allCategories
+    const tableRows = filteredCategories
       .map(
         ({ category, items: ci }) => `
           <tr class="cat-header">
@@ -742,10 +743,11 @@ export default function AdminPriceListPage() {
     <div>
       <h1>Price List Cost Report</h1>
       <div style="font-size:8pt;color:#475569;margin-top:4px;">Tariff Rate: ${globalTariffPercent}% &nbsp;|&nbsp; Discount: ${discountPercentage}% off list</div>
+      ${searchQuery.trim() ? `<div style="font-size:8pt;color:#475569;margin-top:2px;">Search filter: ${searchQuery.trim()}</div>` : ""}
     </div>
     <div class="meta">
       Generated: ${printDate}<br/>
-      Total products: ${items.length}
+      Total products: ${filteredItems.length}
     </div>
   </div>
   <table>

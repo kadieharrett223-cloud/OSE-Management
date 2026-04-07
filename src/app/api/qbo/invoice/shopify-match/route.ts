@@ -8,10 +8,43 @@ export interface QboInvoiceForMatch {
   /** PO number entered on the invoice — we store Shopify order # here */
   poNumber: string;
   customerName: string;
+  salesRepTags: string[];
   txnDate: string;
   totalAmt: number;
   balance: number;
   status: "Open" | "Paid" | "Cancelled";
+}
+
+function extractSalesRepTags(invoice: any): string[] {
+  const tags = new Set<string>();
+
+  const addTags = (raw: unknown) => {
+    if (!raw) return;
+    String(raw)
+      .split(/[\/,&;|]+/)
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .forEach((tag) => tags.add(tag));
+  };
+
+  if (Array.isArray(invoice?.CustomField)) {
+    invoice.CustomField
+      .filter((f: any) => {
+        const name = String(f?.Name || "").toLowerCase();
+        return name === "sales rep" || name === "salesrep" || name === "rep";
+      })
+      .forEach((f: any) => addTags(f?.StringValue));
+  }
+
+  addTags(invoice?.SalesRepRef?.name);
+
+  const memo = invoice?.CustomerMemo?.value;
+  if (memo) {
+    const repMatch = String(memo).match(/Rep:\s*([^\n]+)/i);
+    if (repMatch?.[1]) addTags(repMatch[1]);
+  }
+
+  return Array.from(tags);
 }
 
 const normName = (value: string) =>
@@ -125,6 +158,7 @@ export async function GET(req: NextRequest) {
         docNumber: inv.DocNumber || "",
         poNumber: (inv.PONumber || inv.PONum || inv.CustomField?.find((f: any) => f.Name === "P.O. Number")?.StringValue || "").trim(),
         customerName,
+        salesRepTags: extractSalesRepTags(inv),
         txnDate: inv.TxnDate || "",
         totalAmt,
         balance,

@@ -23,6 +23,7 @@ interface QboInvoice {
   docNumber: string;
   poNumber: string;
   customerName: string;
+  salesRepTags: string[];
   txnDate: string;
   totalAmt: number;
   balance: number;
@@ -259,6 +260,15 @@ function LinkModal({ shopifyOrder, qboInvoices, currentQboId, onSave, onUnlink, 
                         <StatusBadge status={inv.status} />
                       </div>
                       <p className="mt-0.5 truncate text-xs text-slate-600">{inv.customerName}</p>
+                      {inv.salesRepTags?.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {inv.salesRepTags.map((tag) => (
+                            <span key={`${inv.id}-${tag}`} className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
                       <div className="text-sm font-semibold text-slate-800">{money(inv.totalAmt)}</div>
@@ -333,12 +343,8 @@ function StatusBadge({ status }: { status: string }) {
 type FilterTab = "all" | "cancelled" | "manual" | "po" | "name" | "none";
 
 export default function ShopifyReconcilePage() {
-  // Date range â€” default last 90 days
-  const defaultEnd = toYmd(new Date());
-  const defaultStart = toYmd(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000));
-
-  const [startDate, setStartDate] = useState(defaultStart);
-  const [endDate, setEndDate] = useState(defaultEnd);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
 
@@ -367,9 +373,14 @@ export default function ShopifyReconcilePage() {
     setErrorShopify(null);
     setErrorQbo(null);
 
+    const params = new URLSearchParams();
+    if (startDate) params.set("startDate", startDate);
+    if (endDate) params.set("endDate", endDate);
+    const query = params.toString();
+
     const [shopifyRes, qboRes] = await Promise.allSettled([
-      fetch(`/api/shopify/orders?startDate=${startDate}&endDate=${endDate}`),
-      fetch(`/api/qbo/invoice/shopify-match?startDate=${startDate}&endDate=${endDate}`),
+      fetch(`/api/shopify/orders${query ? `?${query}` : ""}`),
+      fetch(`/api/qbo/invoice/shopify-match${query ? `?${query}` : ""}`),
     ]);
 
     // Shopify
@@ -477,6 +488,14 @@ export default function ShopifyReconcilePage() {
   }, [rows, filterTab, search]);
 
   const loading = loadingShopify || loadingQbo || loadingMappings;
+  const handleAllTime = () => {
+    if (!startDate && !endDate) {
+      load();
+      return;
+    }
+    setStartDate("");
+    setEndDate("");
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -516,6 +535,13 @@ export default function ShopifyReconcilePage() {
                   className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
+              <button
+                onClick={handleAllTime}
+                disabled={loading}
+                className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+              >
+                All Time
+              </button>
               <div className="flex-1 min-w-[180px]">
                 <label className="block text-xs font-medium text-slate-500 mb-1">Search</label>
                 <input
@@ -641,6 +667,7 @@ export default function ShopifyReconcilePage() {
                       {/* QBO side */}
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500 w-28">QBO Invoice</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">QBO Customer</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500 w-40">QBO Rep Tags</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500 w-28">QBO Amount</th>
                       <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500 w-24">QBO Status</th>
                       <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500 w-28">Action</th>
@@ -650,7 +677,7 @@ export default function ShopifyReconcilePage() {
                     {loading ? (
                       Array.from({ length: 8 }).map((_, i) => (
                         <tr key={i}>
-                          {Array.from({ length: 11 }).map((__, j) => (
+                          {Array.from({ length: 12 }).map((__, j) => (
                             <td key={j} className="px-4 py-3">
                               <div className="h-4 rounded bg-slate-100 animate-pulse" />
                             </td>
@@ -659,7 +686,7 @@ export default function ShopifyReconcilePage() {
                       ))
                     ) : filtered.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="px-4 py-10 text-center text-slate-400">
+                        <td colSpan={12} className="px-4 py-10 text-center text-slate-400">
                           No orders found for this date range and filter.
                         </td>
                       </tr>
@@ -703,12 +730,25 @@ export default function ShopifyReconcilePage() {
                                   )}
                                 </td>
                                 <td className="px-4 py-3 text-slate-700">{row.qbo.customerName}</td>
+                                <td className="px-4 py-3 text-slate-700">
+                                  {row.qbo.salesRepTags?.length ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {row.qbo.salesRepTags.map((tag) => (
+                                        <span key={`${row.qbo?.id}-${tag}`} className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                                          {tag}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-slate-400">—</span>
+                                  )}
+                                </td>
                                 <td className="px-4 py-3 text-right font-semibold text-slate-800">{money(row.qbo.totalAmt)}</td>
                                 <td className="px-4 py-3 text-center"><StatusBadge status={row.qbo.status} /></td>
                               </>
                             ) : (
                               <td
-                                colSpan={4}
+                                colSpan={5}
                                 className={`px-4 py-3 text-center text-sm font-medium ${row.matchType === "cancelled" ? "text-slate-500" : "text-red-500"}`}>
                                 {row.matchType === "cancelled" ? "Marked as cancelled" : "â€” Invoice not found in QuickBooks â€”"}
                               </td>

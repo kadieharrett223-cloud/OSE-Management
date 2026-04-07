@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { shopifyApiFetch, getShopifyTokens } from "@/lib/shopify";
+import { getShopifyTokens } from "@/lib/shopify";
+
+const SHOPIFY_API_VERSION = "2024-01";
+
+function getNextPageUrl(linkHeader: string | null): string | null {
+  if (!linkHeader) return null;
+
+  const links = linkHeader.split(",").map((part) => part.trim());
+  const next = links.find((link) => /rel="next"/.test(link));
+  if (!next) return null;
+
+  const match = next.match(/<([^>]+)>/);
+  return match?.[1] || null;
+}
 
 export interface ShopifyOrderSummary {
   id: number;
@@ -35,27 +48,26 @@ export async function GET(req: NextRequest) {
     if (startDate) params.set("created_at_min", `${startDate}T00:00:00-00:00`);
     if (endDate) params.set("created_at_max", `${endDate}T23:59:59-00:00`);
 
-    // Paginate through all orders within range
     let allOrders: any[] = [];
-    let url = `/orders.json?${params.toString()}`;
+    let nextUrl: string | null = `https://${tokens.shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?${params.toString()}`;
 
-    while (url) {
-      const data = await shopifyApiFetch<{ orders: any[]; _linkHeader?: string }>(url);
+    while (nextUrl) {
+      const response = await fetch(nextUrl, {
+        headers: {
+          "X-Shopify-Access-Token": tokens.access_token,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Shopify API error ${response.status}: ${text}`);
+      }
+
+      const data = (await response.json()) as { orders: any[] };
       const page = data?.orders || [];
       allOrders = allOrders.concat(page);
-
-      // Shopify uses Link header for cursor pagination handled by shopifyApiFetch
-      // If we got a full page we may need next page; but shopifyApiFetch doesn't expose Link header
-      // so we stop when we get fewer than limit (no more pages)
-      if (page.length < limit) break;
-
-      // If date range is filtering server-side, try advancing by since_id
-      const lastId = page[page.length - 1]?.id;
-      if (!lastId) break;
-
-      const nextParams = new URLSearchParams(params);
-      nextParams.set("since_id", String(lastId));
-      url = `/orders.json?${nextParams.toString()}`;
+      nextUrl = getNextPageUrl(response.headers.get("Link"));
     }
 
     const orders: ShopifyOrderSummary[] = allOrders.map((o: any) => {
