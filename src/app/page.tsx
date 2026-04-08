@@ -43,6 +43,16 @@ interface RecentInvoice {
   status: "Paid" | "Open";
 }
 
+interface PartialPaidInvoice {
+  id: string;
+  docNumber: string;
+  customerName: string;
+  txnDate: string;
+  totalAmt: number;
+  paidAmt: number;
+  balance: number;
+}
+
 interface RecentPurchase {
   id: string;
   poNumber: string;
@@ -253,6 +263,8 @@ export default function Dashboard() {
   const [topExpenses, setTopExpenses] = useState<Array<{ name: string; total: number }>>([]);
   const [partialPaidCount, setPartialPaidCount] = useState<number>(0);
   const [partialPaidRemaining, setPartialPaidRemaining] = useState<number>(0);
+  const [partialPaidInvoices, setPartialPaidInvoices] = useState<PartialPaidInvoice[]>([]);
+  const [loadingPartialPaidInvoices, setLoadingPartialPaidInvoices] = useState(true);
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
   const [customerPaymentsToday, setCustomerPaymentsToday] = useState<CustomerPayment[]>([]);
   const [loadingCustomerPayments, setLoadingCustomerPayments] = useState(true);
@@ -263,7 +275,10 @@ export default function Dashboard() {
   const [recentInvoices, setRecentInvoices] = useState<RecentInvoice[]>([]);
   const [loadingRecentInvoices, setLoadingRecentInvoices] = useState(true);
   const [showOpenInvoicesModal, setShowOpenInvoicesModal] = useState(false);
+  const [showPartialPaidModal, setShowPartialPaidModal] = useState(false);
   const [printingOpenInvoices, setPrintingOpenInvoices] = useState(false);
+  const [printingPartialPaid, setPrintingPartialPaid] = useState(false);
+  const [printPartialPaidError, setPrintPartialPaidError] = useState<string | null>(null);
   const [printOpenInvoicesError, setPrintOpenInvoicesError] = useState<string | null>(null);
   const [recentPurchases, setRecentPurchases] = useState<RecentPurchase[]>([]);
   const [loadingRecentPurchases, setLoadingRecentPurchases] = useState(true);
@@ -593,16 +608,10 @@ export default function Dashboard() {
   // Fetch partially paid invoices for current month
   useEffect(() => {
     const fetchPartialPaidInvoices = async () => {
+      setLoadingPartialPaidInvoices(true);
       try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = (now.getMonth() + 1).toString().padStart(2, '0');
-        const startDate = `${year}-${month}-01`;
-        const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
-        const endDate = `${year}-${month}-${lastDay}`;
-
         const response = await fetch(
-          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=unpaid`
+          `/api/qbo/invoice/query?status=unpaid&allPages=true`
         );
 
         if (!response.ok) throw new Error("Failed to fetch invoices");
@@ -610,25 +619,44 @@ export default function Dashboard() {
         const data = await response.json();
         const invoices = data.invoices || [];
 
-        let count = 0;
-        let remaining = 0;
+        const partialInvoices = invoices
+          .map((inv: any) => {
+            const total = Number(inv.TotalAmt) || 0;
+            const balance = Number(inv.Balance) || 0;
+            const paid = Math.max(total - balance, 0);
 
-        invoices.forEach((inv: any) => {
-          const total = Number(inv.TotalAmt) || 0;
-          const balance = Number(inv.Balance) || 0;
-          const paid = total - balance;
-          if (paid > 0 && balance > 0) {
-            count += 1;
-            remaining += balance;
-          }
+            if (!(paid > 0 && balance > 0)) {
+              return null;
+            }
+
+            return {
+              id: String(inv.Id || ""),
+              docNumber: String(inv.DocNumber || "N/A"),
+              customerName: String(inv.CustomerRef?.name || inv.CustomerRef?.value || "Unknown"),
+              txnDate: String(inv.TxnDate || ""),
+              totalAmt: total,
+              paidAmt: paid,
+              balance,
+            } as PartialPaidInvoice;
+          })
+          .filter((inv: PartialPaidInvoice | null): inv is PartialPaidInvoice => Boolean(inv))
+          .sort((a, b) => b.balance - a.balance);
+
+        let remaining = 0;
+        partialInvoices.forEach((inv) => {
+          remaining += inv.balance;
         });
 
-        setPartialPaidCount(count);
+        setPartialPaidInvoices(partialInvoices);
+        setPartialPaidCount(partialInvoices.length);
         setPartialPaidRemaining(remaining);
       } catch (error) {
         console.error("Error fetching partial paid invoices:", error);
+        setPartialPaidInvoices([]);
         setPartialPaidCount(0);
         setPartialPaidRemaining(0);
+      } finally {
+        setLoadingPartialPaidInvoices(false);
       }
     };
 
@@ -668,6 +696,7 @@ export default function Dashboard() {
         if (!res.ok) throw new Error("Failed to fetch unpaid invoices");
         const data = await res.json();
         const invoices = (data.invoices || []).map((inv: any) => {
+          const total = Number(inv.TotalAmt) || 0;
           const balance = Number(inv.Balance) || 0;
           return {
             id: inv.Id,
@@ -706,6 +735,20 @@ export default function Dashboard() {
     setTimeout(() => {
       window.print();
       setPrintingOpenInvoices(false);
+    }, 150);
+  };
+
+  const handlePrintPartialPaidInvoices = () => {
+    if (loadingPartialPaidInvoices) return;
+    if (partialPaidInvoices.length === 0) {
+      setPrintPartialPaidError("No partially paid invoices to print.");
+      return;
+    }
+    setPrintPartialPaidError(null);
+    setPrintingPartialPaid(true);
+    setTimeout(() => {
+      window.print();
+      setPrintingPartialPaid(false);
     }, 150);
   };
 
@@ -1169,6 +1212,78 @@ export default function Dashboard() {
                   {qboSyncStatus === "ok" ? "Synced" : qboSyncStatus === "error" ? "Sync error" : "Checking"}
                 </div>
                 <div className="mt-2 text-xs text-slate-600 leading-relaxed">Data connection</div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-lg">
+              <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Partially Paid Orders</h2>
+                  <p className="mt-0.5 text-sm text-slate-600">Invoices with a deposit paid and a remaining balance</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {partialPaidInvoices.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPartialPaidModal(true)}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                    >
+                      View all →
+                    </button>
+                  )}
+                  <div className="text-right">
+                    <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Due from Customers</div>
+                    <div className="text-lg font-semibold text-amber-700">${money(partialPaidRemaining)}</div>
+                    <div className="text-xs text-slate-500">{partialPaidCount} partial invoice{partialPaidCount === 1 ? "" : "s"}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full hidden sm:table">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Invoice</th>
+                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
+                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Paid</th>
+                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Due</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {loadingPartialPaidInvoices ? (
+                      <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
+                    ) : partialPaidInvoices.length === 0 ? (
+                      <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">No partially paid invoices</td></tr>
+                    ) : (
+                      partialPaidInvoices.slice(0, 10).map((inv) => (
+                        <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-5 py-3 font-mono text-sm text-slate-700">{inv.docNumber}</td>
+                          <td className="px-5 py-3 text-sm text-slate-700">{inv.customerName}</td>
+                          <td className="px-5 py-3 text-right text-sm text-slate-700">${money(inv.paidAmt)}</td>
+                          <td className="px-5 py-3 text-right text-sm font-semibold text-amber-700">${money(inv.balance)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+
+                <div className="sm:hidden px-4 py-4 space-y-3">
+                  {loadingPartialPaidInvoices ? (
+                    <div className="text-sm text-slate-500">Loading...</div>
+                  ) : partialPaidInvoices.length === 0 ? (
+                    <div className="text-sm text-slate-500">No partially paid invoices</div>
+                  ) : (
+                    partialPaidInvoices.slice(0, 10).map((inv) => (
+                      <div key={inv.id} className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-slate-900">{inv.docNumber}</span>
+                          <span className="text-sm font-semibold text-amber-700">Due ${money(inv.balance)}</span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-600">{inv.customerName}</p>
+                        <p className="mt-1 text-xs text-slate-500">Paid ${money(inv.paidAmt)}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1862,6 +1977,66 @@ export default function Dashboard() {
                                   {inv.status}
                                 </span>
                               </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showPartialPaidModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+                <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">All Partially Paid Invoices</h2>
+                      <p className="mt-0.5 text-sm text-slate-600">Total due from customers: ${money(partialPaidRemaining)}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handlePrintPartialPaidInvoices}
+                        className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
+                      >
+                        {printingPartialPaid ? "Preparing…" : "Print"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPartialPaidModal(false)}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                  {printPartialPaidError && (
+                    <div className="px-5 pt-4 text-sm text-red-600">{printPartialPaidError}</div>
+                  )}
+                  <div className="max-h-[70vh] overflow-y-auto">
+                    <table className="w-full">
+                      <thead className="bg-slate-50 border-b border-slate-100">
+                        <tr>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Invoice</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
+                          <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Total</th>
+                          <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Paid</th>
+                          <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Due</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {partialPaidInvoices.length === 0 ? (
+                          <tr><td colSpan={5} className="px-5 py-6 text-center text-slate-500">No partially paid invoices</td></tr>
+                        ) : (
+                          partialPaidInvoices.map((inv) => (
+                            <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-5 py-3 font-mono text-sm text-slate-700">{inv.docNumber}</td>
+                              <td className="px-5 py-3 text-sm text-slate-700">{inv.customerName}</td>
+                              <td className="px-5 py-3 text-right text-sm text-slate-600">${money(inv.totalAmt)}</td>
+                              <td className="px-5 py-3 text-right text-sm text-slate-600">${money(inv.paidAmt)}</td>
+                              <td className="px-5 py-3 text-right text-sm font-semibold text-amber-700">${money(inv.balance)}</td>
                             </tr>
                           ))
                         )}
