@@ -1780,8 +1780,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            </div>
-
             {showOpenInvoicesModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
                 <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg">
