@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 export const dynamic = "force-dynamic";
 
@@ -1124,7 +1124,7 @@ export default function Dashboard() {
           if (data?.diagnostics?.tokenScope) {
             diagnosticsParts.push(`Scopes: ${data.diagnostics.tokenScope}`);
           }
-          setShopifyPayoutDiagnostics(diagnosticsParts.length > 0 ? diagnosticsParts.join(" • ") : null);
+          setShopifyPayoutDiagnostics(diagnosticsParts.length > 0 ? diagnosticsParts.join(" â€¢ ") : null);
         }
       } catch (err) {
         console.error("Failed to fetch Shopify payouts:", err);
@@ -1215,78 +1215,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-lg">
-              <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Partially Paid Orders</h2>
-                  <p className="mt-0.5 text-sm text-slate-600">Invoices with a deposit paid and a remaining balance</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {partialPaidInvoices.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowPartialPaidModal(true)}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                    >
-                      View all →
-                    </button>
-                  )}
-                  <div className="text-right">
-                    <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Due from Customers</div>
-                    <div className="text-lg font-semibold text-amber-700">${money(partialPaidRemaining)}</div>
-                    <div className="text-xs text-slate-500">{partialPaidCount} partial invoice{partialPaidCount === 1 ? "" : "s"}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full hidden sm:table">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Invoice</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
-                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Paid</th>
-                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Due</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {loadingPartialPaidInvoices ? (
-                      <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
-                    ) : partialPaidInvoices.length === 0 ? (
-                      <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">No partially paid invoices</td></tr>
-                    ) : (
-                      partialPaidInvoices.slice(0, 10).map((inv) => (
-                        <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-5 py-3 font-mono text-sm text-slate-700">{inv.docNumber}</td>
-                          <td className="px-5 py-3 text-sm text-slate-700">{inv.customerName}</td>
-                          <td className="px-5 py-3 text-right text-sm text-slate-700">${money(inv.paidAmt)}</td>
-                          <td className="px-5 py-3 text-right text-sm font-semibold text-amber-700">${money(inv.balance)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-
-                <div className="sm:hidden px-4 py-4 space-y-3">
-                  {loadingPartialPaidInvoices ? (
-                    <div className="text-sm text-slate-500">Loading...</div>
-                  ) : partialPaidInvoices.length === 0 ? (
-                    <div className="text-sm text-slate-500">No partially paid invoices</div>
-                  ) : (
-                    partialPaidInvoices.slice(0, 10).map((inv) => (
-                      <div key={inv.id} className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-semibold text-slate-900">{inv.docNumber}</span>
-                          <span className="text-sm font-semibold text-amber-700">Due ${money(inv.balance)}</span>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-600">{inv.customerName}</p>
-                        <p className="mt-1 text-xs text-slate-500">Paid ${money(inv.paidAmt)}</p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-
             {/* Undeposited Funds + Shopify Scheduled Deposits */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {/* QBO Undeposited Funds */}
@@ -1309,7 +1237,7 @@ export default function Dashboard() {
                       onClick={() => setShowUndepositedModal(true)}
                       className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                     >
-                      View all →
+                      View all â†’
                     </button>
                   )}
                 </div>
@@ -1328,7 +1256,7 @@ export default function Dashboard() {
                       ) : undepositedPayments.length === 0 ? (
                         <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">
                           {undepositedFunds > 0
-                            ? `$${money(undepositedFunds)} in Undeposited Funds — no itemized payments found`
+                            ? `$${money(undepositedFunds)} in Undeposited Funds â€” no itemized payments found`
                             : "No undeposited funds"}
                         </td></tr>
                       ) : (
@@ -1370,7 +1298,7 @@ export default function Dashboard() {
                       onClick={() => setShowDepositsModal(true)}
                       className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                     >
-                      View all →
+                      View all â†’
                     </button>
                   )}
                 </div>
@@ -1416,7 +1344,7 @@ export default function Dashboard() {
                       <p className="mt-0.5 text-sm text-slate-600">Last month vs this month (so far)</p>
                     </div>
                     <div className="text-right text-xs text-slate-500">
-                      ${money(monthlyTotal)} this month • ${money(lastMonthTotal)} last month
+                      ${money(monthlyTotal)} this month â€¢ ${money(lastMonthTotal)} last month
                     </div>
                   </div>
                   <div className="mt-5">
@@ -1560,14 +1488,14 @@ export default function Dashboard() {
                       onClick={handlePrintOpenInvoices}
                       className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
                     >
-                      {printingOpenInvoices ? "Preparing…" : "Print"}
+                      {printingOpenInvoices ? "Preparingâ€¦" : "Print"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowOpenInvoicesModal(true)}
                       className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                     >
-                      View all →
+                      View all â†’
                     </button>
                   </div>
                 </div>
@@ -1642,7 +1570,7 @@ export default function Dashboard() {
                     onClick={() => setShowCustomerPaymentsModal(true)}
                     className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                   >
-                    View all →
+                    View all â†’
                   </button>
                 </div>
                 <div className="overflow-x-auto">
@@ -1695,58 +1623,46 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Recent Purchases + Top SKUs */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="bg-white border border-slate-200 rounded-lg">
-                <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Recent Purchases</h2>
-                    <p className="mt-0.5 text-sm text-slate-600">Latest purchase orders</p>
-                  </div>
-                  <a href="/admin/purchasing" className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</a>
+            {/* Recent Purchases */}
+            <div className="bg-white border border-slate-200 rounded-lg">
+              <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Recent Purchases</h2>
+                  <p className="mt-0.5 text-sm text-slate-600">Latest purchase orders</p>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase text-slate-500 font-medium">
-                      <tr>
-                        <th className="px-5 py-3 text-left">PO</th>
-                        <th className="px-5 py-3 text-left">Vendor</th>
-                        <th className="px-5 py-3 text-right">Total</th>
-                        <th className="px-5 py-3 text-right">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {loadingRecentPurchases ? (
-                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
-                      ) : recentPurchases.length === 0 ? (
-                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">No recent purchases</td></tr>
-                      ) : (
-                        recentPurchases.map((po) => (
-                          <tr key={po.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-5 py-3 font-mono text-sm text-slate-700">{po.poNumber}</td>
-                            <td className="px-5 py-3 text-sm text-slate-700">{po.vendorName}</td>
-                            <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">${money(po.totalAmount)}</td>
-                            <td className="px-5 py-3 text-right">
-                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                                {po.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                <a href="/admin/purchasing" className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">View all â†’</a>
               </div>
-
-              <div className="bg-white border border-slate-200 rounded-lg">
-                <div className="border-b border-slate-200 px-5 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900">Top SKUs This Month</h2>
-                  <p className="mt-0.5 text-sm text-slate-600">Most popular units sold</p>
-                </div>
-                <div className="px-5 py-4 space-y-3 max-h-96 overflow-y-auto">
-                  <TopSkuChart compact={true} />
-                </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50 border-b border-slate-100 text-xs uppercase text-slate-500 font-medium">
+                    <tr>
+                      <th className="px-5 py-3 text-left">PO</th>
+                      <th className="px-5 py-3 text-left">Vendor</th>
+                      <th className="px-5 py-3 text-right">Total</th>
+                      <th className="px-5 py-3 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {loadingRecentPurchases ? (
+                      <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
+                    ) : recentPurchases.length === 0 ? (
+                      <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">No recent purchases</td></tr>
+                    ) : (
+                      recentPurchases.map((po) => (
+                        <tr key={po.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-5 py-3 font-mono text-sm text-slate-700">{po.poNumber}</td>
+                          <td className="px-5 py-3 text-sm text-slate-700">{po.vendorName}</td>
+                          <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">${money(po.totalAmount)}</td>
+                          <td className="px-5 py-3 text-right">
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                              {po.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -1792,145 +1708,78 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Shopify Payouts / Pending Deposits */}
+            {/* Partially Paid Orders */}
             <div className="bg-white border border-slate-200 rounded-lg">
               <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Shopify Orders — Deposit Schedule</h2>
-                  <p className="mt-0.5 text-sm text-slate-600">
-                    {shopifyPaymentsEnabled
-                      ? "Itemized Shopify payout transactions grouped by payout schedule"
-                      : "Connect Shopify Payments to see payout schedule"}
-                  </p>
-                  {shopifyBalance && (
-                    <p className="mt-1 text-sm font-medium text-slate-700">
-                      Shopify balance: <span className="font-bold">{shopifyBalance.currency} ${shopifyBalance.amount}</span>
-                    </p>
-                  )}
+                  <h2 className="text-lg font-semibold text-slate-900">Partially Paid Orders</h2>
+                  <p className="mt-0.5 text-sm text-slate-600">Invoices with a deposit paid and a remaining balance</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {shopifyPayouts.filter((p) => {
-                    const status = normalizePayoutStatus(p.status);
-                    return status === "scheduled" || status === "in_transit";
-                  }).length > 0 && (
-                    <div className="text-right text-xs text-slate-500">
-                      {shopifyPayouts.filter((p) => {
-                        const status = normalizePayoutStatus(p.status);
-                        return status === "scheduled" || status === "in_transit";
-                      }).length} payout(s) pending
-                    </div>
-                  )}
-                  {shopifyOrders.length > 5 && (
+                  {partialPaidInvoices.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setShowShopifyPayoutsModal(true)}
+                      onClick={() => setShowPartialPaidModal(true)}
                       className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                     >
-                      View all →
+                      View all â†’
                     </button>
                   )}
+                  <div className="text-right">
+                    <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Due from Customers</div>
+                    <div className="text-lg font-semibold text-amber-700">${money(partialPaidRemaining)}</div>
+                    <div className="text-xs text-slate-500">{partialPaidCount} partial invoice{partialPaidCount === 1 ? "" : "s"}</div>
+                  </div>
                 </div>
               </div>
-
-              {/* Payout schedule badges */}
-              {!loadingShopifyPayouts && shopifyPaymentsEnabled && shopifyPayouts.length > 0 && (
-                <div className="px-5 py-3 border-b border-slate-100 flex flex-wrap gap-2">
-                  {shopifyPayouts.slice(0, 5).map((payout) => (
-                    <span
-                      key={payout.id}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-                        normalizePayoutStatus(payout.status) === "scheduled"
-                          ? "bg-blue-100 text-blue-700"
-                          : normalizePayoutStatus(payout.status) === "in_transit"
-                          ? "bg-amber-100 text-amber-700"
-                          : normalizePayoutStatus(payout.status) === "paid"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      <span className={`h-1.5 w-1.5 rounded-full ${
-                        normalizePayoutStatus(payout.status) === "scheduled" ? "bg-blue-500"
-                        : normalizePayoutStatus(payout.status) === "in_transit" ? "bg-amber-500"
-                        : normalizePayoutStatus(payout.status) === "paid" ? "bg-emerald-500"
-                        : "bg-slate-400"
-                      }`} />
-                      {normalizePayoutStatus(payout.status) === "scheduled" ? "Scheduled" : normalizePayoutStatus(payout.status) === "in_transit" ? "In Transit" : "Deposited"}: {payout.date} — ${Number(payout.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {payout.currency}
-                    </span>
-                  ))}
-                </div>
-              )}
-
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full hidden sm:table">
                   <thead className="bg-slate-50 border-b border-slate-100">
                     <tr>
-                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Order</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Deposit Date</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Order Date</th>
-                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Order Total</th>
-                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Fee</th>
-                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Net (after fees)</th>
-                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Deposit Status</th>
+                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Invoice</th>
+                      <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
+                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Paid</th>
+                      <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Due</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {loadingShopifyPayouts ? (
-                      <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
-                    ) : !shopifyPaymentsEnabled ? (
-                      <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-500">Shopify Payments not enabled — connect Shopify Payments to see payout data</td></tr>
-                    ) : shopifyOrders.length === 0 ? (
-                      <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-500">No itemized Shopify payout transactions found</td></tr>
+                    {loadingPartialPaidInvoices ? (
+                      <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
+                    ) : partialPaidInvoices.length === 0 ? (
+                      <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">No partially paid invoices</td></tr>
                     ) : (
-                      shopifyOrders.slice(0, 8).map((order) => {
-                        const orderDepositStatus = normalizePayoutStatus(order.pendingDepositStatus);
-                        const depositLabel =
-                          orderDepositStatus === "paid"
-                            ? "Deposited"
-                            : orderDepositStatus === "in_transit"
-                            ? "In Transit"
-                            : orderDepositStatus === "scheduled"
-                            ? "Scheduled"
-                            : order.financial_status === "paid"
-                            ? "Paid — not linked"
-                            : order.financial_status || "—";
-                        const depositColor =
-                          orderDepositStatus === "paid"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : orderDepositStatus === "in_transit"
-                            ? "bg-amber-100 text-amber-700"
-                            : orderDepositStatus === "scheduled"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-slate-100 text-slate-600";
-                        return (
-                          <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-5 py-3 font-mono text-sm text-slate-700">{order.name}</td>
-                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{order.payoutDate || "—"}</td>
-                            <td className="px-5 py-3 text-sm text-slate-600">{order.created_at?.slice(0, 10) || "—"}</td>
-                            <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">
-                              ${Number(order.total_price).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                            </td>
-                            <td className="px-5 py-3 text-right text-sm text-slate-500">
-                              {order.fee
-                                ? `$${Number(order.fee).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-                                : "—"}
-                            </td>
-                            <td className="px-5 py-3 text-right text-sm text-slate-700">
-                              {order.netAmount
-                                ? `$${Number(order.netAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-                                : "—"}
-                            </td>
-                            <td className="px-5 py-3 text-right">
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${depositColor}`}>
-                                {depositLabel}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
+                      partialPaidInvoices.slice(0, 10).map((inv) => (
+                        <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-5 py-3 font-mono text-sm text-slate-700">{inv.docNumber}</td>
+                          <td className="px-5 py-3 text-sm text-slate-700">{inv.customerName}</td>
+                          <td className="px-5 py-3 text-right text-sm text-slate-700">${money(inv.paidAmt)}</td>
+                          <td className="px-5 py-3 text-right text-sm font-semibold text-amber-700">${money(inv.balance)}</td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>
+                <div className="sm:hidden px-4 py-4 space-y-3">
+                  {loadingPartialPaidInvoices ? (
+                    <div className="text-sm text-slate-500">Loading...</div>
+                  ) : partialPaidInvoices.length === 0 ? (
+                    <div className="text-sm text-slate-500">No partially paid invoices</div>
+                  ) : (
+                    partialPaidInvoices.slice(0, 10).map((inv) => (
+                      <div key={inv.id} className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-slate-900">{inv.docNumber}</span>
+                          <span className="text-sm font-semibold text-amber-700">Due ${money(inv.balance)}</span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-600">{inv.customerName}</p>
+                        <p className="mt-1 text-xs text-slate-500">Paid ${money(inv.paidAmt)}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
+            </div>
+
             </div>
 
             {showOpenInvoicesModal && (
@@ -2001,7 +1850,7 @@ export default function Dashboard() {
                         onClick={handlePrintPartialPaidInvoices}
                         className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
                       >
-                        {printingPartialPaid ? "Preparing…" : "Print"}
+                        {printingPartialPaid ? "Preparingâ€¦" : "Print"}
                       </button>
                       <button
                         type="button"
@@ -2129,7 +1978,7 @@ export default function Dashboard() {
                             <tr key={p.id} className="hover:bg-slate-50">
                               <td className="px-5 py-3 font-medium text-slate-900">{p.customerName}</td>
                               <td className="px-5 py-3 text-sm text-slate-600">{p.txnDate}</td>
-                              <td className="px-5 py-3 text-sm text-slate-500 font-mono">{p.invoiceNums.join(", ") || "—"}</td>
+                              <td className="px-5 py-3 text-sm text-slate-500 font-mono">{p.invoiceNums.join(", ") || "â€”"}</td>
                               <td className="px-5 py-3 text-right font-semibold text-amber-700">${money(p.appliedAmt || p.totalAmt)}</td>
                               <td className="px-5 py-3 text-right text-sm text-slate-500">Undeposited Funds</td>
                             </tr>
@@ -2201,7 +2050,7 @@ export default function Dashboard() {
                 <div className="w-full max-w-5xl bg-white border border-slate-200 rounded-lg">
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900">All Shopify Orders — Deposit Status</h2>
+                      <h2 className="text-lg font-semibold text-slate-900">All Shopify Orders â€” Deposit Status</h2>
                       <p className="mt-0.5 text-sm text-slate-600">Itemized Shopify payout transactions and their payout dates</p>
                     </div>
                     <button
@@ -2224,7 +2073,7 @@ export default function Dashboard() {
                             : "bg-slate-100 text-slate-700"
                           }`}
                         >
-                          {payout.date} — ${Number(payout.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {payout.currency} ({normalizePayoutStatus(payout.status) || payout.status})
+                          {payout.date} â€” ${Number(payout.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {payout.currency} ({normalizePayoutStatus(payout.status) || payout.status})
                         </span>
                       ))}
                     </div>
@@ -2249,8 +2098,8 @@ export default function Dashboard() {
                             orderDepositStatus === "paid" ? "Deposited"
                             : orderDepositStatus === "in_transit" ? "In Transit"
                             : orderDepositStatus === "scheduled" ? "Scheduled"
-                            : order.financial_status === "paid" ? "Paid — not linked"
-                            : order.financial_status || "—";
+                            : order.financial_status === "paid" ? "Paid â€” not linked"
+                            : order.financial_status || "â€”";
                           const depositColor =
                             orderDepositStatus === "paid" ? "bg-emerald-100 text-emerald-700"
                             : orderDepositStatus === "in_transit" ? "bg-amber-100 text-amber-700"
@@ -2259,16 +2108,16 @@ export default function Dashboard() {
                           return (
                             <tr key={order.id} className="hover:bg-slate-50">
                               <td className="px-5 py-3 font-mono text-sm text-slate-700">{order.name}</td>
-                              <td className="px-5 py-3 text-sm font-medium text-slate-900">{order.payoutDate || "—"}</td>
-                              <td className="px-5 py-3 text-sm text-slate-600">{order.created_at?.slice(0, 10) || "—"}</td>
+                              <td className="px-5 py-3 text-sm font-medium text-slate-900">{order.payoutDate || "â€”"}</td>
+                              <td className="px-5 py-3 text-sm text-slate-600">{order.created_at?.slice(0, 10) || "â€”"}</td>
                               <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">
                                 ${Number(order.total_price).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                               </td>
                               <td className="px-5 py-3 text-right text-sm text-slate-500">
-                                {order.fee ? `$${Number(order.fee).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
+                                {order.fee ? `$${Number(order.fee).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "â€”"}
                               </td>
                               <td className="px-5 py-3 text-right text-sm text-slate-700">
-                                {order.netAmount ? `$${Number(order.netAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}
+                                {order.netAmount ? `$${Number(order.netAmount).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "â€”"}
                               </td>
                               <td className="px-5 py-3 text-right">
                                 <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${depositColor}`}>
