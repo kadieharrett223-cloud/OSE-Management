@@ -640,7 +640,7 @@ export default function Dashboard() {
             } as PartialPaidInvoice;
           })
           .filter((inv: PartialPaidInvoice | null): inv is PartialPaidInvoice => Boolean(inv))
-          .sort((a, b) => b.balance - a.balance);
+          .sort((a: PartialPaidInvoice, b: PartialPaidInvoice) => b.balance - a.balance);
 
         let remaining = 0;
         partialInvoices.forEach((inv) => {
