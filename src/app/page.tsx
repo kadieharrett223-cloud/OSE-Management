@@ -619,7 +619,7 @@ export default function Dashboard() {
         const data = await response.json();
         const invoices = data.invoices || [];
 
-        const partialInvoices = invoices
+        const partialInvoices: PartialPaidInvoice[] = invoices
           .map((inv: any) => {
             const total = Number(inv.TotalAmt) || 0;
             const balance = Number(inv.Balance) || 0;
@@ -643,7 +643,7 @@ export default function Dashboard() {
           .sort((a: PartialPaidInvoice, b: PartialPaidInvoice) => b.balance - a.balance);
 
         let remaining = 0;
-        partialInvoices.forEach((inv) => {
+        partialInvoices.forEach((inv: PartialPaidInvoice) => {
           remaining += inv.balance;
         });
 
