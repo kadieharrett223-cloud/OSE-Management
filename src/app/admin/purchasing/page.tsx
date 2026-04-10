@@ -51,6 +51,17 @@ type Supplier = {
   notes?: string;
 };
 
+type ScheduledPayment = {
+  id: string;
+  poId: string;
+  poNumber: string;
+  vendorName: string;
+  date: string;
+  amount: number;
+  notes: string;
+  createdAt?: string;
+};
+
 const WEIGHT_LIMIT_LBS = 45000;
 
 const money = (value: number | undefined) => {
@@ -132,6 +143,24 @@ export default function PurchasingPage() {
     notes: "",
   });
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [scheduledPayments, setScheduledPayments] = useState<ScheduledPayment[]>([]);
+  const [loadingScheduledPayments, setLoadingScheduledPayments] = useState(false);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedCalendarMonth, setSelectedCalendarMonth] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    return `${year}-${month}`;
+  });
+  const [scheduleForm, setScheduleForm] = useState({
+    poId: "",
+    date: new Date().toISOString().split("T")[0],
+    amount: 0,
+    notes: "",
+  });
 
   const [supplierModal, setSupplierModal] = useState<{open:boolean, mode:"create"|"edit", supplier?: Supplier|null}>({open:false, mode:"create"});
   const [supplierForm, setSupplierForm] = useState<Supplier>({
@@ -175,6 +204,7 @@ export default function PurchasingPage() {
     fetchPriceList();
     fetchSuppliers();
     fetchCategories();
+    fetchScheduledPayments();
   }, []);
 
   useEffect(() => {
@@ -264,6 +294,127 @@ export default function PurchasingPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function fetchScheduledPayments() {
+    setLoadingScheduledPayments(true);
+    try {
+      const res = await fetch("/api/purchase-orders/payment-schedules", { cache: "no-store" });
+      const payload = await res.json();
+      if (payload.ok) {
+        setScheduledPayments(payload.schedules || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch payment schedules:", error);
+    } finally {
+      setLoadingScheduledPayments(false);
+    }
+  }
+
+  async function handleSaveSchedule() {
+    const selected = pos.find((po) => po.id === scheduleForm.poId);
+    if (!selected) {
+      alert("Please select a purchase order");
+      return;
+    }
+
+    if (!scheduleForm.date) {
+      alert("Please select a date");
+      return;
+    }
+
+    setSavingSchedule(true);
+    try {
+      const isEditing = Boolean(editingScheduleId);
+      const url = isEditing
+        ? `/api/purchase-orders/payment-schedules/${editingScheduleId}`
+        : "/api/purchase-orders/payment-schedules";
+      const method = isEditing ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          poId: selected.id,
+          poNumber: selected.po_number,
+          vendorName: selected.vendor_name,
+          date: scheduleForm.date,
+          amount: Number(scheduleForm.amount || 0),
+          notes: scheduleForm.notes,
+        }),
+      });
+
+      const payload = await res.json();
+      if (!res.ok || !payload.ok) {
+        alert(payload.error || (isEditing ? "Failed to update schedule" : "Failed to schedule payment"));
+        return;
+      }
+
+      if (isEditing) {
+        setScheduledPayments((prev) =>
+          prev.map((schedule) => (schedule.id === editingScheduleId ? payload.schedule : schedule))
+        );
+      } else {
+        setScheduledPayments((prev) => [...prev, payload.schedule]);
+      }
+
+      setShowScheduleModal(false);
+      setEditingScheduleId(null);
+      setScheduleForm({
+        poId: "",
+        date: new Date().toISOString().split("T")[0],
+        amount: 0,
+        notes: "",
+      });
+    } catch (error) {
+      console.error("Failed to save payment schedule:", error);
+      alert(editingScheduleId ? "Failed to update schedule" : "Failed to schedule payment");
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
+
+  async function handleDeleteSchedule(id: string) {
+    if (!confirm("Delete this scheduled payment?")) return;
+
+    try {
+      const res = await fetch(`/api/purchase-orders/payment-schedules/${id}`, {
+        method: "DELETE",
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.ok) {
+        alert(payload.error || "Failed to delete scheduled payment");
+        return;
+      }
+
+      setScheduledPayments((prev) => prev.filter((schedule) => schedule.id !== id));
+    } catch (error) {
+      console.error("Failed to delete scheduled payment:", error);
+      alert("Failed to delete scheduled payment");
+    }
+  }
+
+  function openScheduleModal(date: string) {
+    const defaultPo = pos[0];
+    setEditingScheduleId(null);
+    setScheduleForm({
+      poId: defaultPo?.id || "",
+      date,
+      amount: 0,
+      notes: "",
+    });
+    setShowScheduleModal(true);
+  }
+
+  function openEditScheduleModal(schedule: ScheduledPayment) {
+    setEditingScheduleId(schedule.id);
+    setScheduleForm({
+      poId: schedule.poId,
+      date: schedule.date,
+      amount: Number(schedule.amount || 0),
+      notes: schedule.notes || "",
+    });
+    setShowScheduleModal(true);
   }
 
   const fetchCategories = async () => {
@@ -723,6 +874,41 @@ export default function PurchasingPage() {
   const safePage = Math.min(currentPage, totalPages);
   const pagedPos = sortedFilteredPos.slice((safePage - 1) * pageSize, safePage * pageSize);
 
+  const calendarDays = (() => {
+    const [year, month] = selectedCalendarMonth.split("-").map(Number);
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+    const startPadding = firstDay.getDay();
+    const days: (Date | null)[] = [];
+
+    for (let i = 0; i < startPadding; i++) {
+      days.push(null);
+    }
+
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+      days.push(new Date(year, month - 1, day));
+    }
+
+    return days;
+  })();
+
+  const todayIso = new Date().toISOString().split("T")[0];
+
+  const upcomingScheduledPayments = [...scheduledPayments]
+    .filter((schedule) => schedule.date >= todayIso)
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.poNumber.localeCompare(b.poNumber, undefined, { numeric: true, sensitivity: "base" });
+    });
+
+  const getSchedulesForDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+    return scheduledPayments.filter((schedule) => schedule.date === dateStr);
+  };
+
   const printContainerPaymentReport = () => {
     const rows = sortedFilteredPos.filter(
       (po) => po.status === "TO_BE_PAID" || po.status === "DEPOSIT_DOWN"
@@ -962,6 +1148,13 @@ export default function PurchasingPage() {
                 <div className="flex w-full sm:w-auto items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => setShowCalendarModal(true)}
+                    className="w-full sm:w-auto rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    Calendar
+                  </button>
+                  <button
+                    type="button"
                     onClick={printContainerPaymentReport}
                     disabled={sortedFilteredPos.length === 0}
                     className="w-full sm:w-auto rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1014,6 +1207,67 @@ export default function PurchasingPage() {
                   ))
                 )}
               </div>
+            </section>
+
+            <section className="rounded-xl bg-white p-4 md:p-5 shadow-md ring-1 ring-slate-200 space-y-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-base md:text-lg font-semibold text-slate-900">Scheduled Payment Notifications</h2>
+                  <p className="text-xs text-slate-500">Upcoming payment reminders from your PO calendar.</p>
+                </div>
+              </div>
+
+              {loadingScheduledPayments ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                  Loading scheduled payments...
+                </div>
+              ) : upcomingScheduledPayments.length === 0 ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                  No scheduled payments yet.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {upcomingScheduledPayments.slice(0, 8).map((schedule) => (
+                    <div
+                      key={schedule.id}
+                      className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">
+                          {formatDate(schedule.date)} • PO {schedule.poNumber} • {schedule.vendorName}
+                        </div>
+                        <div className="text-xs text-slate-600">
+                          Amount: ${money(schedule.amount || 0)}
+                          {schedule.notes ? ` • ${schedule.notes}` : ""}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditScheduleModal(schedule)}
+                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => window.location.href = `/admin/purchasing/${schedule.poId}`}
+                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                          View PO
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSchedule(schedule.id)}
+                          className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             {showForm && (
@@ -1587,6 +1841,179 @@ export default function PurchasingPage() {
                       className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                     >
                       {creatingProduct ? "Creating..." : "Create Product"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showCalendarModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="w-full max-w-7xl rounded-xl bg-white p-4 md:p-6 shadow-xl">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">Purchasing Calendar</h2>
+                      <p className="text-sm text-slate-600">Add notes and schedule PO payments by date.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="month"
+                        value={selectedCalendarMonth}
+                        onChange={(e) => setSelectedCalendarMonth(e.target.value)}
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCalendarModal(false)}
+                        className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mb-3 grid grid-cols-7 gap-2">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                      <div key={day} className="text-center text-xs font-semibold uppercase text-slate-500">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-2">
+                    {calendarDays.map((date, index) => {
+                      if (!date) {
+                        return <div key={`empty-${index}`} className="h-28 rounded border border-transparent" />;
+                      }
+
+                      const daySchedules = getSchedulesForDate(date);
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, "0");
+                      const day = String(date.getDate()).padStart(2, "0");
+                      const dateStr = `${year}-${month}-${day}`;
+
+                      return (
+                        <button
+                          key={date.toISOString()}
+                          type="button"
+                          onClick={() => openScheduleModal(dateStr)}
+                          className="h-28 rounded-lg border border-slate-200 bg-slate-50 p-2 text-left hover:bg-slate-100"
+                        >
+                          <div className="text-sm font-semibold text-slate-800">{date.getDate()}</div>
+                          <div className="mt-1 space-y-1">
+                            {daySchedules.slice(0, 2).map((schedule) => (
+                              <div
+                                key={schedule.id}
+                                className="truncate rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-800"
+                                title={`PO ${schedule.poNumber} - $${money(schedule.amount || 0)} ${schedule.notes || ""}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openEditScheduleModal(schedule);
+                                }}
+                              >
+                                PO {schedule.poNumber} • ${money(schedule.amount || 0)}
+                              </div>
+                            ))}
+                            {daySchedules.length > 2 && (
+                              <div className="text-[10px] text-slate-500">+{daySchedules.length - 2} more</div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showScheduleModal && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+                <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    {editingScheduleId ? "Edit Scheduled Payment" : "Schedule Payment"}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {editingScheduleId
+                      ? "Update this payment reminder linked to a purchase order."
+                      : "Create a payment reminder linked to a purchase order."}
+                  </p>
+
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">Date</label>
+                      <input
+                        type="date"
+                        value={scheduleForm.date}
+                        onChange={(e) => setScheduleForm({ ...scheduleForm, date: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">Purchase Order</label>
+                      <select
+                        value={scheduleForm.poId}
+                        onChange={(e) => {
+                          const poId = e.target.value;
+                          const selected = pos.find((po) => po.id === poId);
+                          setScheduleForm({
+                            ...scheduleForm,
+                            poId,
+                            amount: selected ? Number(balance(selected).toFixed(2)) : scheduleForm.amount,
+                          });
+                        }}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      >
+                        <option value="">Select PO...</option>
+                        {pos.map((po) => (
+                          <option key={po.id} value={po.id}>
+                            PO {po.po_number} • {po.vendor_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">Amount</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={scheduleForm.amount}
+                        onChange={(e) => setScheduleForm({ ...scheduleForm, amount: Number(e.target.value) })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">Notes</label>
+                      <textarea
+                        value={scheduleForm.notes}
+                        onChange={(e) => setScheduleForm({ ...scheduleForm, notes: e.target.value })}
+                        rows={3}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                        placeholder="Add reminder details"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowScheduleModal(false);
+                        setEditingScheduleId(null);
+                      }}
+                      className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveSchedule}
+                      disabled={savingSchedule}
+                      className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {savingSchedule ? "Saving..." : editingScheduleId ? "Update Schedule" : "Save Schedule"}
                     </button>
                   </div>
                 </div>
