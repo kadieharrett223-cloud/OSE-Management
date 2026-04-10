@@ -437,8 +437,8 @@ export default function ViewPO() {
       return;
     }
     
-    if (!isNote && (lineItemForm.quantity <= 0 || lineItemForm.unit_price < 0)) {
-      alert("Please fill in Quantity and Unit Price (required for product items)");
+    if (!isNote && lineItemForm.quantity <= 0) {
+      alert("Please enter a quantity greater than 0 for product items");
       return;
     }
 
