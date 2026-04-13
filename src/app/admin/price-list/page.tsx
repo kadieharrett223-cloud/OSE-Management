@@ -966,34 +966,17 @@ export default function AdminPriceListPage() {
         line,
         item: null,
         qty,
-        lineUnitCost: 0,
-        lineShipping: 0,
-        lineCost: 0,
-        lineSell: 0,
-        lineRevenue: 0,
-        lineProfit: 0,
-        lineWeight: 0,
+        lineOutTheDoorCost: 0,
       };
     }
 
-    const unitCost = Number(item.cost_with_shipping || 0);
-    const unitShipping = Number(item.zone5_shipping || 0);
-    const unitCostNoShipping = Number(item.per_unit || 0);
-    const unitRevenue = Number(item.sell_price || 0);
-    const unitProfit = Number(item.profit || 0);
-    const unitWeight = Number(item.weight_lbs || 0);
+    const outTheDoorCostPerUnit = Number(item.cost_with_shipping || 0);
 
     return {
       line,
       item,
       qty,
-      lineUnitCost: unitCostNoShipping * qty,
-      lineShipping: unitShipping * qty,
-      lineCost: unitCost * qty,
-      lineSell: unitRevenue * qty,
-      lineRevenue: unitRevenue * qty,
-      lineProfit: unitProfit * qty,
-      lineWeight: unitWeight * qty,
+      lineOutTheDoorCost: outTheDoorCostPerUnit * qty,
     };
   };
 
@@ -1004,23 +987,11 @@ export default function AdminPriceListPage() {
     rows.reduce(
       (acc, row) => ({
         totalQty: acc.totalQty + row.qty,
-        totalUnitCost: acc.totalUnitCost + row.lineUnitCost,
-        totalShipping: acc.totalShipping + row.lineShipping,
-        totalCost: acc.totalCost + row.lineCost,
-        totalSell: acc.totalSell + row.lineSell,
-        totalRevenue: acc.totalRevenue + row.lineRevenue,
-        totalProfit: acc.totalProfit + row.lineProfit,
-        totalWeight: acc.totalWeight + row.lineWeight,
+        totalOutTheDoorCost: acc.totalOutTheDoorCost + row.lineOutTheDoorCost,
       }),
       {
         totalQty: 0,
-        totalUnitCost: 0,
-        totalShipping: 0,
-        totalCost: 0,
-        totalSell: 0,
-        totalRevenue: 0,
-        totalProfit: 0,
-        totalWeight: 0,
+        totalOutTheDoorCost: 0,
       }
     );
 
@@ -1028,20 +999,10 @@ export default function AdminPriceListPage() {
   const totalsB = summarizeMockPo(mockPoBComputed);
 
   const comparisonDiff = {
-    unitCost: (totalsB.totalQty > 0 ? totalsB.totalUnitCost / totalsB.totalQty : 0) -
-      (totalsA.totalQty > 0 ? totalsA.totalUnitCost / totalsA.totalQty : 0),
-    shipping: (totalsB.totalQty > 0 ? totalsB.totalShipping / totalsB.totalQty : 0) -
-      (totalsA.totalQty > 0 ? totalsA.totalShipping / totalsA.totalQty : 0),
-    costWithShipping: (totalsB.totalQty > 0 ? totalsB.totalCost / totalsB.totalQty : 0) -
-      (totalsA.totalQty > 0 ? totalsA.totalCost / totalsA.totalQty : 0),
-    sellPrice: (totalsB.totalQty > 0 ? totalsB.totalSell / totalsB.totalQty : 0) -
-      (totalsA.totalQty > 0 ? totalsA.totalSell / totalsA.totalQty : 0),
-    profit: (totalsB.totalQty > 0 ? totalsB.totalProfit / totalsB.totalQty : 0) -
-      (totalsA.totalQty > 0 ? totalsA.totalProfit / totalsA.totalQty : 0),
-    totalCost: totalsB.totalCost - totalsA.totalCost,
-    totalRevenue: totalsB.totalRevenue - totalsA.totalRevenue,
-    totalProfit: totalsB.totalProfit - totalsA.totalProfit,
-    totalWeight: totalsB.totalWeight - totalsA.totalWeight,
+    outTheDoorPerUnit:
+      (totalsB.totalQty > 0 ? totalsB.totalOutTheDoorCost / totalsB.totalQty : 0) -
+      (totalsA.totalQty > 0 ? totalsA.totalOutTheDoorCost / totalsA.totalQty : 0),
+    outTheDoorTotal: totalsB.totalOutTheDoorCost - totalsA.totalOutTheDoorCost,
   };
 
   // Get unique suppliers for filter dropdown (canonicalized)
@@ -2242,43 +2203,11 @@ export default function AdminPriceListPage() {
                   </thead>
                   <tbody>
                     <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 text-slate-700">Unit Cost</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalQty > 0 ? totalsA.totalUnitCost / totalsA.totalQty : 0)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalQty > 0 ? totalsB.totalUnitCost / totalsB.totalQty : 0)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.unitCost >= 0 ? "text-red-700" : "text-emerald-700"}`}>
-                        {comparisonDiff.unitCost >= 0 ? "+" : ""}${money(comparisonDiff.unitCost)}
-                      </td>
-                    </tr>
-                    <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 text-slate-700">Shipping</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalQty > 0 ? totalsA.totalShipping / totalsA.totalQty : 0)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalQty > 0 ? totalsB.totalShipping / totalsB.totalQty : 0)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.shipping >= 0 ? "text-red-700" : "text-emerald-700"}`}>
-                        {comparisonDiff.shipping >= 0 ? "+" : ""}${money(comparisonDiff.shipping)}
-                      </td>
-                    </tr>
-                    <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 text-slate-700">Cost with Shipping</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalQty > 0 ? totalsA.totalCost / totalsA.totalQty : 0)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalQty > 0 ? totalsB.totalCost / totalsB.totalQty : 0)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.costWithShipping >= 0 ? "text-red-700" : "text-emerald-700"}`}>
-                        {comparisonDiff.costWithShipping >= 0 ? "+" : ""}${money(comparisonDiff.costWithShipping)}
-                      </td>
-                    </tr>
-                    <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 text-slate-700">Sell Price</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalQty > 0 ? totalsA.totalSell / totalsA.totalQty : 0)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalQty > 0 ? totalsB.totalSell / totalsB.totalQty : 0)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.sellPrice >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                        {comparisonDiff.sellPrice >= 0 ? "+" : ""}${money(comparisonDiff.sellPrice)}
-                      </td>
-                    </tr>
-                    <tr className="border-t border-slate-200 bg-emerald-50/60">
-                      <td className="px-3 py-2 font-semibold text-emerald-900">Profit</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsA.totalQty > 0 ? totalsA.totalProfit / totalsA.totalQty : 0)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsB.totalQty > 0 ? totalsB.totalProfit / totalsB.totalQty : 0)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums font-semibold ${comparisonDiff.profit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                        {comparisonDiff.profit >= 0 ? "+" : ""}${money(comparisonDiff.profit)}
+                      <td className="px-3 py-2 text-slate-700">Out-the-Door Cost (with shipping)</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalQty > 0 ? totalsA.totalOutTheDoorCost / totalsA.totalQty : 0)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalQty > 0 ? totalsB.totalOutTheDoorCost / totalsB.totalQty : 0)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.outTheDoorPerUnit >= 0 ? "text-red-700" : "text-emerald-700"}`}>
+                        {comparisonDiff.outTheDoorPerUnit >= 0 ? "+" : ""}${money(comparisonDiff.outTheDoorPerUnit)}
                       </td>
                     </tr>
                   </tbody>
@@ -2295,35 +2224,11 @@ export default function AdminPriceListPage() {
                   </thead>
                   <tbody>
                     <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 text-slate-700">Total Cost</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalCost)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalCost)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalCost >= 0 ? "text-red-700" : "text-emerald-700"}`}>
-                        {comparisonDiff.totalCost >= 0 ? "+" : ""}${money(comparisonDiff.totalCost)}
-                      </td>
-                    </tr>
-                    <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 text-slate-700">Total Revenue</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalRevenue)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalRevenue)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalRevenue >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                        {comparisonDiff.totalRevenue >= 0 ? "+" : ""}${money(comparisonDiff.totalRevenue)}
-                      </td>
-                    </tr>
-                    <tr className="border-t border-slate-200 bg-emerald-50/60">
-                      <td className="px-3 py-2 font-semibold text-emerald-900">Total Profit</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsA.totalProfit)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsB.totalProfit)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums font-semibold ${comparisonDiff.totalProfit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                        {comparisonDiff.totalProfit >= 0 ? "+" : ""}${money(comparisonDiff.totalProfit)}
-                      </td>
-                    </tr>
-                    <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 text-slate-700">Total Weight (lbs)</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{money(totalsA.totalWeight)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{money(totalsB.totalWeight)}</td>
-                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalWeight >= 0 ? "text-red-700" : "text-emerald-700"}`}>
-                        {comparisonDiff.totalWeight >= 0 ? "+" : ""}{money(comparisonDiff.totalWeight)}
+                      <td className="px-3 py-2 font-semibold text-slate-800">Total Out-the-Door Cost</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-900">${money(totalsA.totalOutTheDoorCost)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-900">${money(totalsB.totalOutTheDoorCost)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums font-semibold ${comparisonDiff.outTheDoorTotal >= 0 ? "text-red-700" : "text-emerald-700"}`}>
+                        {comparisonDiff.outTheDoorTotal >= 0 ? "+" : ""}${money(comparisonDiff.outTheDoorTotal)}
                       </td>
                     </tr>
                   </tbody>
