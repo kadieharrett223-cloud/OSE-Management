@@ -235,7 +235,8 @@ export default function AdminPriceListPage() {
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [mockPoALines, setMockPoALines] = useState<MockPOLine[]>([]);
   const [mockPoBLines, setMockPoBLines] = useState<MockPOLine[]>([]);
-  const [mockPoCostMode, setMockPoCostMode] = useState<'fob' | 'delivered'>('fob');
+  const [mockPoACostMode, setMockPoACostMode] = useState<"fob" | "delivered">("fob");
+  const [mockPoBCostMode, setMockPoBCostMode] = useState<"fob" | "delivered">("fob");
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -534,6 +535,9 @@ export default function AdminPriceListPage() {
   const openCompareModal = () => {
     const firstItem = items[0];
     const secondItem = items[1] || items[0];
+
+    setMockPoACostMode("fob");
+    setMockPoBCostMode("fob");
 
     if (mockPoALines.length === 0 && firstItem) {
       setMockPoALines([
@@ -958,7 +962,7 @@ export default function AdminPriceListPage() {
     });
   };
 
-  const buildMockLineTotals = (line: MockPOLine) => {
+  const buildMockLineTotals = (line: MockPOLine, costMode: "fob" | "delivered") => {
     const item = comparableItemsById.get(line.itemId) || null;
     const qty = Number(line.quantity || 0);
 
@@ -971,10 +975,7 @@ export default function AdminPriceListPage() {
       };
     }
 
-    const costPerUnit =
-      mockPoCostMode === 'fob'
-        ? Number(item.fob_cost || 0)
-        : Number(item.per_unit || 0);
+    const costPerUnit = costMode === "fob" ? Number(item.fob_cost || 0) : Number(item.per_unit || 0);
 
     return {
       line,
@@ -984,8 +985,8 @@ export default function AdminPriceListPage() {
     };
   };
 
-  const mockPoAComputed = mockPoALines.map(buildMockLineTotals);
-  const mockPoBComputed = mockPoBLines.map(buildMockLineTotals);
+  const mockPoAComputed = mockPoALines.map((line) => buildMockLineTotals(line, mockPoACostMode));
+  const mockPoBComputed = mockPoBLines.map((line) => buildMockLineTotals(line, mockPoBCostMode));
 
   const summarizeMockPo = (rows: ReturnType<typeof buildMockLineTotals>[]) =>
     rows.reduce(
@@ -2065,30 +2066,6 @@ export default function AdminPriceListPage() {
                   Build two mock purchase orders and compare costs side by side.
                 </p>
               </div>
-              <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
-                <button
-                  type="button"
-                  onClick={() => setMockPoCostMode('fob')}
-                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                    mockPoCostMode === 'fob'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  FOB Cost
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMockPoCostMode('delivered')}
-                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                    mockPoCostMode === 'delivered'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Final Delivered
-                </button>
-              </div>
               <button
                 onClick={() => setShowCompareModal(false)}
                 className="text-slate-400 hover:text-slate-600"
@@ -2115,13 +2092,39 @@ export default function AdminPriceListPage() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-800">Mock PO A</h3>
-                    <button
-                      type="button"
-                      onClick={() => addMockLine("A")}
-                      className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
-                    >
-                      + Add Line
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
+                        <button
+                          type="button"
+                          onClick={() => setMockPoACostMode("fob")}
+                          className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                            mockPoACostMode === "fob"
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-500 hover:text-slate-700"
+                          }`}
+                        >
+                          FOB
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMockPoACostMode("delivered")}
+                          className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                            mockPoACostMode === "delivered"
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-500 hover:text-slate-700"
+                          }`}
+                        >
+                          Delivered
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addMockLine("A")}
+                        className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+                      >
+                        + Add Line
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -2157,9 +2160,7 @@ export default function AdminPriceListPage() {
                           {selected && (
                             <div className="col-span-3 rounded-md bg-white px-2 py-1 text-[11px] text-slate-600 ring-1 ring-slate-200">
                               {selected.item_no} •{' '}
-                              {mockPoCostMode === 'fob'
-                                ? `FOB $${money(selected.fob_cost)}`
-                                : `Delivered $${money(selected.per_unit)}`}
+                              {mockPoACostMode === "fob" ? `FOB $${money(selected.fob_cost)}` : `Delivered $${money(selected.per_unit)}`}
                             </div>
                           )}
                         </div>
@@ -2171,13 +2172,39 @@ export default function AdminPriceListPage() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-800">Mock PO B</h3>
-                    <button
-                      type="button"
-                      onClick={() => addMockLine("B")}
-                      className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
-                    >
-                      + Add Line
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
+                        <button
+                          type="button"
+                          onClick={() => setMockPoBCostMode("fob")}
+                          className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                            mockPoBCostMode === "fob"
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-500 hover:text-slate-700"
+                          }`}
+                        >
+                          FOB
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMockPoBCostMode("delivered")}
+                          className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                            mockPoBCostMode === "delivered"
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-500 hover:text-slate-700"
+                          }`}
+                        >
+                          Delivered
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addMockLine("B")}
+                        className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+                      >
+                        + Add Line
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -2213,9 +2240,7 @@ export default function AdminPriceListPage() {
                           {selected && (
                             <div className="col-span-3 rounded-md bg-white px-2 py-1 text-[11px] text-slate-600 ring-1 ring-slate-200">
                               {selected.item_no} •{' '}
-                              {mockPoCostMode === 'fob'
-                                ? `FOB $${money(selected.fob_cost)}`
-                                : `Delivered $${money(selected.per_unit)}`}
+                              {mockPoBCostMode === "fob" ? `FOB $${money(selected.fob_cost)}` : `Delivered $${money(selected.per_unit)}`}
                             </div>
                           )}
                         </div>
@@ -2230,14 +2255,14 @@ export default function AdminPriceListPage() {
                   <thead className="bg-slate-100 text-slate-700">
                     <tr>
                       <th className="px-3 py-2 text-left font-semibold">Per Unit Metric</th>
-                      <th className="px-3 py-2 text-right font-semibold">Mock PO A</th>
-                      <th className="px-3 py-2 text-right font-semibold">Mock PO B</th>
+                      <th className="px-3 py-2 text-right font-semibold">Mock PO A ({mockPoACostMode === "fob" ? "FOB" : "Delivered"})</th>
+                      <th className="px-3 py-2 text-right font-semibold">Mock PO B ({mockPoBCostMode === "fob" ? "FOB" : "Delivered"})</th>
                       <th className="px-3 py-2 text-right font-semibold">Difference (B - A)</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 text-slate-700">{mockPoCostMode === 'fob' ? 'FOB Cost per Unit' : 'Final Delivered Cost per Unit'}</td>
+                      <td className="px-3 py-2 text-slate-700">Selected Cost Basis per Unit</td>
                       <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalQty > 0 ? totalsA.totalOutTheDoorCost / totalsA.totalQty : 0)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalQty > 0 ? totalsB.totalOutTheDoorCost / totalsB.totalQty : 0)}</td>
                       <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.outTheDoorPerUnit >= 0 ? "text-red-700" : "text-emerald-700"}`}>
@@ -2251,14 +2276,14 @@ export default function AdminPriceListPage() {
                   <thead className="bg-slate-100 text-slate-700">
                     <tr>
                       <th className="px-3 py-2 text-left font-semibold">Metric</th>
-                      <th className="px-3 py-2 text-right font-semibold">Mock PO A</th>
-                      <th className="px-3 py-2 text-right font-semibold">Mock PO B</th>
+                      <th className="px-3 py-2 text-right font-semibold">Mock PO A ({mockPoACostMode === "fob" ? "FOB" : "Delivered"})</th>
+                      <th className="px-3 py-2 text-right font-semibold">Mock PO B ({mockPoBCostMode === "fob" ? "FOB" : "Delivered"})</th>
                       <th className="px-3 py-2 text-right font-semibold">Difference (B - A)</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="border-t border-slate-200">
-                      <td className="px-3 py-2 font-semibold text-slate-800">{mockPoCostMode === 'fob' ? 'Total FOB Cost' : 'Total Final Delivered Cost'}</td>
+                      <td className="px-3 py-2 font-semibold text-slate-800">Total Selected Cost</td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-900">${money(totalsA.totalOutTheDoorCost)}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-900">${money(totalsB.totalOutTheDoorCost)}</td>
                       <td className={`px-3 py-2 text-right tabular-nums font-semibold ${comparisonDiff.outTheDoorTotal >= 0 ? "text-red-700" : "text-emerald-700"}`}>
@@ -2277,6 +2302,8 @@ export default function AdminPriceListPage() {
                   const secondItem = items[1] || items[0];
                   setMockPoALines(firstItem ? [createMockLine(firstItem.id, Number(firstItem.quantity || 1), firstItem.item_no)] : []);
                   setMockPoBLines(secondItem ? [createMockLine(secondItem.id, Number(secondItem.quantity || 1), secondItem.item_no)] : []);
+                  setMockPoACostMode("fob");
+                  setMockPoBCostMode("fob");
                 }}
                 className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
                 type="button"
