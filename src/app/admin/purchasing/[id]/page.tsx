@@ -70,14 +70,6 @@ export default function ViewPO() {
   const id = params?.id as string;
   const [po, setPO] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [emailForm, setEmailForm] = useState({
-    to_email: "",
-    recipient_name: "",
-    subject: "",
-    message: "",
-  });
-  const [sendingEmail, setSendingEmail] = useState(false);
   const [poNotes, setPoNotes] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -126,11 +118,6 @@ export default function ViewPO() {
     multiplier: 1,
     weight_lbs: 0,
   });
-  const [showNotifyModal, setShowNotifyModal] = useState(false);
-  const [changeReport, setChangeReport] = useState<any>(null);
-  const [notificationNotes, setNotificationNotes] = useState("");
-  const [oldPOData, setOldPOData] = useState<any>(null);
-  const [sendingNotification, setSendingNotification] = useState(false);
   const [changeLogs, setChangeLogs] = useState<POChangeLogEntry[]>([]);
   const [loadingChangeLogs, setLoadingChangeLogs] = useState(false);
   const [editingPayment, setEditingPayment] = useState<any>(null);
@@ -225,43 +212,6 @@ export default function ViewPO() {
       .catch((err) => console.error("Failed to load categories:", err));
   }, []);
 
-  const handleSendEmail = async () => {
-    if (!emailForm.to_email) {
-      alert("Please enter a recipient email");
-      return;
-    }
-
-    setSendingEmail(true);
-    try {
-      const res = await fetch("/api/purchase-orders/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to_email: emailForm.to_email,
-          recipient_name: emailForm.recipient_name,
-          po_number: po?.po_number,
-          subject: emailForm.subject || `Purchase Order #${po?.po_number}`,
-          message: emailForm.message || `Please find the PO #${po?.po_number} attached.`,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "Failed to send email");
-        return;
-      }
-
-      alert(`Email sent to ${emailForm.recipient_name || emailForm.to_email}!`);
-      setShowEmailModal(false);
-      setEmailForm({ to_email: "", recipient_name: "", subject: "", message: "" });
-    } catch (error) {
-      console.error("Email send error:", error);
-      alert("Failed to send email");
-    } finally {
-      setSendingEmail(false);
-    }
-  };
-
   const handleDeletePO = async () => {
     if (!po?.id) return;
     
@@ -293,9 +243,6 @@ export default function ViewPO() {
     
     setEditingPO(true);
     try {
-      // Save old PO data for comparison
-      setOldPOData(JSON.parse(JSON.stringify(po)));
-      
       // Convert empty date strings to null for database compatibility
       const formData = {
         ...editForm,
@@ -318,56 +265,11 @@ export default function ViewPO() {
       setPO(result.data);
       alert("Purchase order updated successfully");
       setShowEditModal(false);
-      
-      // Show notification modal after successful update
-      setShowNotifyModal(true);
-      setNotificationNotes("");
     } catch (error) {
       console.error("Edit error:", error);
       alert("Failed to update purchase order");
     } finally {
       setEditingPO(false);
-    }
-  };
-
-  const handleNotifyInventoryTeam = async () => {
-    if (!po?.id || !oldPOData) return;
-
-    setSendingNotification(true);
-    try {
-      const res = await fetch("/api/purchase-orders/notify-changes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          po_id: po.id,
-          old_po: oldPOData,
-          new_po: po,
-          notes: notificationNotes,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "Failed to send notification");
-        return;
-      }
-
-      const result = await res.json();
-      setChangeReport(result.report);
-      if (result?.emailStatus && result.emailStatus.sent !== true) {
-        const errorText = result.emailStatus.error || "Email was not sent.";
-        alert(`Notification created, but email failed: ${errorText}`);
-      } else {
-        alert("Inventory team has been notified of the changes!");
-      }
-      setShowNotifyModal(false);
-      setNotificationNotes("");
-      setOldPOData(null);
-    } catch (error) {
-      console.error("Notification error:", error);
-      alert("Failed to notify inventory team");
-    } finally {
-      setSendingNotification(false);
     }
   };
 
@@ -685,9 +587,6 @@ export default function ViewPO() {
     if (!po?.id) return;
     setSavingLineItem(true);
     try {
-      // Save old PO data for comparison
-      setOldPOData(JSON.parse(JSON.stringify(po)));
-      
       const newTotal = tempLines.reduce((sum, line) => sum + (line.line_total || 0), 0);
       const res = await fetch(`/api/purchase-orders/${po.id}`, {
         method: "PATCH",
@@ -705,10 +604,6 @@ export default function ViewPO() {
       setEditingLineItems(false);
       setTempLines([]);
       alert("Line items saved successfully");
-      
-      // Show notification modal after successful update
-      setShowNotifyModal(true);
-      setNotificationNotes("");
     } catch (error) {
       console.error("Error saving line items:", error);
       alert("Failed to save line items");
@@ -785,26 +680,6 @@ export default function ViewPO() {
     const qty = Number(line?.quantity || 0);
     return sum + qty * getDisplayUnitPrice(line);
   }, 0);
-
-  const getDeliveredDebugForLine = (line: any) => {
-    const sku = normalizeSku(line?.sku || "");
-    const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
-    const costWithShipping = parseNumeric(matchedItem?.cost_with_shipping);
-    const shippingInput = parseNumeric(matchedItem?.zone5_shipping);
-    const computedNoShipping =
-      Number.isFinite(costWithShipping) && Number.isFinite(shippingInput)
-        ? costWithShipping - shippingInput
-        : Number.NaN;
-
-    return {
-      sourceSku: line?.sku || "",
-      matchedSku: matchedItem?.sku || matchedItem?.item_no || "",
-      costWithShipping,
-      shippingInput,
-      computedNoShipping,
-      shownUnit: getDisplayUnitPrice(line),
-    };
-  };
 
   const applyPoCostMode = (mode: "fob" | "delivered") => {
     setPoCostMode(mode);
@@ -1021,12 +896,6 @@ export default function ViewPO() {
               className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               {editingNotes ? "Done Editing" : "Add Notes"}
-            </button>
-            <button
-              onClick={() => setShowEmailModal(true)}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
-            >
-              Send Email
             </button>
             <button
               onClick={handlePrint}
@@ -1316,21 +1185,6 @@ export default function ViewPO() {
               </>
             )}
           </div>
-          {poCostMode === "delivered" && (
-            <div className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 print:hidden">
-              <div className="font-semibold mb-1">Debug: Cost w/o Shipping Formula (cost_with_shipping - zone5_shipping)</div>
-              <div className="space-y-0.5">
-                {(po.lines || []).map((line, index) => {
-                  const debug = getDeliveredDebugForLine(line);
-                  return (
-                    <div key={`debug-${line.id || index}`}>
-                      #{index + 1} {debug.sourceSku || "(no sku)"} → matched: {debug.matchedSku || "(none)"} | CWS: {Number.isFinite(debug.costWithShipping) ? money(debug.costWithShipping) : "n/a"} | Ship: {Number.isFinite(debug.shippingInput) ? money(debug.shippingInput) : "n/a"} | Calc: {Number.isFinite(debug.computedNoShipping) ? money(debug.computedNoShipping) : "n/a"} | Shown: {money(debug.shownUnit)}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
           <div className="mb-2">
             {!editingLineItems ? (
               /* NORMAL TABLE VIEW */
@@ -1958,81 +1812,6 @@ export default function ViewPO() {
         }
       `}</style>
 
-      {/* Email Modal */}
-      {showEmailModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl space-y-4">
-            <h2 className="text-xl font-semibold text-slate-900">Send PO via Email</h2>
-            
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Recipient Name</label>
-              <input
-                type="text"
-                value={emailForm.recipient_name}
-                onChange={(e) => setEmailForm({ ...emailForm, recipient_name: e.target.value })}
-                placeholder="e.g., John Smith"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Email Address *</label>
-              <input
-                type="email"
-                value={emailForm.to_email}
-                onChange={(e) => setEmailForm({ ...emailForm, to_email: e.target.value })}
-                placeholder="john@example.com"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Email Subject</label>
-              <input
-                type="text"
-                value={emailForm.subject}
-                onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
-                placeholder={`Purchase Order #${po?.po_number}`}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Message</label>
-              <textarea
-                value={emailForm.message}
-                onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
-                placeholder="Add a personal message to the supplier..."
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                rows={4}
-              />
-            </div>
-
-            <div className="border-t border-slate-200 pt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowEmailModal(false);
-                  setEmailForm({ to_email: "", recipient_name: "", subject: "", message: "" });
-                }}
-                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSendEmail}
-                disabled={sendingEmail}
-                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {sendingEmail ? "Sending..." : `Send to ${emailForm.recipient_name || emailForm.to_email || "Supplier"}`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
@@ -2496,114 +2275,6 @@ export default function ViewPO() {
         </div>
       )}
 
-      {/* Notify Inventory Team Modal */}
-      {showNotifyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
-          <div className="w-full max-w-md sm:max-w-lg rounded-lg bg-white p-4 sm:p-6 shadow-lg max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Let Inventory Team Know?</h2>
-            <p className="text-slate-600 mb-4">
-              Would you like to notify the inventory team of the changes made to this PO?
-            </p>
-
-            <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 mb-4 max-h-64 overflow-y-auto">
-              <h3 className="text-sm font-semibold text-slate-900 mb-3">Changes Made:</h3>
-              {oldPOData && po ? (
-                <div className="space-y-2 text-sm">
-                  {po.po_number !== oldPOData.po_number && (
-                    <div className="border-b border-slate-300 pb-2">
-                      <p className="font-medium text-slate-700">PO Number</p>
-                      <p className="text-slate-600">{oldPOData.po_number} → {po.po_number}</p>
-                    </div>
-                  )}
-                  {po.vendor_name !== oldPOData.vendor_name && (
-                    <div className="border-b border-slate-300 pb-2">
-                      <p className="font-medium text-slate-700">Vendor Name</p>
-                      <p className="text-slate-600">{oldPOData.vendor_name} → {po.vendor_name}</p>
-                    </div>
-                  )}
-                  {po.vendor_contact_name !== oldPOData.vendor_contact_name && (
-                    <div className="border-b border-slate-300 pb-2">
-                      <p className="font-medium text-slate-700">Contact Name</p>
-                      <p className="text-slate-600">{oldPOData.vendor_contact_name} → {po.vendor_contact_name}</p>
-                    </div>
-                  )}
-                  {po.vendor_email !== oldPOData.vendor_email && (
-                    <div className="border-b border-slate-300 pb-2">
-                      <p className="font-medium text-slate-700">Email</p>
-                      <p className="text-slate-600">{oldPOData.vendor_email} → {po.vendor_email}</p>
-                    </div>
-                  )}
-                  {po.vendor_phone !== oldPOData.vendor_phone && (
-                    <div className="border-b border-slate-300 pb-2">
-                      <p className="font-medium text-slate-700">Phone</p>
-                      <p className="text-slate-600">{oldPOData.vendor_phone} → {po.vendor_phone}</p>
-                    </div>
-                  )}
-                  {po.terms !== oldPOData.terms && (
-                    <div className="border-b border-slate-300 pb-2">
-                      <p className="font-medium text-slate-700">Terms</p>
-                      <p className="text-slate-600">{oldPOData.terms} → {po.terms}</p>
-                    </div>
-                  )}
-                  {po.expected_delivery !== oldPOData.expected_delivery && (
-                    <div className="border-b border-slate-300 pb-2">
-                      <p className="font-medium text-slate-700">Expected Delivery</p>
-                      <p className="text-slate-600">{oldPOData.expected_delivery || "—"} → {po.expected_delivery || "—"}</p>
-                    </div>
-                  )}
-                  {po.total_amount !== oldPOData.total_amount && (
-                    <div className="border-b border-slate-300 pb-2">
-                      <p className="font-medium text-slate-700">Total Amount</p>
-                      <p className="text-slate-600">${oldPOData.total_amount?.toFixed(2)} → ${po.total_amount?.toFixed(2)}</p>
-                    </div>
-                  )}
-                  {JSON.stringify(po.lines) !== JSON.stringify(oldPOData.lines) && (
-                    <div>
-                      <p className="font-medium text-slate-700">Line Items</p>
-                      <p className="text-slate-600">{oldPOData.lines?.length || 0} items → {po.lines?.length || 0} items</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-slate-500">No changes detected</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Notes for Inventory Team (Optional)</label>
-              <textarea
-                value={notificationNotes}
-                onChange={(e) => setNotificationNotes(e.target.value)}
-                placeholder="Add any additional notes about why these changes were made..."
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                rows={3}
-              />
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowNotifyModal(false);
-                  setNotificationNotes("");
-                }}
-                disabled={sendingNotification}
-                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleNotifyInventoryTeam}
-                disabled={sendingNotification}
-                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {sendingNotification ? "Sending..." : "Yes, Notify Team"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
