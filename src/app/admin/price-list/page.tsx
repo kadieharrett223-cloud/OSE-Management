@@ -59,6 +59,7 @@ type ShopifySyncPreviewItem = {
 type MockPOLine = {
   id: string;
   itemId: string;
+  searchText: string;
   quantity: number;
 };
 
@@ -522,9 +523,10 @@ export default function AdminPriceListPage() {
     setShowCalculator(false); // Close calculator when starting to edit
   };
 
-  const createMockLine = (itemId: string, defaultQty: number): MockPOLine => ({
+  const createMockLine = (itemId: string, defaultQty: number, searchText = ""): MockPOLine => ({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     itemId,
+    searchText,
     quantity: defaultQty > 0 ? defaultQty : 1,
   });
 
@@ -534,13 +536,13 @@ export default function AdminPriceListPage() {
 
     if (mockPoALines.length === 0 && firstItem) {
       setMockPoALines([
-        createMockLine(firstItem.id, Number(firstItem.quantity || 1)),
+        createMockLine(firstItem.id, Number(firstItem.quantity || 1), firstItem.item_no),
       ]);
     }
 
     if (mockPoBLines.length === 0 && secondItem) {
       setMockPoBLines([
-        createMockLine(secondItem.id, Number(secondItem.quantity || 1)),
+        createMockLine(secondItem.id, Number(secondItem.quantity || 1), secondItem.item_no),
       ]);
     }
 
@@ -564,7 +566,7 @@ export default function AdminPriceListPage() {
     if (baseItems.length === 0) return;
 
     const firstItem = baseItems[0];
-    const newLine = createMockLine(firstItem.id, Number(firstItem.quantity || 1));
+    const newLine = createMockLine(firstItem.id, Number(firstItem.quantity || 1), firstItem.item_no);
 
     if (side === "A") setMockPoALines((prev) => [...prev, newLine]);
     else setMockPoBLines((prev) => [...prev, newLine]);
@@ -928,6 +930,32 @@ export default function AdminPriceListPage() {
     .sort((a, b) => a.item_no.localeCompare(b.item_no));
 
   const comparableItemsById = new Map(comparableItems.map((item) => [item.id, item]));
+
+  const findComparableBySearch = (searchText: string) => {
+    const term = searchText.trim().toLowerCase();
+    if (!term) return null;
+
+    return (
+      comparableItems.find((item) => item.item_no.toLowerCase() === term) ||
+      comparableItems.find((item) => item.item_no.toLowerCase().startsWith(term)) ||
+      comparableItems.find((item) => (item.description || "").toLowerCase().includes(term)) ||
+      null
+    );
+  };
+
+  const updateMockLineSearch = (side: "A" | "B", lineId: string, searchText: string) => {
+    const lines = side === "A" ? mockPoALines : mockPoBLines;
+    const current = lines.find((line) => line.id === lineId);
+    if (!current) return;
+
+    const match = findComparableBySearch(searchText);
+
+    updateMockLine(side, lineId, {
+      searchText,
+      itemId: match ? match.id : "",
+      quantity: match ? Number(match.quantity || current.quantity || 1) : current.quantity,
+    });
+  };
 
   const buildMockLineTotals = (line: MockPOLine) => {
     const item = comparableItemsById.get(line.itemId) || null;
@@ -2053,6 +2081,16 @@ export default function AdminPriceListPage() {
             </div>
 
             <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
+              <datalist id="mock-po-product-options">
+                {comparableItems.map((item) => (
+                  <option
+                    key={item.id}
+                    value={item.item_no}
+                    label={(item.description || "No description").slice(0, 80)}
+                  />
+                ))}
+              </datalist>
+
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="mb-3 flex items-center justify-between">
@@ -2071,24 +2109,14 @@ export default function AdminPriceListPage() {
                       const selected = comparableItemsById.get(line.itemId);
                       return (
                         <div key={line.id} className="grid grid-cols-[1fr_92px_34px] gap-2">
-                          <select
-                            value={line.itemId}
-                            onChange={(e) => {
-                              const selectedItem = comparableItemsById.get(e.target.value);
-                              updateMockLine("A", line.id, {
-                                itemId: e.target.value,
-                                quantity: Number(selectedItem?.quantity || line.quantity || 1),
-                              });
-                            }}
+                          <input
+                            type="text"
+                            list="mock-po-product-options"
+                            value={line.searchText || selected?.item_no || ""}
+                            onChange={(e) => updateMockLineSearch("A", line.id, e.target.value)}
+                            placeholder="Type SKU (ex: 2PCF-9)"
                             className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900"
-                          >
-                            <option value="">Select product...</option>
-                            {comparableItems.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.item_no} • {item.description || "No description"}
-                              </option>
-                            ))}
-                          </select>
+                          />
                           <input
                             type="number"
                             min={0}
@@ -2134,24 +2162,14 @@ export default function AdminPriceListPage() {
                       const selected = comparableItemsById.get(line.itemId);
                       return (
                         <div key={line.id} className="grid grid-cols-[1fr_92px_34px] gap-2">
-                          <select
-                            value={line.itemId}
-                            onChange={(e) => {
-                              const selectedItem = comparableItemsById.get(e.target.value);
-                              updateMockLine("B", line.id, {
-                                itemId: e.target.value,
-                                quantity: Number(selectedItem?.quantity || line.quantity || 1),
-                              });
-                            }}
+                          <input
+                            type="text"
+                            list="mock-po-product-options"
+                            value={line.searchText || selected?.item_no || ""}
+                            onChange={(e) => updateMockLineSearch("B", line.id, e.target.value)}
+                            placeholder="Type SKU (ex: 2PCF-9)"
                             className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900"
-                          >
-                            <option value="">Select product...</option>
-                            {comparableItems.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.item_no} • {item.description || "No description"}
-                              </option>
-                            ))}
-                          </select>
+                          />
                           <input
                             type="number"
                             min={0}
@@ -2234,8 +2252,8 @@ export default function AdminPriceListPage() {
                 onClick={() => {
                   const firstItem = items[0];
                   const secondItem = items[1] || items[0];
-                  setMockPoALines(firstItem ? [createMockLine(firstItem.id, Number(firstItem.quantity || 1))] : []);
-                  setMockPoBLines(secondItem ? [createMockLine(secondItem.id, Number(secondItem.quantity || 1))] : []);
+                  setMockPoALines(firstItem ? [createMockLine(firstItem.id, Number(firstItem.quantity || 1), firstItem.item_no)] : []);
+                  setMockPoBLines(secondItem ? [createMockLine(secondItem.id, Number(secondItem.quantity || 1), secondItem.item_no)] : []);
                 }}
                 className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
                 type="button"
