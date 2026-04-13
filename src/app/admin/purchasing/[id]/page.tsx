@@ -138,6 +138,7 @@ export default function ViewPO() {
     notes: "",
   });
   const [savingPayment, setSavingPayment] = useState(false);
+  const [poCostMode, setPoCostMode] = useState<"fob" | "delivered">("fob");
 
   const loadChangeLogs = async (poId: string) => {
     setLoadingChangeLogs(true);
@@ -593,7 +594,19 @@ export default function ViewPO() {
   };
 
   const startInlineEditingLineItems = () => {
-    setTempLines(JSON.parse(JSON.stringify(po?.lines || [])));
+    const baseLines = JSON.parse(JSON.stringify(po?.lines || []));
+    const repricedLines = baseLines.map((line: any) => {
+      const sku = String(line?.sku || "").trim().toLowerCase();
+      const matchedItem = priceList.find((item) => (item.sku || item.item_no || "").toLowerCase() === sku);
+      if (!matchedItem) return line;
+      const unitPrice = resolveUnitPrice(matchedItem, poCostMode);
+      return {
+        ...line,
+        unit_price: unitPrice,
+        line_total: (Number(line.quantity) || 0) * unitPrice,
+      };
+    });
+    setTempLines(repricedLines);
     setEditingLineItems(true);
   };
 
@@ -618,7 +631,7 @@ export default function ViewPO() {
           ...updated[index],
           sku: matchedItem.sku || matchedItem.item_no || "",
           description: matchedItem.description || updated[index].description || "",
-          unit_price: isNote ? 0 : resolveUnitPrice(matchedItem),
+          unit_price: isNote ? 0 : resolveUnitPrice(matchedItem, poCostMode),
           quantity: isNote ? 0 : (updated[index].quantity || 1),
           weight_lbs: matchedItem.weight_lbs || 0,
         };
@@ -714,19 +727,30 @@ export default function ViewPO() {
     return date.toLocaleString();
   };
 
-  const resolveUnitPrice = (item: any) => {
-    const candidates = [
+  const resolveUnitPrice = (item: any, costMode: "fob" | "delivered" = poCostMode) => {
+    const fobCandidates = [
       Number(item?.fob_port_cost),
       Number(item?.fob_cost),
+    ];
+
+    const deliveredCandidates = [
+      Number(item?.per_unit),
       Number(item?.cost_with_shipping),
       Number(item?.shippingIncludedPerUnit),
       Number(item?.shipping_included_per_unit),
-      Number(item?.per_unit),
+    ];
+
+    const fallbackCandidates = [
       Number(item?.sell_price),
       Number(item?.currentSalePricePerUnit),
       Number(item?.list_price),
       Number(item?.zone5_shipping),
     ];
+
+    const candidates =
+      costMode === "fob"
+        ? [...fobCandidates, ...deliveredCandidates, ...fallbackCandidates]
+        : [...deliveredCandidates, ...fobCandidates, ...fallbackCandidates];
 
     for (const value of candidates) {
       if (Number.isFinite(value) && value > 0) return value;
@@ -742,6 +766,48 @@ export default function ViewPO() {
   const skuExists = Boolean(
     lineItemForm.sku && priceList.some((item) => (item.sku || item.item_no)?.toLowerCase() === lineItemForm.sku.toLowerCase())
   );
+
+  const getDisplayUnitPrice = (line: any) => {
+    const sku = String(line?.sku || "").trim().toLowerCase();
+    if (!sku) return Number(line?.unit_price || 0);
+    const matchedItem = priceList.find((item) => (item.sku || item.item_no || "").toLowerCase() === sku);
+    if (!matchedItem) return Number(line?.unit_price || 0);
+    return resolveUnitPrice(matchedItem, poCostMode);
+  };
+
+  const displayedPoTotal = (po?.lines || []).reduce((sum, line) => {
+    const qty = Number(line?.quantity || 0);
+    return sum + qty * getDisplayUnitPrice(line);
+  }, 0);
+
+  const applyPoCostMode = (mode: "fob" | "delivered") => {
+    setPoCostMode(mode);
+
+    setTempLines((prev) =>
+      prev.map((line) => {
+        const sku = String(line?.sku || "").trim().toLowerCase();
+        if (!sku) return line;
+        const matchedItem = priceList.find((item) => (item.sku || item.item_no || "").toLowerCase() === sku);
+        if (!matchedItem) return line;
+        const unitPrice = resolveUnitPrice(matchedItem, mode);
+        return {
+          ...line,
+          unit_price: unitPrice,
+          line_total: (Number(line.quantity) || 0) * unitPrice,
+        };
+      })
+    );
+
+    setLineItemForm((prev) => {
+      const sku = String(prev.sku || "").trim().toLowerCase();
+      if (!sku) return prev;
+      const matchedItem = priceList.find((item) => (item.sku || item.item_no || "").toLowerCase() === sku);
+      if (!matchedItem) return prev;
+      const isNote = (matchedItem.sku || matchedItem.item_no || "").toLowerCase() === "note";
+      if (isNote) return { ...prev, unit_price: 0 };
+      return { ...prev, unit_price: resolveUnitPrice(matchedItem, mode) };
+    });
+  };
 
   const handlePrint = () => {
     if (!po) return;
@@ -1156,6 +1222,26 @@ export default function ViewPO() {
 
           {/* Line Items Table */}
           <div className="mb-2 flex flex-col sm:flex-row items-center gap-2 print:hidden">
+            <div className="inline-flex rounded-md border border-slate-300 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => applyPoCostMode("fob")}
+                className={`rounded px-2 py-1 text-xs font-semibold ${
+                  poCostMode === "fob" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                FOB
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPoCostMode("delivered")}
+                className={`rounded px-2 py-1 text-xs font-semibold ${
+                  poCostMode === "delivered" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Cost w/o Shipping
+              </button>
+            </div>
             {!editingLineItems ? (
               <>
                 <button
@@ -1230,7 +1316,7 @@ export default function ViewPO() {
                       Weight (lbs)
                     </th>
                     <th className="border-r border-gray-400 px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-20">
-                      FOB Cost
+                      {poCostMode === "fob" ? "FOB Cost" : "Cost w/o Shipping"}
                     </th>
                     <th className="px-2 py-1.5 text-right text-[8px] font-bold text-slate-900 uppercase tracking-wider w-24">Amount</th>
                   </tr>
@@ -1299,10 +1385,10 @@ export default function ViewPO() {
                         {line.weight_lbs ? line.weight_lbs.toFixed(0) : "—"}
                       </td>
                       <td className="border-r border-gray-300 px-2 py-1.5 text-right text-slate-900 align-top font-medium">
-                        ${money(line.unit_price)}
+                        ${money(getDisplayUnitPrice(line))}
                       </td>
                       <td className="px-2 py-1.5 text-right text-slate-900 align-top font-semibold">
-                        ${money(line.line_total)}
+                        ${money((Number(line.quantity) || 0) * getDisplayUnitPrice(line))}
                       </td>
                     </tr>
                   ))}
@@ -1311,7 +1397,7 @@ export default function ViewPO() {
                       Total Net (USD)
                     </td>
                     <td className="px-2 py-2 text-right text-sm font-bold text-slate-900">
-                      ${money(po.total_amount)}
+                      ${money(displayedPoTotal)}
                     </td>
                   </tr>
                   {po.payments && po.payments.length > 0 && (
@@ -1354,7 +1440,9 @@ export default function ViewPO() {
                   <div className="col-span-3 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
                   <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">QTY</div>
                   <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">Weight</div>
-                  <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">Rate</div>
+                  <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">
+                    {poCostMode === "fob" ? "FOB Cost" : "Cost w/o Shipping"}
+                  </div>
                   <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right">Amount</div>
                 </div>
                 {tempLines.map((line, index) => (
@@ -2038,7 +2126,9 @@ export default function ViewPO() {
                 <div className="col-span-3 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Part Number</div>
                 <div className="col-span-4 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
                 <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">QTY</div>
-                <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">FOB Cost</div>
+                  <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">
+                    {poCostMode === "fob" ? "FOB Cost" : "Cost w/o Shipping"}
+                  </div>
                 <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-right">Amount</div>
               </div>
               <div className="grid grid-cols-12 gap-0 border-b border-slate-200 bg-slate-50 p-0">
@@ -2060,7 +2150,7 @@ export default function ViewPO() {
                           ...prev,
                           sku: found.sku || found.item_no || "",
                           description: found.description || "",
-                          unit_price: isNote ? 0 : resolveUnitPrice(found),
+                          unit_price: isNote ? 0 : resolveUnitPrice(found, poCostMode),
                           quantity: isNote ? 0 : (prev.quantity || 1),
                           weight_lbs: found.weight_lbs || 0,
                         }));
