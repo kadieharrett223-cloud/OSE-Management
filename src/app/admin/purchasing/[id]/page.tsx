@@ -748,8 +748,8 @@ export default function ViewPO() {
         : Number.NaN;
 
     const deliveredCandidates = [
-      deliveredWithoutShipping,
       toNum(item?.per_unit),
+      deliveredWithoutShipping,
       toNum(item?.cost_with_shipping),
     ];
 

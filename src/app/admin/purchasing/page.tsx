@@ -462,8 +462,8 @@ export default function PurchasingPage() {
         : Number.NaN;
 
     const deliveredCandidates = [
-      deliveredWithoutShipping,
       toNum(item?.per_unit),
+      deliveredWithoutShipping,
       toNum(item?.cost_with_shipping),
     ];
 
