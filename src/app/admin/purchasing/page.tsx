@@ -199,6 +199,7 @@ export default function PurchasingPage() {
     multiplier: 1,
     weight_lbs: 0,
   });
+  const [createPoCostMode, setCreatePoCostMode] = useState<"fob" | "delivered">("fob");
 
   useEffect(() => {
     fetchPOs();
@@ -440,19 +441,30 @@ export default function PurchasingPage() {
     }
   };
 
-  const resolveUnitPrice = (item: any) => {
-    const candidates = [
+  const resolveUnitPrice = (item: any, costMode: "fob" | "delivered" = createPoCostMode) => {
+    const fobCandidates = [
       Number(item?.fob_port_cost),
       Number(item?.fob_cost),
+    ];
+
+    const deliveredCandidates = [
+      Number(item?.per_unit),
       Number(item?.cost_with_shipping),
       Number(item?.shippingIncludedPerUnit),
       Number(item?.shipping_included_per_unit),
-      Number(item?.per_unit),
+    ];
+
+    const fallbackCandidates = [
       Number(item?.sell_price),
       Number(item?.currentSalePricePerUnit),
       Number(item?.list_price),
       Number(item?.zone5_shipping),
     ];
+
+    const candidates =
+      costMode === "fob"
+        ? [...fobCandidates, ...deliveredCandidates, ...fallbackCandidates]
+        : [...deliveredCandidates, ...fobCandidates, ...fallbackCandidates];
 
     for (const value of candidates) {
       if (Number.isFinite(value) && value > 0) return value;
@@ -683,6 +695,7 @@ export default function PurchasingPage() {
   }
 
   function resetForm() {
+    setCreatePoCostMode("fob");
     setFormData({
       po_number: "",
       vendor_name: "",
@@ -752,7 +765,7 @@ export default function PurchasingPage() {
         updated[index] = {
           ...current,
           description: cachedItem.description || "",
-          unit_price: resolveUnitPrice(cachedItem),
+          unit_price: resolveUnitPrice(cachedItem, createPoCostMode),
           weight_lbs: cachedItem.weight_lbs || 0,
         };
 
@@ -777,7 +790,7 @@ export default function PurchasingPage() {
           updated[index] = {
             ...current,
             description: freshItem.description || "",
-            unit_price: resolveUnitPrice(freshItem),
+            unit_price: resolveUnitPrice(freshItem, createPoCostMode),
             weight_lbs: freshItem.weight_lbs || 0,
           };
 
@@ -854,6 +867,23 @@ export default function PurchasingPage() {
 
   const totalWeight = calculateTotalWeight();
   const weightPercentage = (totalWeight / WEIGHT_LIMIT_LBS) * 100;
+
+  const applyCreatePoCostMode = (mode: "fob" | "delivered") => {
+    setCreatePoCostMode(mode);
+    setFormData((prev) => ({
+      ...prev,
+      lines: prev.lines.map((line) => {
+        const sku = String(line.sku || "").trim().toLowerCase();
+        if (!sku) return line;
+        const matchedItem = priceList.find((item) => String(item.sku || "").trim().toLowerCase() === sku);
+        if (!matchedItem) return line;
+        return {
+          ...line,
+          unit_price: resolveUnitPrice(matchedItem, mode),
+        };
+      }),
+    }));
+  };
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredPos = pos.filter((po) => {
@@ -1174,7 +1204,10 @@ export default function PurchasingPage() {
                   </button>
                   {!showForm && (
                     <button
-                      onClick={() => setShowForm(true)}
+                      onClick={() => {
+                        resetForm();
+                        setShowForm(true);
+                      }}
                       className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-blue-700"
                     >
                       Create PO
@@ -1520,6 +1553,30 @@ export default function PurchasingPage() {
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-bold text-slate-700">Line Items</h3>
                     <div className="flex items-center gap-4">
+                      <div className="inline-flex rounded-md border border-slate-300 bg-white p-1">
+                        <button
+                          type="button"
+                          onClick={() => applyCreatePoCostMode("fob")}
+                          className={`rounded px-2 py-1 text-xs font-semibold ${
+                            createPoCostMode === "fob"
+                              ? "bg-slate-900 text-white"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          FOB
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyCreatePoCostMode("delivered")}
+                          className={`rounded px-2 py-1 text-xs font-semibold ${
+                            createPoCostMode === "delivered"
+                              ? "bg-slate-900 text-white"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          Cost w/o Shipping
+                        </button>
+                      </div>
                       <div className="text-xs text-slate-600">
                         <span className="font-semibold">Container weight:</span> 
                         <span className={`ml-1 ${
@@ -1549,7 +1606,9 @@ export default function PurchasingPage() {
                       <div className="col-span-3 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
                       <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">QTY</div>
                       <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">Weight</div>
-                      <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">FOB Cost</div>
+                      <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">
+                        {createPoCostMode === "fob" ? "FOB Cost" : "Cost w/o Shipping"}
+                      </div>
                       <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right">Amount</div>
                     </div>
                     {formData.lines.map((line, index) => (

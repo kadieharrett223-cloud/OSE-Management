@@ -1307,16 +1307,6 @@ export default function AdminPriceListPage() {
                   </svg>
                   Add Product
                 </button>
-                <button
-                  onClick={openCompareModal}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
-                  type="button"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m6 6V7M5 21h14M7 3h10a2 2 0 012 2v2H5V5a2 2 0 012-2z" />
-                  </svg>
-                  Compare Products
-                </button>
               </div>
             </header>
 
