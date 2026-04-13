@@ -98,6 +98,11 @@ function titleCase(value: string) {
 }
 
 export default function PurchasingPage() {
+  const normalizeSku = (value: string | null | undefined) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
   const [priceList, setPriceList] = useState<PriceListItem[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -461,15 +466,11 @@ export default function PurchasingPage() {
         ? costWithShipping - shippingInput
         : Number.NaN;
 
-    const deliveredCandidates = [
-      toNum(item?.per_unit),
-      deliveredWithoutShipping,
-      toNum(item?.cost_with_shipping),
-    ];
+    const deliveredCandidates = [deliveredWithoutShipping];
 
     const fallbackCandidates = [toNum(item?.sell_price), toNum(item?.currentSalePricePerUnit), toNum(item?.list_price)];
 
-    const candidates = costMode === "fob" ? [...fobCandidates, ...fallbackCandidates] : [...deliveredCandidates, ...fallbackCandidates];
+    const candidates = costMode === "fob" ? [...fobCandidates, ...fallbackCandidates] : deliveredCandidates;
 
     for (const value of candidates) {
       if (Number.isFinite(value) && value > 0) return value;
@@ -759,13 +760,14 @@ export default function PurchasingPage() {
     if (!sku) return;
 
     // Try immediate local cache match first.
-    const cachedItem = priceList.find((p) => p.sku === sku);
+    const normalizedSku = normalizeSku(sku);
+    const cachedItem = priceList.find((p) => normalizeSku(p.sku) === normalizedSku);
     if (cachedItem) {
       setFormData((prev) => {
         const updated = [...prev.lines];
         const current = updated[index];
         if (!current) return prev;
-        if ((current.sku || "") !== sku) return prev;
+        if (normalizeSku(current.sku || "") !== normalizedSku) return prev;
 
         updated[index] = {
           ...current,
@@ -783,14 +785,14 @@ export default function PurchasingPage() {
     fetch("/api/price-list?_=" + Date.now(), { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
-        const freshItem = data.find((p: any) => p.sku === sku);
+        const freshItem = data.find((p: any) => normalizeSku(p.sku) === normalizedSku);
         if (!freshItem) return;
 
         setFormData((prev) => {
           const updated = [...prev.lines];
           const current = updated[index];
           if (!current) return prev;
-          if ((current.sku || "") !== sku) return prev;
+          if (normalizeSku(current.sku || "") !== normalizedSku) return prev;
 
           updated[index] = {
             ...current,
@@ -878,9 +880,9 @@ export default function PurchasingPage() {
     setFormData((prev) => ({
       ...prev,
       lines: prev.lines.map((line) => {
-        const sku = String(line.sku || "").trim().toLowerCase();
+        const sku = normalizeSku(line.sku || "");
         if (!sku) return line;
-        const matchedItem = priceList.find((item) => String(item.sku || "").trim().toLowerCase() === sku);
+        const matchedItem = priceList.find((item) => normalizeSku(item.sku) === sku);
         if (!matchedItem) return line;
         return {
           ...line,

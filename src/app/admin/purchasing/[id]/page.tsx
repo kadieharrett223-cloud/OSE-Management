@@ -60,6 +60,11 @@ interface POChangeLogEntry {
 }
 
 export default function ViewPO() {
+  const normalizeSku = (value: string | null | undefined) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+
   const router = useRouter();
   const params = useParams();
   const id = params?.id as string;
@@ -620,9 +625,9 @@ export default function ViewPO() {
     updated[index] = { ...updated[index], [field]: value };
 
     if (field === "sku") {
-      const sku = String(value || "").trim().toLowerCase();
+      const sku = normalizeSku(String(value || ""));
       const matchedItem = priceList.find(
-        (item) => (item.sku || item.item_no || "").toLowerCase() === sku
+        (item) => normalizeSku(item.sku || item.item_no || "") === sku
       );
 
       if (matchedItem) {
@@ -747,15 +752,11 @@ export default function ViewPO() {
         ? costWithShipping - shippingInput
         : Number.NaN;
 
-    const deliveredCandidates = [
-      toNum(item?.per_unit),
-      deliveredWithoutShipping,
-      toNum(item?.cost_with_shipping),
-    ];
+    const deliveredCandidates = [deliveredWithoutShipping];
 
     const fallbackCandidates = [toNum(item?.sell_price), toNum(item?.currentSalePricePerUnit), toNum(item?.list_price)];
 
-    const candidates = costMode === "fob" ? [...fobCandidates, ...fallbackCandidates] : [...deliveredCandidates, ...fallbackCandidates];
+    const candidates = costMode === "fob" ? [...fobCandidates, ...fallbackCandidates] : deliveredCandidates;
 
     for (const value of candidates) {
       if (Number.isFinite(value) && value > 0) return value;
@@ -769,13 +770,13 @@ export default function ViewPO() {
   const balanceDue = po ? po.total_amount - totalPaid : 0;
 
   const skuExists = Boolean(
-    lineItemForm.sku && priceList.some((item) => (item.sku || item.item_no)?.toLowerCase() === lineItemForm.sku.toLowerCase())
+    lineItemForm.sku && priceList.some((item) => normalizeSku(item.sku || item.item_no || "") === normalizeSku(lineItemForm.sku))
   );
 
   const getDisplayUnitPrice = (line: any) => {
-    const sku = String(line?.sku || "").trim().toLowerCase();
+    const sku = normalizeSku(line?.sku || "");
     if (!sku) return Number(line?.unit_price || 0);
-    const matchedItem = priceList.find((item) => (item.sku || item.item_no || "").toLowerCase() === sku);
+    const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
     if (!matchedItem) return Number(line?.unit_price || 0);
     return resolveUnitPrice(matchedItem, poCostMode);
   };
@@ -790,9 +791,9 @@ export default function ViewPO() {
 
     setTempLines((prev) =>
       prev.map((line) => {
-        const sku = String(line?.sku || "").trim().toLowerCase();
+        const sku = normalizeSku(line?.sku || "");
         if (!sku) return line;
-        const matchedItem = priceList.find((item) => (item.sku || item.item_no || "").toLowerCase() === sku);
+        const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
         if (!matchedItem) return line;
         const unitPrice = resolveUnitPrice(matchedItem, mode);
         return {
@@ -804,9 +805,9 @@ export default function ViewPO() {
     );
 
     setLineItemForm((prev) => {
-      const sku = String(prev.sku || "").trim().toLowerCase();
+      const sku = normalizeSku(prev.sku || "");
       if (!sku) return prev;
-      const matchedItem = priceList.find((item) => (item.sku || item.item_no || "").toLowerCase() === sku);
+      const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
       if (!matchedItem) return prev;
       const isNote = (matchedItem.sku || matchedItem.item_no || "").toLowerCase() === "note";
       if (isNote) return { ...prev, unit_price: 0 };
@@ -847,7 +848,7 @@ export default function ViewPO() {
       return;
     }
 
-    if (priceList.some((item) => (item.sku || item.item_no)?.toLowerCase() === itemNo.toLowerCase())) {
+    if (priceList.some((item) => normalizeSku(item.sku || item.item_no || "") === normalizeSku(itemNo))) {
       alert("That SKU already exists in the price list.");
       return;
     }
