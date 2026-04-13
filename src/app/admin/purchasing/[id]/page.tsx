@@ -732,21 +732,21 @@ export default function ViewPO() {
     return date.toLocaleString();
   };
 
+  const parseNumeric = (value: any) => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : Number.NaN;
+    if (typeof value === "string") {
+      const cleaned = value.replace(/[^0-9.-]/g, "");
+      const parsed = Number(cleaned);
+      return Number.isFinite(parsed) ? parsed : Number.NaN;
+    }
+    return Number.NaN;
+  };
+
   const resolveUnitPrice = (item: any, costMode: "fob" | "delivered" = poCostMode) => {
-    const toNum = (value: any) => {
-      if (typeof value === "number") return Number.isFinite(value) ? value : Number.NaN;
-      if (typeof value === "string") {
-        const cleaned = value.replace(/[^0-9.-]/g, "");
-        const parsed = Number(cleaned);
-        return Number.isFinite(parsed) ? parsed : Number.NaN;
-      }
-      return Number.NaN;
-    };
+    const fobCandidates = [parseNumeric(item?.fob_port_cost), parseNumeric(item?.fob_cost)];
 
-    const fobCandidates = [toNum(item?.fob_port_cost), toNum(item?.fob_cost)];
-
-    const costWithShipping = toNum(item?.cost_with_shipping);
-    const shippingInput = toNum(item?.zone5_shipping);
+    const costWithShipping = parseNumeric(item?.cost_with_shipping);
+    const shippingInput = parseNumeric(item?.zone5_shipping);
     const deliveredWithoutShipping =
       Number.isFinite(costWithShipping) && Number.isFinite(shippingInput)
         ? costWithShipping - shippingInput
@@ -754,7 +754,7 @@ export default function ViewPO() {
 
     const deliveredCandidates = [deliveredWithoutShipping];
 
-    const fallbackCandidates = [toNum(item?.sell_price), toNum(item?.currentSalePricePerUnit), toNum(item?.list_price)];
+    const fallbackCandidates = [parseNumeric(item?.sell_price), parseNumeric(item?.currentSalePricePerUnit), parseNumeric(item?.list_price)];
 
     const candidates = costMode === "fob" ? [...fobCandidates, ...fallbackCandidates] : deliveredCandidates;
 
@@ -785,6 +785,26 @@ export default function ViewPO() {
     const qty = Number(line?.quantity || 0);
     return sum + qty * getDisplayUnitPrice(line);
   }, 0);
+
+  const getDeliveredDebugForLine = (line: any) => {
+    const sku = normalizeSku(line?.sku || "");
+    const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
+    const costWithShipping = parseNumeric(matchedItem?.cost_with_shipping);
+    const shippingInput = parseNumeric(matchedItem?.zone5_shipping);
+    const computedNoShipping =
+      Number.isFinite(costWithShipping) && Number.isFinite(shippingInput)
+        ? costWithShipping - shippingInput
+        : Number.NaN;
+
+    return {
+      sourceSku: line?.sku || "",
+      matchedSku: matchedItem?.sku || matchedItem?.item_no || "",
+      costWithShipping,
+      shippingInput,
+      computedNoShipping,
+      shownUnit: getDisplayUnitPrice(line),
+    };
+  };
 
   const applyPoCostMode = (mode: "fob" | "delivered") => {
     setPoCostMode(mode);
@@ -1296,6 +1316,21 @@ export default function ViewPO() {
               </>
             )}
           </div>
+          {poCostMode === "delivered" && (
+            <div className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 print:hidden">
+              <div className="font-semibold mb-1">Debug: Cost w/o Shipping Formula (cost_with_shipping - zone5_shipping)</div>
+              <div className="space-y-0.5">
+                {(po.lines || []).map((line, index) => {
+                  const debug = getDeliveredDebugForLine(line);
+                  return (
+                    <div key={`debug-${line.id || index}`}>
+                      #{index + 1} {debug.sourceSku || "(no sku)"} → matched: {debug.matchedSku || "(none)"} | CWS: {Number.isFinite(debug.costWithShipping) ? money(debug.costWithShipping) : "n/a"} | Ship: {Number.isFinite(debug.shippingInput) ? money(debug.shippingInput) : "n/a"} | Calc: {Number.isFinite(debug.computedNoShipping) ? money(debug.computedNoShipping) : "n/a"} | Shown: {money(debug.shownUnit)}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="mb-2">
             {!editingLineItems ? (
               /* NORMAL TABLE VIEW */
