@@ -966,7 +966,10 @@ export default function AdminPriceListPage() {
         line,
         item: null,
         qty,
+        lineUnitCost: 0,
+        lineShipping: 0,
         lineCost: 0,
+        lineSell: 0,
         lineRevenue: 0,
         lineProfit: 0,
         lineWeight: 0,
@@ -974,6 +977,8 @@ export default function AdminPriceListPage() {
     }
 
     const unitCost = Number(item.cost_with_shipping || 0);
+    const unitShipping = Number(item.zone5_shipping || 0);
+    const unitCostNoShipping = Number(item.per_unit || 0);
     const unitRevenue = Number(item.sell_price || 0);
     const unitProfit = Number(item.profit || 0);
     const unitWeight = Number(item.weight_lbs || 0);
@@ -982,7 +987,10 @@ export default function AdminPriceListPage() {
       line,
       item,
       qty,
+      lineUnitCost: unitCostNoShipping * qty,
+      lineShipping: unitShipping * qty,
       lineCost: unitCost * qty,
+      lineSell: unitRevenue * qty,
       lineRevenue: unitRevenue * qty,
       lineProfit: unitProfit * qty,
       lineWeight: unitWeight * qty,
@@ -995,18 +1003,41 @@ export default function AdminPriceListPage() {
   const summarizeMockPo = (rows: ReturnType<typeof buildMockLineTotals>[]) =>
     rows.reduce(
       (acc, row) => ({
+        totalQty: acc.totalQty + row.qty,
+        totalUnitCost: acc.totalUnitCost + row.lineUnitCost,
+        totalShipping: acc.totalShipping + row.lineShipping,
         totalCost: acc.totalCost + row.lineCost,
+        totalSell: acc.totalSell + row.lineSell,
         totalRevenue: acc.totalRevenue + row.lineRevenue,
         totalProfit: acc.totalProfit + row.lineProfit,
         totalWeight: acc.totalWeight + row.lineWeight,
       }),
-      { totalCost: 0, totalRevenue: 0, totalProfit: 0, totalWeight: 0 }
+      {
+        totalQty: 0,
+        totalUnitCost: 0,
+        totalShipping: 0,
+        totalCost: 0,
+        totalSell: 0,
+        totalRevenue: 0,
+        totalProfit: 0,
+        totalWeight: 0,
+      }
     );
 
   const totalsA = summarizeMockPo(mockPoAComputed);
   const totalsB = summarizeMockPo(mockPoBComputed);
 
   const comparisonDiff = {
+    unitCost: (totalsB.totalQty > 0 ? totalsB.totalUnitCost / totalsB.totalQty : 0) -
+      (totalsA.totalQty > 0 ? totalsA.totalUnitCost / totalsA.totalQty : 0),
+    shipping: (totalsB.totalQty > 0 ? totalsB.totalShipping / totalsB.totalQty : 0) -
+      (totalsA.totalQty > 0 ? totalsA.totalShipping / totalsA.totalQty : 0),
+    costWithShipping: (totalsB.totalQty > 0 ? totalsB.totalCost / totalsB.totalQty : 0) -
+      (totalsA.totalQty > 0 ? totalsA.totalCost / totalsA.totalQty : 0),
+    sellPrice: (totalsB.totalQty > 0 ? totalsB.totalSell / totalsB.totalQty : 0) -
+      (totalsA.totalQty > 0 ? totalsA.totalSell / totalsA.totalQty : 0),
+    profit: (totalsB.totalQty > 0 ? totalsB.totalProfit / totalsB.totalQty : 0) -
+      (totalsA.totalQty > 0 ? totalsA.totalProfit / totalsA.totalQty : 0),
     totalCost: totalsB.totalCost - totalsA.totalCost,
     totalRevenue: totalsB.totalRevenue - totalsA.totalRevenue,
     totalProfit: totalsB.totalProfit - totalsA.totalProfit,
@@ -2200,6 +2231,59 @@ export default function AdminPriceListPage() {
               </div>
 
               <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-sm mb-3">
+                  <thead className="bg-slate-100 text-slate-700">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold">Per Unit Metric</th>
+                      <th className="px-3 py-2 text-right font-semibold">Mock PO A</th>
+                      <th className="px-3 py-2 text-right font-semibold">Mock PO B</th>
+                      <th className="px-3 py-2 text-right font-semibold">Difference (B - A)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-slate-200">
+                      <td className="px-3 py-2 text-slate-700">Unit Cost</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalQty > 0 ? totalsA.totalUnitCost / totalsA.totalQty : 0)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalQty > 0 ? totalsB.totalUnitCost / totalsB.totalQty : 0)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.unitCost >= 0 ? "text-red-700" : "text-emerald-700"}`}>
+                        {comparisonDiff.unitCost >= 0 ? "+" : ""}${money(comparisonDiff.unitCost)}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-slate-200">
+                      <td className="px-3 py-2 text-slate-700">Shipping</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalQty > 0 ? totalsA.totalShipping / totalsA.totalQty : 0)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalQty > 0 ? totalsB.totalShipping / totalsB.totalQty : 0)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.shipping >= 0 ? "text-red-700" : "text-emerald-700"}`}>
+                        {comparisonDiff.shipping >= 0 ? "+" : ""}${money(comparisonDiff.shipping)}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-slate-200">
+                      <td className="px-3 py-2 text-slate-700">Cost with Shipping</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalQty > 0 ? totalsA.totalCost / totalsA.totalQty : 0)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalQty > 0 ? totalsB.totalCost / totalsB.totalQty : 0)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.costWithShipping >= 0 ? "text-red-700" : "text-emerald-700"}`}>
+                        {comparisonDiff.costWithShipping >= 0 ? "+" : ""}${money(comparisonDiff.costWithShipping)}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-slate-200">
+                      <td className="px-3 py-2 text-slate-700">Sell Price</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalQty > 0 ? totalsA.totalSell / totalsA.totalQty : 0)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalQty > 0 ? totalsB.totalSell / totalsB.totalQty : 0)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.sellPrice >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                        {comparisonDiff.sellPrice >= 0 ? "+" : ""}${money(comparisonDiff.sellPrice)}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-slate-200 bg-emerald-50/60">
+                      <td className="px-3 py-2 font-semibold text-emerald-900">Profit</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsA.totalQty > 0 ? totalsA.totalProfit / totalsA.totalQty : 0)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsB.totalQty > 0 ? totalsB.totalProfit / totalsB.totalQty : 0)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums font-semibold ${comparisonDiff.profit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                        {comparisonDiff.profit >= 0 ? "+" : ""}${money(comparisonDiff.profit)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
                 <table className="w-full text-sm">
                   <thead className="bg-slate-100 text-slate-700">
                     <tr>
