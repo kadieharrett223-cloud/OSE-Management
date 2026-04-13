@@ -56,6 +56,12 @@ type ShopifySyncPreviewItem = {
   compare_at_price: number | null;
 };
 
+type MockPOLine = {
+  id: string;
+  itemId: string;
+  quantity: number;
+};
+
 const money = (v: number | null) => {
   if (v === null || v === undefined) return "—";
   return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -226,8 +232,8 @@ export default function AdminPriceListPage() {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printCols, setPrintCols] = useState<Set<PrintColKey>>(new Set(DEFAULT_PRINT_COLS));
   const [showCompareModal, setShowCompareModal] = useState(false);
-  const [compareAId, setCompareAId] = useState<string>("");
-  const [compareBId, setCompareBId] = useState<string>("");
+  const [mockPoALines, setMockPoALines] = useState<MockPOLine[]>([]);
+  const [mockPoBLines, setMockPoBLines] = useState<MockPOLine[]>([]);
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -516,12 +522,60 @@ export default function AdminPriceListPage() {
     setShowCalculator(false); // Close calculator when starting to edit
   };
 
+  const createMockLine = (itemId: string, defaultQty: number): MockPOLine => ({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    itemId,
+    quantity: defaultQty > 0 ? defaultQty : 1,
+  });
+
   const openCompareModal = () => {
-    const fallbackA = filteredItems[0]?.id || "";
-    const fallbackB = filteredItems[1]?.id || filteredItems[0]?.id || "";
-    setCompareAId((prev) => (prev ? prev : fallbackA));
-    setCompareBId((prev) => (prev ? prev : fallbackB));
+    const firstItem = items[0];
+    const secondItem = items[1] || items[0];
+
+    if (mockPoALines.length === 0 && firstItem) {
+      setMockPoALines([
+        createMockLine(firstItem.id, Number(firstItem.quantity || 1)),
+      ]);
+    }
+
+    if (mockPoBLines.length === 0 && secondItem) {
+      setMockPoBLines([
+        createMockLine(secondItem.id, Number(secondItem.quantity || 1)),
+      ]);
+    }
+
     setShowCompareModal(true);
+  };
+
+  const updateMockLine = (
+    side: "A" | "B",
+    lineId: string,
+    updates: Partial<MockPOLine>
+  ) => {
+    const updater = (lines: MockPOLine[]) =>
+      lines.map((line) => (line.id === lineId ? { ...line, ...updates } : line));
+
+    if (side === "A") setMockPoALines(updater);
+    else setMockPoBLines(updater);
+  };
+
+  const addMockLine = (side: "A" | "B") => {
+    const baseItems = items;
+    if (baseItems.length === 0) return;
+
+    const firstItem = baseItems[0];
+    const newLine = createMockLine(firstItem.id, Number(firstItem.quantity || 1));
+
+    if (side === "A") setMockPoALines((prev) => [...prev, newLine]);
+    else setMockPoBLines((prev) => [...prev, newLine]);
+  };
+
+  const removeMockLine = (side: "A" | "B", lineId: string) => {
+    if (side === "A") {
+      setMockPoALines((prev) => (prev.length > 1 ? prev.filter((line) => line.id !== lineId) : prev));
+    } else {
+      setMockPoBLines((prev) => (prev.length > 1 ? prev.filter((line) => line.id !== lineId) : prev));
+    }
   };
 
   const cancelEditing = () => {
@@ -552,6 +606,7 @@ export default function AdminPriceListPage() {
           importing: newProduct.quantity ? null : newProduct.importing,
           zone5_shipping: newProduct.zone5_shipping,
           margin: newProduct.margin || 0,
+          tariff_exempt: newProduct.tariff_exempt || false,
           is_active: true
         }])
         .select();
@@ -572,6 +627,7 @@ export default function AdminPriceListPage() {
         importing: null,
         zone5_shipping: null,
         margin: 0,
+        tariff_exempt: false,
       });
       await loadData();
     } catch (error: any) {
@@ -867,35 +923,60 @@ export default function AdminPriceListPage() {
     return matchesSearch && matchesSupplier;
   });
 
-  const comparableItems = filteredItems
+  const comparableItems = items
     .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
     .sort((a, b) => a.item_no.localeCompare(b.item_no));
 
-  const compareItemA = comparableItems.find((item) => item.id === compareAId) || null;
-  const compareItemB = comparableItems.find((item) => item.id === compareBId) || null;
+  const comparableItemsById = new Map(comparableItems.map((item) => [item.id, item]));
 
-  const containerTotals = (item: PriceListItem | null) => {
+  const buildMockLineTotals = (line: MockPOLine) => {
+    const item = comparableItemsById.get(line.itemId) || null;
+    const qty = Number(line.quantity || 0);
+
     if (!item) {
-      return { qty: 0, totalCost: 0, totalRevenue: 0, totalProfit: 0, totalWeight: 0 };
+      return {
+        line,
+        item: null,
+        qty,
+        lineCost: 0,
+        lineRevenue: 0,
+        lineProfit: 0,
+        lineWeight: 0,
+      };
     }
 
-    const qty = Number(item.quantity || 0);
-    const perUnitCost = Number(item.cost_with_shipping || 0);
-    const perUnitSell = Number(item.sell_price || 0);
-    const perUnitProfit = Number(item.profit || 0);
+    const unitCost = Number(item.cost_with_shipping || 0);
+    const unitRevenue = Number(item.sell_price || 0);
+    const unitProfit = Number(item.profit || 0);
     const unitWeight = Number(item.weight_lbs || 0);
 
     return {
+      line,
+      item,
       qty,
-      totalCost: perUnitCost * qty,
-      totalRevenue: perUnitSell * qty,
-      totalProfit: perUnitProfit * qty,
-      totalWeight: unitWeight * qty,
+      lineCost: unitCost * qty,
+      lineRevenue: unitRevenue * qty,
+      lineProfit: unitProfit * qty,
+      lineWeight: unitWeight * qty,
     };
   };
 
-  const totalsA = containerTotals(compareItemA);
-  const totalsB = containerTotals(compareItemB);
+  const mockPoAComputed = mockPoALines.map(buildMockLineTotals);
+  const mockPoBComputed = mockPoBLines.map(buildMockLineTotals);
+
+  const summarizeMockPo = (rows: ReturnType<typeof buildMockLineTotals>[]) =>
+    rows.reduce(
+      (acc, row) => ({
+        totalCost: acc.totalCost + row.lineCost,
+        totalRevenue: acc.totalRevenue + row.lineRevenue,
+        totalProfit: acc.totalProfit + row.lineProfit,
+        totalWeight: acc.totalWeight + row.lineWeight,
+      }),
+      { totalCost: 0, totalRevenue: 0, totalProfit: 0, totalWeight: 0 }
+    );
+
+  const totalsA = summarizeMockPo(mockPoAComputed);
+  const totalsB = summarizeMockPo(mockPoBComputed);
 
   const comparisonDiff = {
     totalCost: totalsB.totalCost - totalsA.totalCost,
@@ -1845,6 +1926,18 @@ export default function AdminPriceListPage() {
                     className="w-full rounded-lg border border-blue-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                   />
                 </div>
+
+                <div className="col-span-2">
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm font-medium text-purple-800">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(newProduct.tariff_exempt)}
+                      onChange={(e) => setNewProduct({ ...newProduct, tariff_exempt: e.target.checked })}
+                      className="h-4 w-4 rounded border-purple-300 text-purple-600 accent-purple-600"
+                    />
+                    Tariff Exempt (skip tariff/ocean/importing calculations)
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -1940,12 +2033,12 @@ export default function AdminPriceListPage() {
       )}
       {showCompareModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
+          <div className="w-full max-w-6xl rounded-2xl bg-white shadow-2xl max-h-[92vh] overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">Container Product Comparison</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Mock PO Comparison</h2>
                 <p className="mt-1 text-xs text-slate-600">
-                  Compare total container cost, revenue, profit, and weight between two products.
+                  Build two mock purchase orders with multiple products and compare total cost, revenue, profit, and weight.
                 </p>
               </div>
               <button
@@ -1959,117 +2052,196 @@ export default function AdminPriceListPage() {
               </button>
             </div>
 
-            <div className="space-y-4 px-6 py-5">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-700">Product A</label>
-                  <select
-                    value={compareAId}
-                    onChange={(e) => setCompareAId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  >
-                    <option value="">Select product...</option>
-                    {comparableItems.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.item_no} • {item.description || "No description"}
-                      </option>
-                    ))}
-                  </select>
+            <div className="max-h-[72vh] overflow-y-auto px-6 py-5">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-800">Mock PO A</h3>
+                    <button
+                      type="button"
+                      onClick={() => addMockLine("A")}
+                      className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+                    >
+                      + Add Line
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {mockPoALines.map((line) => {
+                      const selected = comparableItemsById.get(line.itemId);
+                      return (
+                        <div key={line.id} className="grid grid-cols-[1fr_92px_34px] gap-2">
+                          <select
+                            value={line.itemId}
+                            onChange={(e) => {
+                              const selectedItem = comparableItemsById.get(e.target.value);
+                              updateMockLine("A", line.id, {
+                                itemId: e.target.value,
+                                quantity: Number(selectedItem?.quantity || line.quantity || 1),
+                              });
+                            }}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900"
+                          >
+                            <option value="">Select product...</option>
+                            {comparableItems.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.item_no} • {item.description || "No description"}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min={0}
+                            step="1"
+                            value={line.quantity}
+                            onChange={(e) => updateMockLine("A", line.id, { quantity: Number(e.target.value) || 0 })}
+                            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-right text-slate-900"
+                            title="Quantity"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeMockLine("A", line.id)}
+                            className="rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                          {selected && (
+                            <div className="col-span-3 rounded-md bg-white px-2 py-1 text-[11px] text-slate-600 ring-1 ring-slate-200">
+                              {selected.item_no} • Unit Cost ${money(selected.cost_with_shipping)} • Unit Profit ${money(selected.profit)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-700">Product B</label>
-                  <select
-                    value={compareBId}
-                    onChange={(e) => setCompareBId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  >
-                    <option value="">Select product...</option>
-                    {comparableItems.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.item_no} • {item.description || "No description"}
-                      </option>
-                    ))}
-                  </select>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-800">Mock PO B</h3>
+                    <button
+                      type="button"
+                      onClick={() => addMockLine("B")}
+                      className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+                    >
+                      + Add Line
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {mockPoBLines.map((line) => {
+                      const selected = comparableItemsById.get(line.itemId);
+                      return (
+                        <div key={line.id} className="grid grid-cols-[1fr_92px_34px] gap-2">
+                          <select
+                            value={line.itemId}
+                            onChange={(e) => {
+                              const selectedItem = comparableItemsById.get(e.target.value);
+                              updateMockLine("B", line.id, {
+                                itemId: e.target.value,
+                                quantity: Number(selectedItem?.quantity || line.quantity || 1),
+                              });
+                            }}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900"
+                          >
+                            <option value="">Select product...</option>
+                            {comparableItems.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.item_no} • {item.description || "No description"}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min={0}
+                            step="1"
+                            value={line.quantity}
+                            onChange={(e) => updateMockLine("B", line.id, { quantity: Number(e.target.value) || 0 })}
+                            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-right text-slate-900"
+                            title="Quantity"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeMockLine("B", line.id)}
+                            className="rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
+                            title="Remove line"
+                          >
+                            ×
+                          </button>
+                          {selected && (
+                            <div className="col-span-3 rounded-md bg-white px-2 py-1 text-[11px] text-slate-600 ring-1 ring-slate-200">
+                              {selected.item_no} • Unit Cost ${money(selected.cost_with_shipping)} • Unit Profit ${money(selected.profit)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              {!compareItemA || !compareItemB ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  Select two products to compare container totals.
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Product A</div>
-                      <div className="mt-1 font-mono text-sm font-semibold text-slate-900">{compareItemA.item_no}</div>
-                      <div className="text-xs text-slate-600">Container Qty: {totalsA.qty || "—"}</div>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Product B</div>
-                      <div className="mt-1 font-mono text-sm font-semibold text-slate-900">{compareItemB.item_no}</div>
-                      <div className="text-xs text-slate-600">Container Qty: {totalsB.qty || "—"}</div>
-                    </div>
-                  </div>
-
-                  {(totalsA.qty <= 0 || totalsB.qty <= 0) && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                      One or both products are missing container quantity. Add quantity to get accurate container comparison totals.
-                    </div>
-                  )}
-
-                  <div className="overflow-x-auto rounded-xl border border-slate-200">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-100 text-slate-700">
-                        <tr>
-                          <th className="px-3 py-2 text-left font-semibold">Metric</th>
-                          <th className="px-3 py-2 text-right font-semibold">Product A</th>
-                          <th className="px-3 py-2 text-right font-semibold">Product B</th>
-                          <th className="px-3 py-2 text-right font-semibold">Difference (B - A)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-t border-slate-200">
-                          <td className="px-3 py-2 text-slate-700">Total Cost / Container</td>
-                          <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalCost)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalCost)}</td>
-                          <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalCost >= 0 ? "text-red-700" : "text-emerald-700"}`}>
-                            {comparisonDiff.totalCost >= 0 ? "+" : ""}${money(comparisonDiff.totalCost)}
-                          </td>
-                        </tr>
-                        <tr className="border-t border-slate-200">
-                          <td className="px-3 py-2 text-slate-700">Total Revenue / Container</td>
-                          <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalRevenue)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalRevenue)}</td>
-                          <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalRevenue >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                            {comparisonDiff.totalRevenue >= 0 ? "+" : ""}${money(comparisonDiff.totalRevenue)}
-                          </td>
-                        </tr>
-                        <tr className="border-t border-slate-200 bg-emerald-50/60">
-                          <td className="px-3 py-2 font-semibold text-emerald-900">Total Profit / Container</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsA.totalProfit)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsB.totalProfit)}</td>
-                          <td className={`px-3 py-2 text-right tabular-nums font-semibold ${comparisonDiff.totalProfit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                            {comparisonDiff.totalProfit >= 0 ? "+" : ""}${money(comparisonDiff.totalProfit)}
-                          </td>
-                        </tr>
-                        <tr className="border-t border-slate-200">
-                          <td className="px-3 py-2 text-slate-700">Total Weight / Container (lbs)</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{money(totalsA.totalWeight)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{money(totalsB.totalWeight)}</td>
-                          <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalWeight >= 0 ? "text-red-700" : "text-emerald-700"}`}>
-                            {comparisonDiff.totalWeight >= 0 ? "+" : ""}{money(comparisonDiff.totalWeight)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
+              <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-100 text-slate-700">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold">Metric</th>
+                      <th className="px-3 py-2 text-right font-semibold">Mock PO A</th>
+                      <th className="px-3 py-2 text-right font-semibold">Mock PO B</th>
+                      <th className="px-3 py-2 text-right font-semibold">Difference (B - A)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-slate-200">
+                      <td className="px-3 py-2 text-slate-700">Total Cost</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalCost)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalCost)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalCost >= 0 ? "text-red-700" : "text-emerald-700"}`}>
+                        {comparisonDiff.totalCost >= 0 ? "+" : ""}${money(comparisonDiff.totalCost)}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-slate-200">
+                      <td className="px-3 py-2 text-slate-700">Total Revenue</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalRevenue)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalRevenue)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalRevenue >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                        {comparisonDiff.totalRevenue >= 0 ? "+" : ""}${money(comparisonDiff.totalRevenue)}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-slate-200 bg-emerald-50/60">
+                      <td className="px-3 py-2 font-semibold text-emerald-900">Total Profit</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsA.totalProfit)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsB.totalProfit)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums font-semibold ${comparisonDiff.totalProfit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                        {comparisonDiff.totalProfit >= 0 ? "+" : ""}${money(comparisonDiff.totalProfit)}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-slate-200">
+                      <td className="px-3 py-2 text-slate-700">Total Weight (lbs)</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{money(totalsA.totalWeight)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{money(totalsB.totalWeight)}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalWeight >= 0 ? "text-red-700" : "text-emerald-700"}`}>
+                        {comparisonDiff.totalWeight >= 0 ? "+" : ""}{money(comparisonDiff.totalWeight)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 rounded-b-2xl">
+              <button
+                onClick={() => {
+                  const firstItem = items[0];
+                  const secondItem = items[1] || items[0];
+                  setMockPoALines(firstItem ? [createMockLine(firstItem.id, Number(firstItem.quantity || 1))] : []);
+                  setMockPoBLines(secondItem ? [createMockLine(secondItem.id, Number(secondItem.quantity || 1))] : []);
+                }}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                type="button"
+              >
+                Reset
+              </button>
               <button
                 onClick={() => setShowCompareModal(false)}
                 className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
