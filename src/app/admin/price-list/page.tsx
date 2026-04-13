@@ -1439,14 +1439,6 @@ export default function AdminPriceListPage() {
                                       Save
                                     </button>
                                     <button
-                                      onClick={() => setEditingItem((prev) => prev ? { ...prev, manual_pricing_override: !prev.manual_pricing_override } : prev)}
-                                      className={`px-2 py-1 text-xs font-semibold rounded ${editingItem?.manual_pricing_override ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
-                                      type="button"
-                                      title={editingItem?.manual_pricing_override ? "Manual pricing override enabled - tariff/ocean/import won't auto-calculate" : "Enable manual pricing override"}
-                                    >
-                                      {editingItem?.manual_pricing_override ? '✓ Manual' : 'Manual'}
-                                    </button>
-                                    <button
                                       onClick={() => setEditingItem((prev) => prev ? { ...prev, tariff_exempt: !prev.tariff_exempt } : prev)}
                                       className={`px-2 py-1 text-xs font-semibold rounded ${editingItem?.tariff_exempt ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
                                       type="button"
@@ -1472,9 +1464,6 @@ export default function AdminPriceListPage() {
                                     >
                                       Edit
                                     </button>
-                                    {item.manual_pricing_override && (
-                                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded">Override</span>
-                                    )}
                                     {item.tariff_exempt && (
                                       <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">Exempt</span>
                                     )}
