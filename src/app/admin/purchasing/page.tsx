@@ -159,6 +159,7 @@ export default function PurchasingPage() {
     poId: "",
     date: new Date().toISOString().split("T")[0],
     amount: 0,
+    amountType: "custom" as "custom" | "down_payment" | "final_payment",
     notes: "",
   });
 
@@ -331,6 +332,13 @@ export default function PurchasingPage() {
         : "/api/purchase-orders/payment-schedules";
       const method = isEditing ? "PATCH" : "POST";
 
+      const finalAmount =
+        scheduleForm.amountType === "down_payment"
+          ? Number((computedTotal(selected) * 0.3).toFixed(2))
+          : scheduleForm.amountType === "final_payment"
+          ? Number(balance(selected).toFixed(2))
+          : Number(scheduleForm.amount || 0);
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -339,7 +347,7 @@ export default function PurchasingPage() {
           poNumber: selected.po_number,
           vendorName: selected.vendor_name,
           date: scheduleForm.date,
-          amount: Number(scheduleForm.amount || 0),
+          amount: finalAmount,
           notes: scheduleForm.notes,
         }),
       });
@@ -364,6 +372,7 @@ export default function PurchasingPage() {
         poId: "",
         date: new Date().toISOString().split("T")[0],
         amount: 0,
+        amountType: "custom",
         notes: "",
       });
     } catch (error) {
@@ -401,6 +410,7 @@ export default function PurchasingPage() {
       poId: defaultPo?.id || "",
       date,
       amount: 0,
+      amountType: "custom",
       notes: "",
     });
     setShowScheduleModal(true);
@@ -412,6 +422,7 @@ export default function PurchasingPage() {
       poId: schedule.poId,
       date: schedule.date,
       amount: Number(schedule.amount || 0),
+      amountType: "custom",
       notes: schedule.notes || "",
     });
     setShowScheduleModal(true);
@@ -1975,13 +1986,82 @@ export default function PurchasingPage() {
 
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-700">Amount</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={scheduleForm.amount}
-                        onChange={(e) => setScheduleForm({ ...scheduleForm, amount: Number(e.target.value) })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      />
+                      {(() => {
+                        const selPO = pos.find((po) => po.id === scheduleForm.poId);
+                        const downAmt = selPO ? computedTotal(selPO) * 0.3 : null;
+                        const finalAmt = selPO ? balance(selPO) : null;
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setScheduleForm({ ...scheduleForm, amountType: "custom" })}
+                                className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                                  scheduleForm.amountType === "custom"
+                                    ? "border-blue-600 bg-blue-50 text-blue-700"
+                                    : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                                }`}
+                              >
+                                Custom
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setScheduleForm({ ...scheduleForm, amountType: "down_payment" })}
+                                className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                                  scheduleForm.amountType === "down_payment"
+                                    ? "border-amber-500 bg-amber-50 text-amber-700"
+                                    : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                                }`}
+                              >
+                                Down Payment
+                                {downAmt !== null && (
+                                  <span className="block text-[10px] font-normal mt-0.5">
+                                    30% = ${money(downAmt)}
+                                  </span>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setScheduleForm({ ...scheduleForm, amountType: "final_payment" })}
+                                className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                                  scheduleForm.amountType === "final_payment"
+                                    ? "border-green-600 bg-green-50 text-green-700"
+                                    : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                                }`}
+                              >
+                                Final Payment
+                                {finalAmt !== null && (
+                                  <span className="block text-[10px] font-normal mt-0.5">
+                                    Balance: ${money(finalAmt)}
+                                  </span>
+                                )}
+                              </button>
+                            </div>
+                            {scheduleForm.amountType === "custom" && (
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={scheduleForm.amount}
+                                onChange={(e) => setScheduleForm({ ...scheduleForm, amount: Number(e.target.value) })}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                placeholder="Enter amount"
+                              />
+                            )}
+                            {scheduleForm.amountType !== "custom" && selPO && (
+                              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                Will use:{" "}
+                                <span className="font-semibold">
+                                  ${money(
+                                    scheduleForm.amountType === "down_payment"
+                                      ? computedTotal(selPO) * 0.3
+                                      : balance(selPO)
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div>

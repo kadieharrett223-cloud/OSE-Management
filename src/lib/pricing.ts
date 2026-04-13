@@ -8,6 +8,7 @@ export type PricingInput = {
   margin: number; // Margin % as decimal (e.g., 0.2296 for 22.96%)
   listPrice?: number; // Optional manual list price
   discount?: number; // % off list price (default 20)
+  tariffExempt?: boolean; // If true, skip tariff (FOB×2), ocean, and importing calculations
 };
 
 export type PricingResult = PricingInput & {
@@ -35,6 +36,7 @@ const FIELD_KEYS: Record<keyof PricingInput, string[]> = {
   margin: ["margin", "margin %", "margin percent"],
   listPrice: ["list price", "manual list price", "suggested retail"],
   discount: ["discount", "discount %", "discount percent"],
+  tariffExempt: ["tariff exempt", "exempt", "tariff_exempt"],
 };
 
 const normalizeNumber = (value: unknown): number => {
@@ -51,6 +53,16 @@ const normalizeNumber = (value: unknown): number => {
 const normalizeText = (value: unknown): string =>
   typeof value === "string" ? value.trim() : value !== undefined && value !== null ? String(value).trim() : "";
 
+const normalizeBoolean = (value: unknown): boolean => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return ["yes", "true", "1", "y", "exempt"].includes(normalized);
+  }
+  return false;
+};
+
 const floorTo = (value: number, step: number): number => Math.floor(value / step) * step;
 
 export const computePricingRow = (raw: PricingInput): PricingResult => {
@@ -64,6 +76,7 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
     margin: Math.min(normalizeNumber(raw.margin), 0.9999), // Cap at 99.99%
     listPrice: raw.listPrice !== undefined ? normalizeNumber(raw.listPrice) : undefined,
     discount: raw.discount !== undefined ? normalizeNumber(raw.discount) : 20, // Default 20%
+    tariffExempt: raw.tariffExempt === true,
   };
 
   // Constants
@@ -71,10 +84,25 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
   const IMPORTING_PER_CONTAINER = 2100;
 
   // Pricing calculations
-  const tariff = base.fobCost * 2; // Tariff = FOB × 2
-  const oceanPerUnit = OCEAN_FREIGHT_PER_CONTAINER / base.quantity;
-  const importingPerUnit = IMPORTING_PER_CONTAINER / base.quantity;
-  const costNoShipping = tariff + oceanPerUnit + importingPerUnit;
+  let tariff: number;
+  let oceanPerUnit: number;
+  let importingPerUnit: number;
+  let costNoShipping: number;
+
+  if (base.tariffExempt) {
+    // Tariff exempt: skip tariff calculation, only use FOB + shipping
+    tariff = 0;
+    oceanPerUnit = 0;
+    importingPerUnit = 0;
+    costNoShipping = base.fobCost;
+  } else {
+    // Normal: tariff = FOB × 2, plus ocean and importing per unit
+    tariff = base.fobCost * 2;
+    oceanPerUnit = OCEAN_FREIGHT_PER_CONTAINER / base.quantity;
+    importingPerUnit = IMPORTING_PER_CONTAINER / base.quantity;
+    costNoShipping = tariff + oceanPerUnit + importingPerUnit;
+  }
+
   const finalCost = costNoShipping + base.shipping;
   
   // Sell price based on margin: Sell = Final / (1 - Margin)
@@ -137,6 +165,7 @@ export const mapSheetRowToInput = (raw: Record<string, unknown>): PricingInput |
     margin: marginValue,
     listPrice: pickField("listPrice") !== undefined ? normalizeNumber(pickField("listPrice")) : undefined,
     discount: pickField("discount") !== undefined ? normalizeNumber(pickField("discount")) : 20,
+    tariffExempt: normalizeBoolean(pickField("tariffExempt")),
   };
 };
 
@@ -153,6 +182,7 @@ export const exportRowShape = {
     "Margin %",
     "List Price (Optional)",
     "Discount %",
+    "Tariff Exempt",
   ],
   computedHeaders: [
     "Tariff (FOB × 2)",
@@ -178,6 +208,7 @@ export const toExportRow = (row: PricingResult) => ({
   "Margin %": row.formattedMargin,
   "List Price (Optional)": row.listPrice ?? "",
   "Discount %": row.discount,
+  "Tariff Exempt": row.tariffExempt ? "Yes" : "No",
   "Tariff (FOB × 2)": row.tariff,
   "Ocean Per Unit": row.oceanPerUnit,
   "Importing Per Unit": row.importingPerUnit,

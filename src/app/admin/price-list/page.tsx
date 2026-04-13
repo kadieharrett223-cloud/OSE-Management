@@ -26,6 +26,7 @@ type PriceListItem = {
   zone5_shipping: number | null;
   margin: number | null; // Margin as decimal (e.g., 0.2296 for 22.96%)
   manual_pricing_override: boolean; // Allow manual control of pricing calculations
+  tariff_exempt: boolean; // Skip tariff calculation for items exempt from tariffs
   // Derived fields (computed by DB)
   tariff_105: number | null;
   per_unit: number | null;
@@ -236,6 +237,7 @@ export default function AdminPriceListPage() {
     importing: null,
     zone5_shipping: null,
     margin: 0,
+    tariff_exempt: false,
   });
 
   // Save discount to localStorage when changed
@@ -364,6 +366,7 @@ export default function AdminPriceListPage() {
           zone5_shipping: editingItem.zone5_shipping,
           margin: editingItem.margin,
           manual_pricing_override: editingItem.manual_pricing_override,
+          tariff_exempt: editingItem.tariff_exempt,
         })
         .eq("id", editingItem.id);
       
@@ -387,16 +390,22 @@ export default function AdminPriceListPage() {
     const zone5_shipping = item.zone5_shipping || 0;
     const margin = item.margin || 0;
     const tariffMultiplier = 1 + globalTariffPercent / 100;
+    const isTariffExempt = item.tariff_exempt === true;
 
     // Check if manual override is enabled
     const isManualOverride = item.manual_pricing_override === true;
 
-    // Calculate or preserve tariff/ocean/import based on override flag
+    // Calculate or preserve tariff/ocean/import based on override flag and tariff exempt flag
     let tariff_105: number;
     let ocean_per_unit: number;
     let importing_per_unit: number;
 
-    if (isManualOverride) {
+    if (isTariffExempt) {
+      // Tariff exempt: no tariff, ocean, or importing charges
+      tariff_105 = 0;
+      ocean_per_unit = 0;
+      importing_per_unit = 0;
+    } else if (isManualOverride) {
       // Manual override mode: use the user-entered values as-is
       tariff_105 = item.tariff_105 || 0;
       ocean_per_unit = item.ocean_frt || 0;
@@ -409,7 +418,7 @@ export default function AdminPriceListPage() {
     }
 
     // 2) Per unit: Tariff + Ocean per-unit + Importing per-unit
-    const per_unit = tariff_105 + ocean_per_unit + importing_per_unit;
+    const per_unit = (isTariffExempt ? fob_cost : tariff_105) + ocean_per_unit + importing_per_unit;
 
     // 3) Final cost with shipping: Per unit + Zone 5
     const cost_with_shipping = per_unit + zone5_shipping;
@@ -1438,6 +1447,14 @@ export default function AdminPriceListPage() {
                                       {editingItem?.manual_pricing_override ? '✓ Manual' : 'Manual'}
                                     </button>
                                     <button
+                                      onClick={() => setEditingItem((prev) => prev ? { ...prev, tariff_exempt: !prev.tariff_exempt } : prev)}
+                                      className={`px-2 py-1 text-xs font-semibold rounded ${editingItem?.tariff_exempt ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
+                                      type="button"
+                                      title={editingItem?.tariff_exempt ? "Tariff exempt - no tariff calculation applied" : "Mark as tariff exempt"}
+                                    >
+                                      {editingItem?.tariff_exempt ? '✓ Exempt' : 'Exempt'}
+                                    </button>
+                                    <button
                                       onClick={cancelEditing}
                                       disabled={isLoading}
                                       className="px-2 py-1 text-xs font-semibold text-slate-600 bg-transparent hover:bg-slate-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1457,6 +1474,9 @@ export default function AdminPriceListPage() {
                                     </button>
                                     {item.manual_pricing_override && (
                                       <span className="text-[10px] font-bold px-1.5 py-0.5 bg-green-100 text-green-700 rounded">Override</span>
+                                    )}
+                                    {item.tariff_exempt && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">Exempt</span>
                                     )}
                                     <button
                                       onClick={() => handleDeleteProduct(item.id)}
