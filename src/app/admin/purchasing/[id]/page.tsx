@@ -728,44 +728,24 @@ export default function ViewPO() {
   };
 
   const resolveUnitPrice = (item: any, costMode: "fob" | "delivered" = poCostMode) => {
-    const fobCandidates = [
-      Number(item?.fob_port_cost),
-      Number(item?.fob_cost),
-    ];
+    const fobCandidates = [Number(item?.fob_port_cost), Number(item?.fob_cost)];
 
-    const shippingCandidates = [
-      Number(item?.zone5_shipping),
-      Number(item?.shipping_cost),
-      Number(item?.shipping),
-    ];
-
-    const shippingValue = shippingCandidates.find((value) => Number.isFinite(value) && value >= 0) ?? 0;
-
-    const deliveredMinusShippingCandidates = [
-      Number(item?.cost_with_shipping),
-      Number(item?.shippingIncludedPerUnit),
-      Number(item?.shipping_included_per_unit),
-    ].map((value) => (Number.isFinite(value) ? value - shippingValue : Number.NaN));
+    const costWithShipping = Number(item?.cost_with_shipping);
+    const shippingInput = Number(item?.zone5_shipping);
+    const deliveredWithoutShipping =
+      Number.isFinite(costWithShipping) && Number.isFinite(shippingInput)
+        ? costWithShipping - shippingInput
+        : Number.NaN;
 
     const deliveredCandidates = [
-      ...deliveredMinusShippingCandidates,
+      deliveredWithoutShipping,
       Number(item?.per_unit),
       Number(item?.cost_with_shipping),
-      Number(item?.shippingIncludedPerUnit),
-      Number(item?.shipping_included_per_unit),
     ];
 
-    const fallbackCandidates = [
-      Number(item?.sell_price),
-      Number(item?.currentSalePricePerUnit),
-      Number(item?.list_price),
-      Number(item?.zone5_shipping),
-    ];
+    const fallbackCandidates = [Number(item?.sell_price), Number(item?.currentSalePricePerUnit), Number(item?.list_price)];
 
-    const candidates =
-      costMode === "fob"
-        ? [...fobCandidates, ...deliveredCandidates, ...fallbackCandidates]
-        : [...deliveredCandidates, ...fobCandidates, ...fallbackCandidates];
+    const candidates = costMode === "fob" ? [...fobCandidates, ...fallbackCandidates] : [...deliveredCandidates, ...fallbackCandidates];
 
     for (const value of candidates) {
       if (Number.isFinite(value) && value > 0) return value;
