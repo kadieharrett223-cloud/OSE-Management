@@ -225,6 +225,9 @@ export default function AdminPriceListPage() {
   const [shopifyPreviewItems, setShopifyPreviewItems] = useState<ShopifySyncPreviewItem[]>([]);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printCols, setPrintCols] = useState<Set<PrintColKey>>(new Set(DEFAULT_PRINT_COLS));
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [compareAId, setCompareAId] = useState<string>("");
+  const [compareBId, setCompareBId] = useState<string>("");
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -511,6 +514,14 @@ export default function AdminPriceListPage() {
     setEditingId(item.id);
     setEditingItem({ ...item }); // Create a copy
     setShowCalculator(false); // Close calculator when starting to edit
+  };
+
+  const openCompareModal = () => {
+    const fallbackA = filteredItems[0]?.id || "";
+    const fallbackB = filteredItems[1]?.id || filteredItems[0]?.id || "";
+    setCompareAId((prev) => (prev ? prev : fallbackA));
+    setCompareBId((prev) => (prev ? prev : fallbackB));
+    setShowCompareModal(true);
   };
 
   const cancelEditing = () => {
@@ -856,6 +867,43 @@ export default function AdminPriceListPage() {
     return matchesSearch && matchesSupplier;
   });
 
+  const comparableItems = filteredItems
+    .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
+    .sort((a, b) => a.item_no.localeCompare(b.item_no));
+
+  const compareItemA = comparableItems.find((item) => item.id === compareAId) || null;
+  const compareItemB = comparableItems.find((item) => item.id === compareBId) || null;
+
+  const containerTotals = (item: PriceListItem | null) => {
+    if (!item) {
+      return { qty: 0, totalCost: 0, totalRevenue: 0, totalProfit: 0, totalWeight: 0 };
+    }
+
+    const qty = Number(item.quantity || 0);
+    const perUnitCost = Number(item.cost_with_shipping || 0);
+    const perUnitSell = Number(item.sell_price || 0);
+    const perUnitProfit = Number(item.profit || 0);
+    const unitWeight = Number(item.weight_lbs || 0);
+
+    return {
+      qty,
+      totalCost: perUnitCost * qty,
+      totalRevenue: perUnitSell * qty,
+      totalProfit: perUnitProfit * qty,
+      totalWeight: unitWeight * qty,
+    };
+  };
+
+  const totalsA = containerTotals(compareItemA);
+  const totalsB = containerTotals(compareItemB);
+
+  const comparisonDiff = {
+    totalCost: totalsB.totalCost - totalsA.totalCost,
+    totalRevenue: totalsB.totalRevenue - totalsA.totalRevenue,
+    totalProfit: totalsB.totalProfit - totalsA.totalProfit,
+    totalWeight: totalsB.totalWeight - totalsA.totalWeight,
+  };
+
   // Get unique suppliers for filter dropdown (canonicalized)
   const uniqueSuppliers = Array.from(
     new Set(items.filter((item) => item.supplier).map((item) => canonicalizeRep(item.supplier!)))
@@ -1152,6 +1200,16 @@ export default function AdminPriceListPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                   Add Product
+                </button>
+                <button
+                  onClick={openCompareModal}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                  type="button"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m6 6V7M5 21h14M7 3h10a2 2 0 012 2v2H5V5a2 2 0 012-2z" />
+                  </svg>
+                  Compare Products
                 </button>
               </div>
             </header>
@@ -1875,6 +1933,149 @@ export default function AdminPriceListPage() {
                 disabled={isShopifySyncing || shopifyPreviewItems.length === 0}
               >
                 {isShopifySyncing ? "Pushing..." : "Confirm Push to Shopify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showCompareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Container Product Comparison</h2>
+                <p className="mt-1 text-xs text-slate-600">
+                  Compare total container cost, revenue, profit, and weight between two products.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCompareModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+                type="button"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Product A</label>
+                  <select
+                    value={compareAId}
+                    onChange={(e) => setCompareAId(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    <option value="">Select product...</option>
+                    {comparableItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.item_no} • {item.description || "No description"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">Product B</label>
+                  <select
+                    value={compareBId}
+                    onChange={(e) => setCompareBId(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    <option value="">Select product...</option>
+                    {comparableItems.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.item_no} • {item.description || "No description"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {!compareItemA || !compareItemB ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Select two products to compare container totals.
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Product A</div>
+                      <div className="mt-1 font-mono text-sm font-semibold text-slate-900">{compareItemA.item_no}</div>
+                      <div className="text-xs text-slate-600">Container Qty: {totalsA.qty || "—"}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Product B</div>
+                      <div className="mt-1 font-mono text-sm font-semibold text-slate-900">{compareItemB.item_no}</div>
+                      <div className="text-xs text-slate-600">Container Qty: {totalsB.qty || "—"}</div>
+                    </div>
+                  </div>
+
+                  {(totalsA.qty <= 0 || totalsB.qty <= 0) && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      One or both products are missing container quantity. Add quantity to get accurate container comparison totals.
+                    </div>
+                  )}
+
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100 text-slate-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold">Metric</th>
+                          <th className="px-3 py-2 text-right font-semibold">Product A</th>
+                          <th className="px-3 py-2 text-right font-semibold">Product B</th>
+                          <th className="px-3 py-2 text-right font-semibold">Difference (B - A)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-slate-200">
+                          <td className="px-3 py-2 text-slate-700">Total Cost / Container</td>
+                          <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalCost)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalCost)}</td>
+                          <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalCost >= 0 ? "text-red-700" : "text-emerald-700"}`}>
+                            {comparisonDiff.totalCost >= 0 ? "+" : ""}${money(comparisonDiff.totalCost)}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-slate-200">
+                          <td className="px-3 py-2 text-slate-700">Total Revenue / Container</td>
+                          <td className="px-3 py-2 text-right tabular-nums">${money(totalsA.totalRevenue)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">${money(totalsB.totalRevenue)}</td>
+                          <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalRevenue >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                            {comparisonDiff.totalRevenue >= 0 ? "+" : ""}${money(comparisonDiff.totalRevenue)}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-slate-200 bg-emerald-50/60">
+                          <td className="px-3 py-2 font-semibold text-emerald-900">Total Profit / Container</td>
+                          <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsA.totalProfit)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums font-semibold text-emerald-900">${money(totalsB.totalProfit)}</td>
+                          <td className={`px-3 py-2 text-right tabular-nums font-semibold ${comparisonDiff.totalProfit >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                            {comparisonDiff.totalProfit >= 0 ? "+" : ""}${money(comparisonDiff.totalProfit)}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-slate-200">
+                          <td className="px-3 py-2 text-slate-700">Total Weight / Container (lbs)</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{money(totalsA.totalWeight)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{money(totalsB.totalWeight)}</td>
+                          <td className={`px-3 py-2 text-right tabular-nums ${comparisonDiff.totalWeight >= 0 ? "text-red-700" : "text-emerald-700"}`}>
+                            {comparisonDiff.totalWeight >= 0 ? "+" : ""}{money(comparisonDiff.totalWeight)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 rounded-b-2xl">
+              <button
+                onClick={() => setShowCompareModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                type="button"
+              >
+                Close
               </button>
             </div>
           </div>
