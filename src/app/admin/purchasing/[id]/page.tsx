@@ -728,10 +728,20 @@ export default function ViewPO() {
   };
 
   const resolveUnitPrice = (item: any, costMode: "fob" | "delivered" = poCostMode) => {
-    const fobCandidates = [Number(item?.fob_port_cost), Number(item?.fob_cost)];
+    const toNum = (value: any) => {
+      if (typeof value === "number") return Number.isFinite(value) ? value : Number.NaN;
+      if (typeof value === "string") {
+        const cleaned = value.replace(/[^0-9.-]/g, "");
+        const parsed = Number(cleaned);
+        return Number.isFinite(parsed) ? parsed : Number.NaN;
+      }
+      return Number.NaN;
+    };
 
-    const costWithShipping = Number(item?.cost_with_shipping);
-    const shippingInput = Number(item?.zone5_shipping);
+    const fobCandidates = [toNum(item?.fob_port_cost), toNum(item?.fob_cost)];
+
+    const costWithShipping = toNum(item?.cost_with_shipping);
+    const shippingInput = toNum(item?.zone5_shipping);
     const deliveredWithoutShipping =
       Number.isFinite(costWithShipping) && Number.isFinite(shippingInput)
         ? costWithShipping - shippingInput
@@ -739,11 +749,11 @@ export default function ViewPO() {
 
     const deliveredCandidates = [
       deliveredWithoutShipping,
-      Number(item?.per_unit),
-      Number(item?.cost_with_shipping),
+      toNum(item?.per_unit),
+      toNum(item?.cost_with_shipping),
     ];
 
-    const fallbackCandidates = [Number(item?.sell_price), Number(item?.currentSalePricePerUnit), Number(item?.list_price)];
+    const fallbackCandidates = [toNum(item?.sell_price), toNum(item?.currentSalePricePerUnit), toNum(item?.list_price)];
 
     const candidates = costMode === "fob" ? [...fobCandidates, ...fallbackCandidates] : [...deliveredCandidates, ...fallbackCandidates];
 
