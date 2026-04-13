@@ -447,7 +447,22 @@ export default function PurchasingPage() {
       Number(item?.fob_cost),
     ];
 
+    const shippingCandidates = [
+      Number(item?.zone5_shipping),
+      Number(item?.shipping_cost),
+      Number(item?.shipping),
+    ];
+
+    const shippingValue = shippingCandidates.find((value) => Number.isFinite(value) && value >= 0) ?? 0;
+
+    const deliveredMinusShippingCandidates = [
+      Number(item?.cost_with_shipping),
+      Number(item?.shippingIncludedPerUnit),
+      Number(item?.shipping_included_per_unit),
+    ].map((value) => (Number.isFinite(value) ? value - shippingValue : Number.NaN));
+
     const deliveredCandidates = [
+      ...deliveredMinusShippingCandidates,
       Number(item?.per_unit),
       Number(item?.cost_with_shipping),
       Number(item?.shippingIncludedPerUnit),
