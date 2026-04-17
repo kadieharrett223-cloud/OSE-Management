@@ -658,14 +658,7 @@ export default function ViewPO() {
   );
 
   const getDisplayUnitPrice = (line: any) => {
-    const storedUnitPrice = Number(line?.unit_price || 0);
-    if (storedUnitPrice > 0) return storedUnitPrice;
-
-    const sku = normalizeSku(line?.sku || "");
-    if (!sku) return storedUnitPrice;
-    const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
-    if (!matchedItem) return storedUnitPrice;
-    return resolveUnitPrice(matchedItem, poCostMode);
+    return Number(line?.unit_price || 0);
   };
 
   const displayedPoTotal = (po?.lines || []).reduce((sum, line) => {
@@ -675,36 +668,6 @@ export default function ViewPO() {
 
   const applyPoCostMode = (mode: "fob" | "delivered") => {
     setPoCostMode(mode);
-
-    setTempLines((prev) =>
-      prev.map((line) => {
-        const storedUnitPrice = Number(line?.unit_price || 0);
-        if (storedUnitPrice > 0) return line;
-
-        const sku = normalizeSku(line?.sku || "");
-        if (!sku) return line;
-        const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
-        if (!matchedItem) return line;
-        const unitPrice = resolveUnitPrice(matchedItem, mode);
-        return {
-          ...line,
-          unit_price: unitPrice,
-          line_total: (Number(line.quantity) || 0) * unitPrice,
-        };
-      })
-    );
-
-    setLineItemForm((prev) => {
-      if (Number(prev.unit_price || 0) > 0) return prev;
-
-      const sku = normalizeSku(prev.sku || "");
-      if (!sku) return prev;
-      const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
-      if (!matchedItem) return prev;
-      const isNote = (matchedItem.sku || matchedItem.item_no || "").toLowerCase() === "note";
-      if (isNote) return { ...prev, unit_price: 0 };
-      return { ...prev, unit_price: resolveUnitPrice(matchedItem, mode) };
-    });
   };
 
   const handlePrint = () => {

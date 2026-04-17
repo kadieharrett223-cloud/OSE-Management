@@ -56,54 +56,15 @@ const derivePaymentStatus = (po: any): string => {
 
 const enrichPurchaseOrderWithFobCosts = async (supabase: any, po: any) => {
   const lines = Array.isArray(po?.lines) ? po.lines : [];
-  const skus = Array.from(new Set(lines.map((line: any) => String(line?.sku || "").trim()).filter(Boolean)));
-
-  if (skus.length === 0) {
-    return {
-      ...po,
-      total_amount: deriveTotalFromLines(po),
-    };
-  }
-
-  const { data: priceItems, error } = await supabase
-    .from("price_list_items")
-    .select("item_no, fob_cost")
-    .in("item_no", skus)
-    .eq("is_active", true);
-
-  if (error) {
-    console.warn("Unable to enrich purchase order with FOB costs:", error.message);
-    return {
-      ...po,
-      total_amount: deriveTotalFromLines(po),
-    };
-  }
-
-  const fobBySku = new Map<string, number>();
-  for (const item of priceItems || []) {
-    const sku = String(item.item_no || "").trim().toLowerCase();
-    const fob = Number(item.fob_cost);
-    if (sku && Number.isFinite(fob) && fob > 0) {
-      fobBySku.set(sku, fob);
-    }
-  }
-
-  const resolveLineUnitPrice = (line: any): number => {
-    const storedUnitPrice = normalizeCurrency(line?.unit_price);
-    if (storedUnitPrice > 0) return storedUnitPrice;
-
-    const skuKey = String(line?.sku || "").trim().toLowerCase();
-    const fobCost = fobBySku.get(skuKey);
-    return fobCost && fobCost > 0 ? fobCost : 0;
-  };
 
   const enrichedLines = lines.map((line: any) => {
     const quantity = normalizeCurrency(line?.quantity);
-    const unitPrice = resolveLineUnitPrice(line);
+    const unitPrice = normalizeCurrency(line?.unit_price);
+    const lineTotal = normalizeCurrency(line?.line_total) || quantity * unitPrice;
     return {
       ...line,
       unit_price: unitPrice,
-      line_total: quantity * unitPrice,
+      line_total: lineTotal,
     };
   });
 

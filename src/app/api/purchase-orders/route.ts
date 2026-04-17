@@ -50,62 +50,16 @@ export async function GET(req: NextRequest) {
     };
 
     const enrichPurchaseOrdersWithFobCosts = async (purchaseOrders: any[]) => {
-      const allSkus = Array.from(
-        new Set(
-          (purchaseOrders || [])
-            .flatMap((po: any) => (Array.isArray(po?.lines) ? po.lines : []))
-            .map((line: any) => String(line?.sku || "").trim())
-            .filter(Boolean)
-        )
-      );
-
-      if (allSkus.length === 0) {
-        return (purchaseOrders || []).map((po: any) => ({
-          ...po,
-          total_amount: deriveTotalAmount(po),
-        }));
-      }
-
-      const { data: priceItems, error: priceError } = await supabase
-        .from("price_list_items")
-        .select("item_no, fob_cost")
-        .in("item_no", allSkus)
-        .eq("is_active", true);
-
-      if (priceError) {
-        console.warn("Unable to enrich purchase orders with FOB costs:", priceError.message);
-        return (purchaseOrders || []).map((po: any) => ({
-          ...po,
-          total_amount: deriveTotalAmount(po),
-        }));
-      }
-
-      const fobBySku = new Map<string, number>();
-      for (const item of priceItems || []) {
-        const sku = String(item.item_no || "").trim().toLowerCase();
-        const fob = Number(item.fob_cost);
-        if (sku && Number.isFinite(fob) && fob > 0) {
-          fobBySku.set(sku, fob);
-        }
-      }
-
-      const resolveLineUnitPrice = (line: any): number => {
-        const storedUnitPrice = normalizeCurrency(line?.unit_price);
-        if (storedUnitPrice > 0) return storedUnitPrice;
-
-        const skuKey = String(line?.sku || "").trim().toLowerCase();
-        const fobCost = fobBySku.get(skuKey);
-        return fobCost && fobCost > 0 ? fobCost : 0;
-      };
-
       return (purchaseOrders || []).map((po: any) => {
         const lines = (Array.isArray(po?.lines) ? po.lines : []).map((line: any) => {
           const quantity = normalizeCurrency(line?.quantity);
-          const unitPrice = resolveLineUnitPrice(line);
+          const unitPrice = normalizeCurrency(line?.unit_price);
+          const lineTotal = normalizeCurrency(line?.line_total) || quantity * unitPrice;
+
           return {
             ...line,
             unit_price: unitPrice,
-            line_total: quantity * unitPrice,
+            line_total: lineTotal,
           };
         });
 
