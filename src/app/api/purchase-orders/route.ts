@@ -89,17 +89,23 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      const resolveLineUnitPrice = (line: any): number => {
+        const storedUnitPrice = normalizeCurrency(line?.unit_price);
+        if (storedUnitPrice > 0) return storedUnitPrice;
+
+        const skuKey = String(line?.sku || "").trim().toLowerCase();
+        const fobCost = fobBySku.get(skuKey);
+        return fobCost && fobCost > 0 ? fobCost : 0;
+      };
+
       return (purchaseOrders || []).map((po: any) => {
         const lines = (Array.isArray(po?.lines) ? po.lines : []).map((line: any) => {
-          const skuKey = String(line?.sku || "").trim().toLowerCase();
-          const fobCost = fobBySku.get(skuKey);
-          if (!fobCost) return line;
-
           const quantity = normalizeCurrency(line?.quantity);
+          const unitPrice = resolveLineUnitPrice(line);
           return {
             ...line,
-            unit_price: fobCost,
-            line_total: quantity * fobCost,
+            unit_price: unitPrice,
+            line_total: quantity * unitPrice,
           };
         });
 

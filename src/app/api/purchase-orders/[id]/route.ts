@@ -88,16 +88,22 @@ const enrichPurchaseOrderWithFobCosts = async (supabase: any, po: any) => {
     }
   }
 
-  const enrichedLines = lines.map((line: any) => {
+  const resolveLineUnitPrice = (line: any): number => {
+    const storedUnitPrice = normalizeCurrency(line?.unit_price);
+    if (storedUnitPrice > 0) return storedUnitPrice;
+
     const skuKey = String(line?.sku || "").trim().toLowerCase();
     const fobCost = fobBySku.get(skuKey);
-    if (!fobCost) return line;
+    return fobCost && fobCost > 0 ? fobCost : 0;
+  };
 
+  const enrichedLines = lines.map((line: any) => {
     const quantity = normalizeCurrency(line?.quantity);
+    const unitPrice = resolveLineUnitPrice(line);
     return {
       ...line,
-      unit_price: fobCost,
-      line_total: quantity * fobCost,
+      unit_price: unitPrice,
+      line_total: quantity * unitPrice,
     };
   });
 

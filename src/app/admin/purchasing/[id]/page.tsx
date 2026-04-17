@@ -502,18 +502,7 @@ export default function ViewPO() {
 
   const startInlineEditingLineItems = () => {
     const baseLines = JSON.parse(JSON.stringify(po?.lines || []));
-    const repricedLines = baseLines.map((line: any) => {
-      const sku = String(line?.sku || "").trim().toLowerCase();
-      const matchedItem = priceList.find((item) => (item.sku || item.item_no || "").toLowerCase() === sku);
-      if (!matchedItem) return line;
-      const unitPrice = resolveUnitPrice(matchedItem, poCostMode);
-      return {
-        ...line,
-        unit_price: unitPrice,
-        line_total: (Number(line.quantity) || 0) * unitPrice,
-      };
-    });
-    setTempLines(repricedLines);
+    setTempLines(baseLines);
     setEditingLineItems(true);
   };
 
@@ -669,10 +658,13 @@ export default function ViewPO() {
   );
 
   const getDisplayUnitPrice = (line: any) => {
+    const storedUnitPrice = Number(line?.unit_price || 0);
+    if (storedUnitPrice > 0) return storedUnitPrice;
+
     const sku = normalizeSku(line?.sku || "");
-    if (!sku) return Number(line?.unit_price || 0);
+    if (!sku) return storedUnitPrice;
     const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
-    if (!matchedItem) return Number(line?.unit_price || 0);
+    if (!matchedItem) return storedUnitPrice;
     return resolveUnitPrice(matchedItem, poCostMode);
   };
 
@@ -686,6 +678,9 @@ export default function ViewPO() {
 
     setTempLines((prev) =>
       prev.map((line) => {
+        const storedUnitPrice = Number(line?.unit_price || 0);
+        if (storedUnitPrice > 0) return line;
+
         const sku = normalizeSku(line?.sku || "");
         if (!sku) return line;
         const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
@@ -700,6 +695,8 @@ export default function ViewPO() {
     );
 
     setLineItemForm((prev) => {
+      if (Number(prev.unit_price || 0) > 0) return prev;
+
       const sku = normalizeSku(prev.sku || "");
       if (!sku) return prev;
       const matchedItem = priceList.find((item) => normalizeSku(item.sku || item.item_no || "") === sku);
