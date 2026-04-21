@@ -23,6 +23,22 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'integrations' | 'defaults' | 'billing'>('integrations');
   const [globalTariffPercent, setGlobalTariffPercent] = useState<string>('100');
   const [savingTariff, setSavingTariff] = useState(false);
+  const [savingOrderSyncSettings, setSavingOrderSyncSettings] = useState(false);
+  const [runningOrderSync, setRunningOrderSync] = useState(false);
+  const [orderSyncEnabled, setOrderSyncEnabled] = useState(false);
+  const [orderSyncStatuses, setOrderSyncStatuses] = useState('paid');
+  const [defaultCustomerId, setDefaultCustomerId] = useState('');
+  const [defaultItemId, setDefaultItemId] = useState('');
+  const [shippingItemId, setShippingItemId] = useState('');
+  const [paymentMethodId, setPaymentMethodId] = useState('');
+  const [paymentMethodName, setPaymentMethodName] = useState('Shopify');
+  const [depositAccountId, setDepositAccountId] = useState('');
+  const [customerMappingJson, setCustomerMappingJson] = useState('{\n\n}');
+  const [lineItemMappingJson, setLineItemMappingJson] = useState('{\n\n}');
+  const [autoSendToEmail, setAutoSendToEmail] = useState('');
+  const [sendSummaryEmail, setSendSummaryEmail] = useState(false);
+  const [createMissingCustomers, setCreateMissingCustomers] = useState(false);
+  const [lastOrderSyncAt, setLastOrderSyncAt] = useState<string | null>(null);
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -37,6 +53,27 @@ export default function SettingsPage() {
           const data = await shopifyRes.json();
           setShopifyConnected(data.connected);
           setShopifyShop(data.shop);
+        }
+
+        const shopifySettingsRes = await fetch('/api/shopify/settings');
+        if (shopifySettingsRes.ok) {
+          const shopifySettingsData = await shopifySettingsRes.json();
+          const settings = shopifySettingsData?.settings || {};
+
+          setOrderSyncEnabled(Boolean(settings.order_sync_enabled));
+          setOrderSyncStatuses(Array.isArray(settings.order_sync_financial_statuses) ? settings.order_sync_financial_statuses.join(', ') : 'paid');
+          setDefaultCustomerId(settings.qbo_default_customer_id || '');
+          setDefaultItemId(settings.qbo_default_item_id || '');
+          setShippingItemId(settings.qbo_shipping_item_id || '');
+          setPaymentMethodId(settings.qbo_payment_method_id || '');
+          setPaymentMethodName(settings.qbo_payment_method_name || 'Shopify');
+          setDepositAccountId(settings.qbo_deposit_account_id || '');
+          setCustomerMappingJson(JSON.stringify(settings.customer_mapping_json || {}, null, 2));
+          setLineItemMappingJson(JSON.stringify(settings.line_item_mapping_json || {}, null, 2));
+          setAutoSendToEmail(settings.auto_send_to_email || '');
+          setSendSummaryEmail(Boolean(settings.send_summary_email));
+          setCreateMissingCustomers(Boolean(settings.create_missing_customers));
+          setLastOrderSyncAt(settings.last_order_sync_at || null);
         }
 
         // Load global pricing settings (admin-only)
@@ -202,6 +239,90 @@ export default function SettingsPage() {
       setError(err.message || 'Failed to save tariff setting');
     } finally {
       setSavingTariff(false);
+    }
+  };
+
+  const parseMapJson = (raw: string, label: string) => {
+    try {
+      const parsed = JSON.parse(raw || '{}');
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error(`${label} must be a JSON object`);
+      }
+      return parsed;
+    } catch {
+      throw new Error(`${label} must be valid JSON`);
+    }
+  };
+
+  const handleSaveOrderSyncSettings = async () => {
+    try {
+      setSavingOrderSyncSettings(true);
+      setError(null);
+      setSuccess(null);
+
+      const customerMap = parseMapJson(customerMappingJson, 'Customer mapping');
+      const lineMap = parseMapJson(lineItemMappingJson, 'Line item mapping');
+      const statuses = orderSyncStatuses
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+
+      const res = await fetch('/api/shopify/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_sync_enabled: orderSyncEnabled,
+          order_sync_financial_statuses: statuses.length > 0 ? statuses : ['paid'],
+          qbo_default_customer_id: defaultCustomerId || null,
+          qbo_default_item_id: defaultItemId || null,
+          qbo_shipping_item_id: shippingItemId || null,
+          qbo_payment_method_id: paymentMethodId || null,
+          qbo_payment_method_name: paymentMethodName || 'Shopify',
+          qbo_deposit_account_id: depositAccountId || null,
+          customer_mapping_json: customerMap,
+          line_item_mapping_json: lineMap,
+          auto_send_to_email: autoSendToEmail || null,
+          send_summary_email: sendSummaryEmail,
+          create_missing_customers: createMissingCustomers,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save Shopify order sync settings');
+      }
+
+      setSuccess('Shopify to QuickBooks order sync settings saved.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to save order sync settings');
+    } finally {
+      setSavingOrderSyncSettings(false);
+    }
+  };
+
+  const handleRunOrderSync = async () => {
+    try {
+      setRunningOrderSync(true);
+      setError(null);
+      setSuccess(null);
+
+      const res = await fetch('/api/shopify/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manualImport: true }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to sync Shopify orders to QuickBooks');
+      }
+
+      setLastOrderSyncAt(new Date().toISOString());
+      setSuccess(`Manual import completed: ${data.synced} synced, ${data.skipped} skipped, ${data.failed} failed.`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to run manual Shopify import');
+    } finally {
+      setRunningOrderSync(false);
     }
   };
 
@@ -379,6 +500,187 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow mb-6 p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Shopify to QuickBooks Order Sync</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Automatically create QuickBooks invoices from Shopify orders (without auto-recording payments) and send summary emails.
+              </p>
+
+              <div className="space-y-4">
+                <label className="flex items-center gap-3 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={orderSyncEnabled}
+                    onChange={(e) => setOrderSyncEnabled(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  Enable automatic Shopify → QuickBooks order sync
+                </label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Shopify Financial Statuses</label>
+                    <input
+                      type="text"
+                      value={orderSyncStatuses}
+                      onChange={(e) => setOrderSyncStatuses(e.target.value)}
+                      placeholder="paid, partially_paid"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Comma-separated values to sync from Shopify.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">QBO Payment Method Name</label>
+                    <input
+                      type="text"
+                      value={paymentMethodName}
+                      onChange={(e) => setPaymentMethodName(e.target.value)}
+                      placeholder="Shopify"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">QBO Default Customer ID</label>
+                    <input
+                      type="text"
+                      value={defaultCustomerId}
+                      onChange={(e) => setDefaultCustomerId(e.target.value)}
+                      placeholder="123"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">QBO Default Item ID</label>
+                    <input
+                      type="text"
+                      value={defaultItemId}
+                      onChange={(e) => setDefaultItemId(e.target.value)}
+                      placeholder="123"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">QBO Shipping Item ID</label>
+                    <input
+                      type="text"
+                      value={shippingItemId}
+                      onChange={(e) => setShippingItemId(e.target.value)}
+                      placeholder="123"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">QBO Payment Method ID (optional override)</label>
+                    <input
+                      type="text"
+                      value={paymentMethodId}
+                      onChange={(e) => setPaymentMethodId(e.target.value)}
+                      placeholder="45"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">QBO Deposit Account ID (optional)</label>
+                    <input
+                      type="text"
+                      value={depositAccountId}
+                      onChange={(e) => setDepositAccountId(e.target.value)}
+                      placeholder="35"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Customer Mapping JSON</label>
+                    <textarea
+                      value={customerMappingJson}
+                      onChange={(e) => setCustomerMappingJson(e.target.value)}
+                      rows={8}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Map Shopify email/name to QBO Customer ID.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Line Item Mapping JSON</label>
+                    <textarea
+                      value={lineItemMappingJson}
+                      onChange={(e) => setLineItemMappingJson(e.target.value)}
+                      rows={8}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Map Shopify SKU to QBO Item ID.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Auto-send Summary To</label>
+                    <input
+                      type="email"
+                      value={autoSendToEmail}
+                      onChange={(e) => setAutoSendToEmail(e.target.value)}
+                      placeholder="ops@yourcompany.com"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm text-gray-700 mt-7">
+                      <input
+                        type="checkbox"
+                        checked={sendSummaryEmail}
+                        onChange={(e) => setSendSummaryEmail(e.target.checked)}
+                        className="h-4 w-4"
+                      />
+                      Send summary email after each sync
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={createMissingCustomers}
+                        onChange={(e) => setCreateMissingCustomers(e.target.checked)}
+                        className="h-4 w-4"
+                      />
+                      Auto-create missing QBO customers
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSaveOrderSyncSettings}
+                    disabled={savingOrderSyncSettings}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingOrderSyncSettings ? 'Saving...' : 'Save Order Sync Settings'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRunOrderSync}
+                    disabled={runningOrderSync}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {runningOrderSync ? 'Importing...' : 'Manual Import Orders'}
+                  </button>
+
+                  <p className="text-xs text-gray-500">
+                    Last sync: {lastOrderSyncAt ? new Date(lastOrderSyncAt).toLocaleString() : 'Never'}
+                  </p>
+                </div>
               </div>
             </div>
           </>

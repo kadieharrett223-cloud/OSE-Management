@@ -533,15 +533,32 @@ export default function ShopifyReconcilePage() {
     await loadMappings();
   };
 
-  const handleCreateNewInvoice = async (shopifyOrder: ShopifyOrder) => {
+  const handleCreateNewInvoice = async (shopifyOrder: ShopifyOrder, sendInvoice = false) => {
     const orderId = String(shopifyOrder.id);
     setCreatingInvoiceFor(orderId);
     setActionError(null);
     try {
+      let sendToEmail = "";
+      if (sendInvoice) {
+        const input = window.prompt(
+          "Send QBO invoice to email (leave blank to use saved/default email):",
+          shopifyOrder.customerEmail || ""
+        );
+        if (input === null) {
+          setCreatingInvoiceFor(null);
+          return;
+        }
+        sendToEmail = String(input || "").trim();
+      }
+
       const res = await fetch("/api/shopify/reconcile-create-invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shopify_order_id: orderId }),
+        body: JSON.stringify({
+          shopify_order_id: orderId,
+          send_invoice: sendInvoice,
+          send_to_email: sendToEmail || null,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -883,16 +900,28 @@ export default function ShopifyReconcilePage() {
                                   {row.matchType === "cancelled" ? "Undo Cancel" : "Mark Cancelled"}
                                 </button>
                                 {!row.qbo && row.matchType !== "cancelled" && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCreateNewInvoice(row.shopify)}
-                                    disabled={creatingInvoiceFor === String(row.shopify.id)}
-                                    className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                                  >
-                                    {creatingInvoiceFor === String(row.shopify.id)
-                                      ? "Creating…"
-                                      : "Create New QBO Invoice"}
-                                  </button>
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCreateNewInvoice(row.shopify)}
+                                      disabled={creatingInvoiceFor === String(row.shopify.id)}
+                                      className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                    >
+                                      {creatingInvoiceFor === String(row.shopify.id)
+                                        ? "Creating…"
+                                        : "Create New QBO Invoice"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCreateNewInvoice(row.shopify, true)}
+                                      disabled={creatingInvoiceFor === String(row.shopify.id)}
+                                      className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50"
+                                    >
+                                      {creatingInvoiceFor === String(row.shopify.id)
+                                        ? "Creating…"
+                                        : "Create + Send To…"}
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             </td>

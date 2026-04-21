@@ -48,6 +48,34 @@ type ShopifyOrder = {
     first_name?: string | null;
     last_name?: string | null;
     email?: string | null;
+    phone?: string | null;
+  } | null;
+  phone?: string | null;
+  billing_address?: {
+    name?: string | null;
+    company?: string | null;
+    address1?: string | null;
+    address2?: string | null;
+    city?: string | null;
+    province?: string | null;
+    province_code?: string | null;
+    zip?: string | null;
+    country?: string | null;
+    country_code?: string | null;
+    phone?: string | null;
+  } | null;
+  shipping_address?: {
+    name?: string | null;
+    company?: string | null;
+    address1?: string | null;
+    address2?: string | null;
+    city?: string | null;
+    province?: string | null;
+    province_code?: string | null;
+    zip?: string | null;
+    country?: string | null;
+    country_code?: string | null;
+    phone?: string | null;
   } | null;
   email?: string | null;
   line_items: ShopifyOrderLine[];
@@ -119,6 +147,47 @@ function customerEmail(order: ShopifyOrder) {
   return String(order.customer?.email || order.email || "").trim().toLowerCase();
 }
 
+function customerPhone(order: ShopifyOrder) {
+  return String(order.phone || order.customer?.phone || order.shipping_address?.phone || order.billing_address?.phone || "").trim();
+}
+
+function buildQboAddress(
+  addr: ShopifyOrder["billing_address"] | ShopifyOrder["shipping_address"] | null | undefined,
+  options?: { includeContact?: boolean; email?: string | null; phone?: string | null }
+) {
+  if (!addr) return undefined;
+
+  const lines = [
+    [addr.name, addr.company].filter(Boolean).join(" - "),
+    addr.address1 || "",
+    addr.address2 || "",
+  ].filter(Boolean) as string[];
+
+  if (options?.includeContact) {
+    const contact = [
+      options.phone ? `Phone: ${options.phone}` : null,
+      options.email ? `Email: ${options.email}` : null,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    if (contact) lines.push(contact);
+  }
+
+  const out: Record<string, string> = {
+    City: String(addr.city || "").trim(),
+    CountrySubDivisionCode: String(addr.province_code || addr.province || "").trim(),
+    PostalCode: String(addr.zip || "").trim(),
+    Country: String(addr.country || addr.country_code || "").trim(),
+  };
+
+  lines.slice(0, 5).forEach((line, idx) => {
+    out[`Line${idx + 1}`] = line;
+  });
+
+  const hasValue = Object.values(out).some((v) => String(v || "").trim().length > 0);
+  return hasValue ? out : undefined;
+}
+
 function orderShippingTotal(order: ShopifyOrder): number {
   return (order.shipping_lines || []).reduce((sum, line) => {
     const v = Number(line?.price || 0);
@@ -145,7 +214,7 @@ async function fetchShopifyOrdersSince(since: string): Promise<ShopifyOrder[]> {
     limit: "250",
     status: "any",
     created_at_min: since,
-    fields: "id,name,order_number,created_at,financial_status,total_price,note,email,customer,line_items,shipping_lines",
+    fields: "id,name,order_number,created_at,financial_status,total_price,note,email,phone,customer,billing_address,shipping_address,line_items,shipping_lines",
   });
 
   let nextUrl: string | null = `https://${tokens.shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?${params.toString()}`;
@@ -170,36 +239,6 @@ async function fetchShopifyOrdersSince(since: string): Promise<ShopifyOrder[]> {
   }
 
   return allOrders;
-}
-
-async function resolvePaymentMethodId(settings: ShopifySyncSettings): Promise<string | null> {
-  if (settings.qbo_payment_method_id) {
-    return settings.qbo_payment_method_id;
-  }
-
-  const methodName = String(settings.qbo_payment_method_name || "Shopify").trim();
-  if (!methodName) return null;
-
-  const query = `SELECT * FROM PaymentMethod WHERE Name = '${methodName.replace(/'/g, "''")}' MAXRESULTS 1`;
-  const existing = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
-  const existingMethod = existing?.QueryResponse?.PaymentMethod?.[0];
-  if (existingMethod?.Id) {
-    return existingMethod.Id;
-  }
-
-  try {
-    const created = await authorizedQboFetch<any>("/paymentmethod?minorversion=65", {
-      method: "POST",
-      body: JSON.stringify({
-        Name: methodName,
-        Type: "NON_CREDIT_CARD",
-      }),
-    });
-
-    return created?.PaymentMethod?.Id || null;
-  } catch {
-    return null;
-  }
 }
 
 async function findOrCreateCustomerId(
@@ -240,7 +279,7 @@ async function findOrCreateCustomerId(
   return created?.Customer?.Id || null;
 }
 
-function buildInvoiceLines(order: ShopifyOrder, lineMap: JsonMap, skuToQboItemMap: JsonMap, defaultItemId: string | null) {
+function buildInvoiceLines(order: ShopifyOrder, lineMap: JsonMap, skuToQboItemMap: JsonMap) {
   return (order.line_items || []).map((line) => {
     const sku = normalizeToken(line.sku);
     const price = Number(line.price || 0);
@@ -251,11 +290,11 @@ function buildInvoiceLines(order: ShopifyOrder, lineMap: JsonMap, skuToQboItemMa
     // 1. Explicit SKU mapping (most specific — user set this directly)
     // 2. Legacy explicit SKU mapping
     // 3. Price-list SKU mapping
-    // 4. Default item
+    // 4. (No fallback) — unmapped lines must be explicitly mapped
     const explicitTitleItemId = (titleMappingKey(line.title) && lineMap[titleMappingKey(line.title)!]) || null;
     const explicitSkuItemId = (sku && lineMap[sku]) || null;
     const priceListItemId = (sku && skuToQboItemMap[sku]) || null;
-    const mappedItemId = explicitTitleItemId || explicitSkuItemId || priceListItemId || defaultItemId;
+    const mappedItemId = explicitTitleItemId || explicitSkuItemId || priceListItemId;
 
     if (!mappedItemId) {
       throw new Error(`No QBO item mapping for line "${line.title || sku || "Shopify line item"}"`);
@@ -426,8 +465,6 @@ export async function syncShopifyOrdersToQbo(params?: {
     const existingByOrderId = new Map<string, any>();
     (existingMappings || []).forEach((m: any) => existingByOrderId.set(String(m.shopify_order_id), m));
 
-    const paymentMethodId = await resolvePaymentMethodId(settings);
-
     for (const order of filteredOrders) {
       const orderId = String(order.id);
       const orderName = order.name || `#${order.order_number}`;
@@ -463,9 +500,26 @@ export async function syncShopifyOrdersToQbo(params?: {
         const qboLines = buildInvoiceLines(
           order,
           settings.line_item_mapping_json || {},
-          skuToQboItemMap,
-          settings.qbo_default_item_id
+          skuToQboItemMap
         );
+
+        const missingLineTitles = (order.line_items || [])
+          .filter((line) => {
+            const sku = normalizeToken(line.sku);
+            const titleKey = titleMappingKey(line.title);
+            const explicitTitleItemId = (titleKey && (settings.line_item_mapping_json || {})[titleKey]) || null;
+            const explicitSkuItemId = (sku && (settings.line_item_mapping_json || {})[sku]) || null;
+            const priceListItemId = (sku && skuToQboItemMap[sku]) || null;
+            const itemId = explicitTitleItemId || explicitSkuItemId || priceListItemId || settings.qbo_default_item_id;
+            return !itemId;
+          })
+          .map((line) => line.title || line.sku || "Shopify line item");
+
+        if (missingLineTitles.length > 0) {
+          throw new Error(
+            `Unmapped Shopify line item(s): ${Array.from(new Set(missingLineTitles)).join(", ")}. Map these in Product Mapping before syncing.`
+          );
+        }
 
         const shippingTotal = Number(orderShippingTotal(order).toFixed(2));
         if (shippingTotal > 0 && settings.qbo_shipping_item_id) {
@@ -480,6 +534,13 @@ export async function syncShopifyOrdersToQbo(params?: {
             },
           });
         }
+
+        const billAddr = buildQboAddress(order.billing_address || null, { includeContact: false });
+        const shipAddr = buildQboAddress(order.shipping_address || null, {
+          includeContact: true,
+          email: customerEmail(order) || null,
+          phone: customerPhone(order) || null,
+        });
 
         const invoicePayload: any = {
           CustomerRef: { value: customerId },
@@ -498,6 +559,12 @@ export async function syncShopifyOrdersToQbo(params?: {
           },
         };
 
+        if (customerEmail(order)) {
+          invoicePayload.BillEmail = { Address: customerEmail(order) };
+        }
+        if (billAddr) invoicePayload.BillAddr = billAddr;
+        if (shipAddr) invoicePayload.ShipAddr = shipAddr;
+
         const invoiceRes = await authorizedQboFetch<any>("/invoice?minorversion=65", {
           method: "POST",
           body: JSON.stringify(invoicePayload),
@@ -506,39 +573,6 @@ export async function syncShopifyOrdersToQbo(params?: {
         const invoice = invoiceRes?.Invoice;
         if (!invoice?.Id) {
           throw new Error("QBO did not return a created invoice Id");
-        }
-
-        const totalAmt = Number(order.total_price || 0);
-        let paymentId: string | undefined;
-
-        if (totalAmt > 0) {
-          const paymentPayload: any = {
-            CustomerRef: { value: customerId },
-            TotalAmt: Number(totalAmt.toFixed(2)),
-            TxnDate: order.created_at.slice(0, 10),
-            PrivateNote: `Paid via Shopify (${orderName})`,
-            Line: [
-              {
-                Amount: Number(totalAmt.toFixed(2)),
-                LinkedTxn: [{ TxnId: invoice.Id, TxnType: "Invoice" }],
-              },
-            ],
-          };
-
-          if (paymentMethodId) {
-            paymentPayload.PaymentMethodRef = { value: paymentMethodId };
-          }
-
-          if (settings.qbo_deposit_account_id) {
-            paymentPayload.DepositToAccountRef = { value: settings.qbo_deposit_account_id };
-          }
-
-          const paymentRes = await authorizedQboFetch<any>("/payment?minorversion=65", {
-            method: "POST",
-            body: JSON.stringify(paymentPayload),
-          });
-
-          paymentId = paymentRes?.Payment?.Id;
         }
 
         await supabase
@@ -564,7 +598,6 @@ export async function syncShopifyOrdersToQbo(params?: {
           status: "synced",
           invoiceId: invoice.Id,
           invoiceNumber: invoice.DocNumber,
-          paymentId,
         });
       } catch (err: any) {
         result.failed += 1;
