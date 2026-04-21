@@ -124,13 +124,10 @@ function buildQboAddress(
   ].filter(Boolean) as string[];
 
   if (options?.includeContact) {
-    const contact = [
-      options.phone ? `Phone: ${options.phone}` : null,
-      options.email ? `Email: ${options.email}` : null,
-    ]
-      .filter(Boolean)
-      .join(" | ");
-    if (contact) lines.push(contact);
+    if (options.phone) {
+      lines.push(`Phone: ${options.phone}`);
+    }
+    lines.push(options.email ? `Email: ${options.email}` : "Email: *no customer email*");
   }
 
   const out: Record<string, string> = {
@@ -362,7 +359,7 @@ export async function POST(req: NextRequest) {
     const invoicePayload: any = {
       CustomerRef: { value: customerId },
       Line: invoiceLines,
-      TxnDate: String(order.created_at || "").slice(0, 10),
+      TxnDate: new Date().toISOString().slice(0, 10),
       PONumber: String(order.name || `#${order.order_number}`).replace(/^#/, ""),
       PrivateNote: `Manually created from Shopify Reconcile (${order.id})`,
       CustomerMemo: {

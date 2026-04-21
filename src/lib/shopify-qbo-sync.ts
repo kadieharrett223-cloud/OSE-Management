@@ -164,13 +164,10 @@ function buildQboAddress(
   ].filter(Boolean) as string[];
 
   if (options?.includeContact) {
-    const contact = [
-      options.phone ? `Phone: ${options.phone}` : null,
-      options.email ? `Email: ${options.email}` : null,
-    ]
-      .filter(Boolean)
-      .join(" | ");
-    if (contact) lines.push(contact);
+    if (options.phone) {
+      lines.push(`Phone: ${options.phone}`);
+    }
+    lines.push(options.email ? `Email: ${options.email}` : "Email: *no customer email*");
   }
 
   const out: Record<string, string> = {
@@ -464,6 +461,7 @@ export async function syncShopifyOrdersToQbo(params?: {
 
     const existingByOrderId = new Map<string, any>();
     (existingMappings || []).forEach((m: any) => existingByOrderId.set(String(m.shopify_order_id), m));
+    const syncDate = new Date().toISOString().slice(0, 10);
 
     for (const order of filteredOrders) {
       const orderId = String(order.id);
@@ -545,7 +543,7 @@ export async function syncShopifyOrdersToQbo(params?: {
         const invoicePayload: any = {
           CustomerRef: { value: customerId },
           Line: qboLines,
-          TxnDate: order.created_at.slice(0, 10),
+          TxnDate: syncDate,
           PONumber: String(orderName).replace(/^#/, ""),
           PrivateNote: `Shopify Order ${orderName} (${orderId})`,
           CustomerMemo: {
