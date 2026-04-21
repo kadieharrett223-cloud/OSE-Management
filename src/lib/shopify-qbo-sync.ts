@@ -267,9 +267,17 @@ function buildInvoiceLines(order: ShopifyOrder, lineMap: JsonMap, skuToQboItemMa
     const price = Number(line.price || 0);
     const qty = Number(line.quantity || 0);
     const amount = Number((price * qty).toFixed(2));
-    const lineKeys = mappingKeysForLine(line);
-    const explicitItemId = lineKeys.map((key) => lineMap[key]).find(Boolean) || null;
-    const mappedItemId = explicitItemId || (sku && skuToQboItemMap[sku]) || defaultItemId;
+
+    // Resolution priority:
+    // 1. Explicit SKU mapping (most specific — user set this directly)
+    // 2. Price-list SKU mapping
+    // 3. Explicit title/property mapping (fallback for lines with no SKU)
+    // 4. Default item
+    const explicitSkuItemId = (sku && lineMap[sku]) || null;
+    const priceListItemId = (sku && skuToQboItemMap[sku]) || null;
+    const propKeys = mappingKeysForLine(line).filter((k) => k !== sku);
+    const propItemId = propKeys.map((key) => lineMap[key]).find(Boolean) || null;
+    const mappedItemId = explicitSkuItemId || priceListItemId || propItemId || defaultItemId;
 
     if (!mappedItemId) {
       throw new Error(`No QBO item mapping for line "${line.title || sku || "Shopify line item"}"`);

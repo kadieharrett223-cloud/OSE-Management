@@ -266,9 +266,14 @@ export async function POST(req: NextRequest) {
     const defaultItemId = settingsData?.qbo_default_item_id || null;
     const invoiceLines = (order.line_items || []).map((line) => {
       const sku = normalizeToken(line.sku);
-      const lineKeys = mappingKeysForLine(line);
-      const explicitItemId = lineKeys.map((key) => lineMap[key]).find(Boolean) || null;
-      const itemId = explicitItemId || (sku && skuMap[sku]) || defaultItemId;
+
+      // Resolution priority: explicit SKU → price-list SKU → prop/title keys → default
+      const explicitSkuItemId = (sku && lineMap[sku]) || null;
+      const priceListItemId = (sku && skuMap[sku]) || null;
+      const propKeys = mappingKeysForLine(line).filter((k) => k !== sku);
+      const propItemId = propKeys.map((key) => lineMap[key]).find(Boolean) || null;
+      const itemId = explicitSkuItemId || priceListItemId || propItemId || defaultItemId;
+
       if (!itemId) {
         throw new Error(`No QBO item mapping for line "${line.title || line.sku || "Shopify line item"}"`);
       }
