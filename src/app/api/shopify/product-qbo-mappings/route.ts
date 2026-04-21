@@ -249,23 +249,6 @@ export async function GET() {
       }
     }
 
-      // Add any order-seen SKUs that weren't in the product-catalog variants
-      const catalogKeys = new Set(rows.map((r) => r.sku.toLowerCase()));
-      for (const [orderSku, orderTitle] of orderSkuTitles) {
-        if (!catalogKeys.has(orderSku)) {
-          const explicit = explicitMap[orderSku] || null;
-          const priceList = priceMap[orderSku] || null;
-          rows.push({
-            sku: orderSku.toUpperCase(), // display as uppercase to match model-number style
-            variantId: syntheticId--,
-            productTitle: orderTitle,
-            variantTitle: "",
-            mappedQboItemId: explicit || priceList,
-            mappingSource: explicit ? "explicit" : priceList ? "price_list" : "none",
-          });
-        }
-      }
-
     let syntheticId = -1;
     for (const key of Array.from(customKeySet)) {
       const explicit = explicitMap[key] || null;
