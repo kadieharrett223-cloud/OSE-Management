@@ -310,6 +310,27 @@ function buildInvoiceLines(order: ShopifyOrder, lineMap: JsonMap, skuToQboItemMa
   });
 }
 
+function isDuplicateDocNumberError(error: any) {
+  const text = String(error?.message || "").toLowerCase();
+  return text.includes("duplicate") && text.includes("doc") && text.includes("number");
+}
+
+async function getNextSequentialInvoiceDocNumber(): Promise<number> {
+  const query = "SELECT DocNumber FROM Invoice WHERE DocNumber != '' ORDER BY MetaData.LastUpdatedTime DESC MAXRESULTS 500";
+  const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
+  const invoices = Array.isArray(res?.QueryResponse?.Invoice) ? res.QueryResponse.Invoice : [];
+
+  let maxNumericDoc = 0;
+  for (const invoice of invoices) {
+    const raw = String(invoice?.DocNumber || "").trim();
+    if (!/^\d+$/.test(raw)) continue;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > maxNumericDoc) maxNumericDoc = n;
+  }
+
+  return maxNumericDoc + 1;
+}
+
 async function sendSummaryEmail(recipient: string, result: ShopifyOrderSyncResult) {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
     return;
@@ -462,6 +483,7 @@ export async function syncShopifyOrdersToQbo(params?: {
     const existingByOrderId = new Map<string, any>();
     (existingMappings || []).forEach((m: any) => existingByOrderId.set(String(m.shopify_order_id), m));
     const syncDate = new Date().toISOString().slice(0, 10);
+    let nextDocNumber = await getNextSequentialInvoiceDocNumber();
 
     for (const order of filteredOrders) {
       const orderId = String(order.id);
@@ -564,12 +586,26 @@ export async function syncShopifyOrdersToQbo(params?: {
         if (billAddr) invoicePayload.BillAddr = billAddr;
         if (shipAddr) invoicePayload.ShipAddr = shipAddr;
 
-        const invoiceRes = await authorizedQboFetch<any>("/invoice?minorversion=65", {
-          method: "POST",
-          body: JSON.stringify(invoicePayload),
-        });
+        let invoice: any = null;
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const invoiceRes = await authorizedQboFetch<any>("/invoice?minorversion=65", {
+            method: "POST",
+            body: JSON.stringify({ ...invoicePayload, DocNumber: String(nextDocNumber) }),
+          }).catch((err) => {
+            if (isDuplicateDocNumberError(err)) {
+              nextDocNumber += 1;
+              return null;
+            }
+            throw err;
+          });
 
-        const invoice = invoiceRes?.Invoice;
+          invoice = invoiceRes?.Invoice;
+          if (invoice?.Id) {
+            nextDocNumber += 1;
+            break;
+          }
+        }
+
         if (!invoice?.Id) {
           throw new Error("QBO did not return a created invoice Id");
         }
