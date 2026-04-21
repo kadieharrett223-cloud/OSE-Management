@@ -589,7 +589,6 @@ export async function syncShopifyOrdersToQbo(params?: {
 
         if (missingLineTitles.length > 0) {
           throw new Error(
-            `Unmapped Shopify line item(s): ${Array.from(new Set(missingLineTitles)).join(", ")}. Map these in Product Mapping before syncing.`
             `Invoice not created — unmapped line item(s): ${Array.from(new Set(missingLineTitles)).join(", ")}. Go to Product Mapping and map them first.`
           );
         }
