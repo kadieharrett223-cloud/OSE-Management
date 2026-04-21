@@ -534,7 +534,8 @@ export async function syncShopifyOrdersToQbo(params?: {
         }
 
         const billAddr = buildQboAddress(order.billing_address || null, { includeContact: false });
-        const shipAddr = buildQboAddress(order.shipping_address || null, {
+        const shippingAddrSource = order.shipping_address || order.billing_address || null;
+        const shipAddr = buildQboAddress(shippingAddrSource, {
           includeContact: true,
           email: customerEmail(order) || null,
           phone: customerPhone(order) || null,
