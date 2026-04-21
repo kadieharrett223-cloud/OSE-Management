@@ -144,21 +144,42 @@ export async function shopifyApiFetch<T>(
  * Get all Shopify products
  */
 export async function getShopifyProducts() {
-  interface ShopifyProductsResponse {
-    products: Array<{
-      id: number;
-      title: string;
-      variants: Array<{
-        id: number;
-        sku: string;
-        price: string;
-        inventory_item_id: number;
-      }>;
-    }>;
+  const tokens = await getShopifyTokens();
+  if (!tokens) {
+    throw new Error("No Shopify connection. Please connect your Shopify store first.");
   }
 
-  const data = await shopifyApiFetch<ShopifyProductsResponse>("/products.json?limit=250");
-  return data.products;
+  const allProducts: any[] = [];
+  let nextUrl: string | null = `https://${tokens.shop}/admin/api/${SHOPIFY_API_VERSION}/products.json?limit=250`;
+
+  const getNextPageUrl = (linkHeader: string | null): string | null => {
+    if (!linkHeader) return null;
+    const links = linkHeader.split(",").map((part) => part.trim());
+    const next = links.find((link) => /rel="next"/.test(link));
+    if (!next) return null;
+    const match = next.match(/<([^>]+)>/);
+    return match?.[1] || null;
+  };
+
+  while (nextUrl) {
+    const response = await fetch(nextUrl, {
+      headers: {
+        "X-Shopify-Access-Token": tokens.access_token,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Shopify API error ${response.status}: ${text}`);
+    }
+
+    const data = (await response.json()) as { products: any[] };
+    allProducts.push(...(data.products || []));
+    nextUrl = getNextPageUrl(response.headers.get("Link"));
+  }
+
+  return allProducts;
 }
 
 type ShopifyCollection = {

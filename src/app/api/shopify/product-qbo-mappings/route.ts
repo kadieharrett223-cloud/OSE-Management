@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
-import { getShopifyProductsByCollectionIds } from "@/lib/shopify";
+import { getShopifyProducts } from "@/lib/shopify";
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -65,7 +65,6 @@ export async function GET() {
 
     if (settingsError) throw settingsError;
 
-    const allowedCollectionIds = (settings?.allowed_collection_ids || []) as string[];
     const explicitMap = toMap(settings?.line_item_mapping_json);
 
     const { data: priceRows, error: priceError } = await supabase
@@ -84,7 +83,7 @@ export async function GET() {
     let products: any[] = [];
     let warning: string | null = schemaWarning;
     try {
-      products = await getShopifyProductsByCollectionIds(allowedCollectionIds);
+      products = await getShopifyProducts();
     } catch (shopifyError: any) {
       warning = shopifyError?.message || "Unable to fetch Shopify products";
       products = [];

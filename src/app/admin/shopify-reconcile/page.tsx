@@ -820,7 +820,7 @@ export default function ShopifyReconcilePage() {
                         <td colSpan={5} className="px-4 py-5 text-center text-slate-400">No SKUs to map.</td>
                       </tr>
                     ) : (
-                      visibleProductMappings.slice(0, 100).map((row) => {
+                      visibleProductMappings.map((row) => {
                         const selected = productMappingSelection[row.sku] || "";
                         return (
                           <tr key={`${row.sku}-${row.variantId}`}>
