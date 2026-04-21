@@ -182,6 +182,8 @@ export async function GET() {
 
     // Include app-driven line item option/title keys discovered from recent Shopify orders
     const customKeySet = new Set<string>();
+      // SKUs seen on actual order line items that may differ from product-catalog variant SKUs
+      const orderSkuTitles = new Map<string, string>(); // normalizedSku → line title
     try {
       const tokens = await getShopifyTokens();
       if (tokens) {
@@ -210,6 +212,10 @@ export async function GET() {
               const sku = normalizeToken(line?.sku);
               const title = normalizeToken(line?.title);
               if (!sku && title) customKeySet.add(`title:${title}`);
+                // Track every real-order SKU so we can surface it if missing from product catalog
+                if (sku && !orderSkuTitles.has(sku)) {
+                  orderSkuTitles.set(sku, String(line?.title || sku));
+                }
 
               for (const prop of line?.properties || []) {
                 const name = normalizeToken(prop?.name);
@@ -243,6 +249,23 @@ export async function GET() {
       }
     }
 
+      // Add any order-seen SKUs that weren't in the product-catalog variants
+      const catalogKeys = new Set(rows.map((r) => r.sku.toLowerCase()));
+      for (const [orderSku, orderTitle] of orderSkuTitles) {
+        if (!catalogKeys.has(orderSku)) {
+          const explicit = explicitMap[orderSku] || null;
+          const priceList = priceMap[orderSku] || null;
+          rows.push({
+            sku: orderSku.toUpperCase(), // display as uppercase to match model-number style
+            variantId: syntheticId--,
+            productTitle: orderTitle,
+            variantTitle: "",
+            mappedQboItemId: explicit || priceList,
+            mappingSource: explicit ? "explicit" : priceList ? "price_list" : "none",
+          });
+        }
+      }
+
     let syntheticId = -1;
     for (const key of Array.from(customKeySet)) {
       const explicit = explicitMap[key] || null;
@@ -256,6 +279,23 @@ export async function GET() {
         mappingSource: explicit ? "explicit" : "none",
       });
     }
+
+      // Add any order-seen SKUs that weren't in the product-catalog variants
+      const catalogKeys = new Set(rows.map((r) => r.sku.toLowerCase()));
+      for (const [orderSku, orderTitle] of orderSkuTitles) {
+        if (!catalogKeys.has(orderSku)) {
+          const explicit = explicitMap[orderSku] || null;
+          const priceList = priceMap[orderSku] || null;
+          rows.push({
+            sku: orderSku.toUpperCase(),
+            variantId: syntheticId--,
+            productTitle: orderTitle,
+            variantTitle: "",
+            mappedQboItemId: explicit || priceList,
+            mappingSource: explicit ? "explicit" : priceList ? "price_list" : "none",
+          });
+        }
+      }
 
     rows.sort((a, b) => a.sku.localeCompare(b.sku));
 
