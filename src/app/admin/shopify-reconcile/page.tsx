@@ -444,15 +444,23 @@ export default function ShopifyReconcilePage() {
       if (!mappingRes.ok) {
         throw new Error(mappingData?.error || "Failed to load Shopify/QBO product mappings");
       }
-      if (!qboItemsRes.ok) {
-        throw new Error(qboItemsData?.error || "Failed to load QBO items");
-      }
 
       const rows: ProductMappingRow[] = Array.isArray(mappingData?.mappings) ? mappingData.mappings : [];
-      const qboList: QboItemOption[] = Array.isArray(qboItemsData?.items) ? qboItemsData.items : [];
+      const qboList: QboItemOption[] = qboItemsRes.ok && Array.isArray(qboItemsData?.items) ? qboItemsData.items : [];
 
       setProductMappings(rows);
       setQboItems(qboList);
+
+      const warnings: string[] = [];
+      if (mappingData?.warning) {
+        warnings.push(String(mappingData.warning));
+      }
+      if (!qboItemsRes.ok) {
+        warnings.push(String(qboItemsData?.error || "Failed to load QBO items"));
+      }
+      if (warnings.length > 0) {
+        setProductMappingError(warnings.join(" • "));
+      }
 
       const nextSelection: Record<string, string> = {};
       rows.forEach((row) => {
