@@ -36,26 +36,57 @@ function normalizeToken(value: string | null | undefined): string {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function isLikelyInternalId(value: string): boolean {
+  if (!value) return true;
+  if (/^\d{8,}$/.test(value)) return true;
+  if (/^gid:\/\//.test(value)) return true;
+  if (/^image-dropdown-\d+$/i.test(value)) return true;
+  if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(value)) return true;
+  return false;
+}
+
+function isLikelyMetaPropertyName(name: string): boolean {
+  if (!name) return true;
+  return (
+    name.startsWith("_") ||
+    name.startsWith("gpo_") ||
+    name.includes("gpo_parent") ||
+    name.includes("gpo_field_name") ||
+    name.includes("_bundle")
+  );
+}
+
+function isHumanReadableOptionValue(value: string): boolean {
+  if (!value) return false;
+  if (isLikelyInternalId(value)) return false;
+  if (!/[a-z]/i.test(value)) return false;
+  return value.length <= 120;
+}
+
+function prettyLabel(raw: string): string {
+  return raw.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function parseMappingKeyLabel(key: string): { productTitle: string; variantTitle: string } {
   if (key.startsWith("prop:")) {
     const parts = key.split(":");
-    const optionName = parts[1] || "option";
-    const optionValue = parts.slice(2).join(":") || "value";
+    const optionName = prettyLabel(parts[1] || "option");
+    const optionValue = prettyLabel(parts.slice(2).join(":") || "value");
     return {
-      productTitle: "Shopify App Option",
+      productTitle: "Shopify Dropdown",
       variantTitle: `${optionName} = ${optionValue}`,
     };
   }
   if (key.startsWith("propvalue:")) {
     return {
-      productTitle: "Shopify App Option Value",
-      variantTitle: key.slice("propvalue:".length) || "value",
+      productTitle: "Shopify Dropdown Value",
+      variantTitle: prettyLabel(key.slice("propvalue:".length) || "value"),
     };
   }
   if (key.startsWith("title:")) {
     return {
       productTitle: "Shopify Line Title",
-      variantTitle: key.slice("title:".length) || "line item",
+      variantTitle: prettyLabel(key.slice("title:".length) || "line item"),
     };
   }
   return {
@@ -184,8 +215,18 @@ export async function GET() {
                 const name = normalizeToken(prop?.name);
                 const value = normalizeToken(prop?.value);
                 if (!value) continue;
-                if (name) customKeySet.add(`prop:${name}:${value}`);
-                customKeySet.add(`propvalue:${value}`);
+
+                const explicitPropKey = name ? `prop:${name}:${value}` : "";
+                const isExplicitMapped = explicitPropKey ? Boolean(explicitMap[explicitPropKey]) : false;
+
+                if (name && (isExplicitMapped || (!isLikelyMetaPropertyName(name) && isHumanReadableOptionValue(value)))) {
+                  customKeySet.add(explicitPropKey);
+                }
+
+                const valueOnlyKey = `propvalue:${value}`;
+                if (explicitMap[valueOnlyKey] || isHumanReadableOptionValue(value)) {
+                  customKeySet.add(valueOnlyKey);
+                }
               }
             }
           }
