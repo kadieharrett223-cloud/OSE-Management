@@ -791,7 +791,6 @@ export default function ShopifyReconcilePage() {
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">QBO Customer</th>
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500 w-40">QBO Rep Tags</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-slate-500 w-28">QBO Amount</th>
-                      <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-slate-500 w-24">QBO Status</th>
                       <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-slate-500 w-44">Action</th>
                     </tr>
                   </thead>
@@ -799,7 +798,7 @@ export default function ShopifyReconcilePage() {
                     {loading ? (
                       Array.from({ length: 8 }).map((_, i) => (
                         <tr key={i}>
-                          {Array.from({ length: 12 }).map((__, j) => (
+                          {Array.from({ length: 11 }).map((__, j) => (
                             <td key={j} className="px-4 py-2">
                               <div className="h-4 rounded bg-slate-100 animate-pulse" />
                             </td>
@@ -808,7 +807,7 @@ export default function ShopifyReconcilePage() {
                       ))
                     ) : filtered.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="px-4 py-10 text-center text-slate-400">
+                        <td colSpan={11} className="px-4 py-10 text-center text-slate-400">
                           No orders found for this date range and filter.
                         </td>
                       </tr>
@@ -873,11 +872,10 @@ export default function ShopifyReconcilePage() {
                                   )}
                                 </td>
                                 <td className="px-4 py-2 text-right font-semibold text-slate-800">{money(row.qbo.totalAmt)}</td>
-                                <td className="px-4 py-2 text-center"><StatusBadge status={row.qbo.status} /></td>
                               </>
                             ) : (
                               <td
-                                colSpan={5}
+                                colSpan={4}
                                 className={`px-4 py-2 text-center text-sm font-medium ${
                                   row.matchType === "cancelled"
                                     ? "text-slate-500"
