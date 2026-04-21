@@ -571,7 +571,7 @@ export async function syncShopifyOrdersToQbo(params?: {
             const explicitTitleItemId = (titleKey && (settings.line_item_mapping_json || {})[titleKey]) || null;
             const explicitSkuItemId = (sku && (settings.line_item_mapping_json || {})[sku]) || null;
             const priceListItemId = (sku && skuToQboItemMap[sku]) || null;
-            const itemId = explicitTitleItemId || explicitSkuItemId || priceListItemId || settings.qbo_default_item_id;
+            const itemId = explicitTitleItemId || explicitSkuItemId || priceListItemId;
             return !itemId;
           })
           .map((line) => line.title || line.sku || "Shopify line item");
@@ -579,6 +579,7 @@ export async function syncShopifyOrdersToQbo(params?: {
         if (missingLineTitles.length > 0) {
           throw new Error(
             `Unmapped Shopify line item(s): ${Array.from(new Set(missingLineTitles)).join(", ")}. Map these in Product Mapping before syncing.`
+            `Invoice not created — unmapped line item(s): ${Array.from(new Set(missingLineTitles)).join(", ")}. Go to Product Mapping and map them first.`
           );
         }
 

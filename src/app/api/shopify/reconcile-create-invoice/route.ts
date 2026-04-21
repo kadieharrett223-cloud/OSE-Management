@@ -358,9 +358,9 @@ export async function POST(req: NextRequest) {
       .map((line) => line.title || line.sku || "Shopify line item");
 
     if (missingLineTitles.length > 0) {
-      throw new Error(
-        `Unmapped Shopify line item(s): ${Array.from(new Set(missingLineTitles)).join(", ")}. Map these in Product Mapping before creating the invoice.`
-      );
+        throw new Error(
+          `Invoice not created — the following line items are not mapped to a QBO item: ${Array.from(new Set(missingLineTitles)).join(", ")}. Go to Product Mapping and map them first.`
+        );
     }
 
     const invoiceLines = (order.line_items || []).map((line) => {
