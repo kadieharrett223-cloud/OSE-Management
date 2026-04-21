@@ -87,6 +87,7 @@ export default function SpecialOrdersPage() {
   const [details, setDetails] = useState<SpecialOrderDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingOrder, setDeletingOrder] = useState(false);
   const [newInvoiceNumber, setNewInvoiceNumber] = useState("");
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -270,6 +271,35 @@ export default function SpecialOrdersPage() {
       );
     } catch (error: any) {
       alert(error?.message || "Failed to delete document");
+    }
+  }
+
+  async function deleteOrder() {
+    if (!details || deletingOrder) return;
+
+    const orderLabel = details.qbo_invoice_number || details.order_name;
+    const confirmed = window.confirm(`Delete special order "${orderLabel}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingOrder(true);
+    try {
+      const res = await fetch(`/api/special-orders/${details.id}`, { method: "DELETE" });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || "Failed to delete special order");
+
+      const nextOrders = orders.filter((order) => order.id !== details.id);
+      setOrders(nextOrders);
+
+      if (nextOrders.length > 0) {
+        setSelectedId(nextOrders[0].id);
+      } else {
+        setSelectedId(null);
+        setDetails(null);
+      }
+    } catch (error: any) {
+      alert(error?.message || "Failed to delete special order");
+    } finally {
+      setDeletingOrder(false);
     }
   }
 
@@ -495,7 +525,14 @@ export default function SpecialOrdersPage() {
                       )}
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex justify-between gap-2">
+                      <button
+                        onClick={deleteOrder}
+                        disabled={deletingOrder}
+                        className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                      >
+                        {deletingOrder ? "Deleting..." : "Delete Order"}
+                      </button>
                       <button
                         onClick={saveDetails}
                         disabled={saving}

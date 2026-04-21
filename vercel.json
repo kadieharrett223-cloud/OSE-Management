@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/mobile-notifications",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/shopify-qbo-sync",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

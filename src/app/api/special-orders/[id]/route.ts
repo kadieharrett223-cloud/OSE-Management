@@ -167,6 +167,26 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     }
 
     const supabase = getServerSupabaseClient();
+
+    const { data: docs, error: docsError } = await supabase
+      .from("special_order_documents")
+      .select("file_path")
+      .eq("special_order_id", params.id);
+
+    if (docsError) throw docsError;
+
+    const filePaths = (docs || [])
+      .map((doc: any) => doc?.file_path)
+      .filter((path: any) => typeof path === "string" && path.trim().length > 0);
+
+    if (filePaths.length > 0) {
+      const { error: removeStorageError } = await supabase.storage
+        .from("special-order-documents")
+        .remove(filePaths);
+
+      if (removeStorageError) throw removeStorageError;
+    }
+
     const { error } = await supabase.from("special_orders").delete().eq("id", params.id);
 
     if (error) throw error;
