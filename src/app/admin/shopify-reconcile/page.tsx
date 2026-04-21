@@ -30,6 +30,21 @@ interface QboInvoice {
   status: "Open" | "Paid" | "Cancelled";
 }
 
+interface QboItemOption {
+  id: string;
+  name: string;
+  sku?: string;
+}
+
+interface ProductMappingRow {
+  sku: string;
+  variantId: number;
+  productTitle: string;
+  variantTitle: string;
+  mappedQboItemId: string | null;
+  mappingSource: "explicit" | "price_list" | "none";
+}
+
 interface ManualMapping {
   shopify_order_id: string;
   shopify_order_number: string;
@@ -40,7 +55,7 @@ interface ManualMapping {
   is_cancelled?: boolean;
 }
 
-type MatchType = "cancelled" | "manual" | "po" | "name" | "none";
+type MatchType = "cancelled" | "manual" | "name" | "customer" | "none";
 
 interface MatchedRow {
   shopify: ShopifyOrder;
@@ -55,17 +70,47 @@ const money = (v: number | string) =>
 
 const toYmd = (date: Date) => date.toISOString().slice(0, 10);
 
-const normName = (s: string) =>
+const normalizePersonName = (s: string) =>
   s
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 
+const nameSuffixes = new Set([
+  "llc",
+  "inc",
+  "co",
+  "company",
+  "ltd",
+  "corp",
+  "corporation",
+  "pllc",
+  "lp",
+  "llp",
+]);
+
+const firstLastKey = (s: string) => {
+  const parts = normalizePersonName(s).split(" ").filter(Boolean);
+  if (parts.length < 2) return "";
+
+  let end = parts.length - 1;
+  while (end > 0 && nameSuffixes.has(parts[end])) {
+    end -= 1;
+  }
+
+  if (end <= 0) return "";
+  const first = parts[0];
+  const last = parts[end];
+  if (!first || !last || first === last) return "";
+  return `${first} ${last}`;
+};
+
 function buildMatchedRows(
   shopifyOrders: ShopifyOrder[],
   qboInvoices: QboInvoice[],
-  manualMappings: ManualMapping[]
+  manualMappings: ManualMapping[],
+  qboCustomerNames: string[]
 ): { rows: MatchedRow[]; unmatchedQbo: QboInvoice[] } {
   const usedQboIds = new Set<string>();
   const manualMap = new Map<string, ManualMapping>();
@@ -74,15 +119,9 @@ function buildMatchedRows(
   for (const inv of qboInvoices) qboById.set(inv.id, inv);
   for (const m of manualMappings) manualMap.set(m.shopify_order_id, m);
 
-  // Build lookup maps for auto-matching
-  const qboByPo = new Map<string, QboInvoice>();
   const qboByName = new Map<string, QboInvoice[]>();
-
   for (const inv of qboInvoices) {
-    const po = inv.poNumber.trim().replace(/^#/, "").toLowerCase();
-    if (po) qboByPo.set(po, inv);
-
-    const norm = normName(inv.customerName);
+    const norm = firstLastKey(inv.customerName);
     if (norm) {
       const existing = qboByName.get(norm) || [];
       existing.push(inv);
@@ -90,11 +129,12 @@ function buildMatchedRows(
     }
   }
 
+  const customerNameSet = new Set(qboCustomerNames.map((name) => firstLastKey(name)).filter(Boolean));
+
   const rows: MatchedRow[] = shopifyOrders.map((order) => {
     const shopifyIdStr = String(order.id);
-    const orderNum = order.orderNumber.toLowerCase();
+    const normCustomer = firstLastKey(order.customerName);
 
-    // 1. Manual mapping â€” highest priority
     const manualEntry = manualMap.get(shopifyIdStr);
     if (manualEntry?.is_cancelled) {
       return { shopify: order, qbo: null, matchType: "cancelled" };
@@ -104,33 +144,45 @@ function buildMatchedRows(
     if (manualQboId) {
       const inv = qboById.get(manualQboId);
       if (inv) {
+        const manualNote = String(manualEntry?.note || "").toLowerCase();
+        const isAutoSyncedMapping = manualNote.includes("auto-synced shopify") || manualNote.includes("auto synced shopify");
+        const normInvoiceCustomer = firstLastKey(inv.customerName);
+        const hasCustomerMismatch =
+          Boolean(normCustomer) &&
+          Boolean(normInvoiceCustomer) &&
+          normCustomer !== normInvoiceCustomer;
+
+        if (!(isAutoSyncedMapping && hasCustomerMismatch)) {
         usedQboIds.add(inv.id);
         return { shopify: order, qbo: inv, matchType: "manual" };
+        }
       }
     }
 
-    // 2. Try PO match
-    const poMatch = qboByPo.get(orderNum);
-    if (poMatch && !usedQboIds.has(poMatch.id)) {
-      usedQboIds.add(poMatch.id);
-      return { shopify: order, qbo: poMatch, matchType: "po" };
-    }
-
-    // 3. Try customer name match â€” pick closest date match
-    const normCustomer = normName(order.customerName);
     const nameMatches = (qboByName.get(normCustomer) || []).filter(
       (inv) => !usedQboIds.has(inv.id)
     );
     if (nameMatches.length > 0) {
-      // Pick the QBO invoice whose date is closest to Shopify order date
       const orderDate = new Date(order.created_at).getTime();
-      const best = nameMatches.sort(
-        (a, b) =>
-          Math.abs(new Date(a.txnDate).getTime() - orderDate) -
-          Math.abs(new Date(b.txnDate).getTime() - orderDate)
-      )[0];
-      usedQboIds.add(best.id);
-      return { shopify: order, qbo: best, matchType: "name" };
+      const MAX_DAYS = 90;
+      const MAX_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
+      const nearby = nameMatches.filter(
+        (inv) => Math.abs(new Date(inv.txnDate).getTime() - orderDate) <= MAX_MS
+      );
+      const candidates = nearby.length > 0 ? nearby : [];
+      if (candidates.length > 0) {
+        const best = candidates.sort(
+          (a, b) =>
+            Math.abs(new Date(a.txnDate).getTime() - orderDate) -
+            Math.abs(new Date(b.txnDate).getTime() - orderDate)
+        )[0];
+        usedQboIds.add(best.id);
+        return { shopify: order, qbo: best, matchType: "name" };
+      }
+    }
+
+    if (customerNameSet.has(normCustomer)) {
+      return { shopify: order, qbo: null, matchType: "customer" };
     }
 
     return { shopify: order, qbo: null, matchType: "none" };
@@ -153,16 +205,16 @@ function MatchBadge({ type }: { type: MatchType }) {
         â˜… Manual
       </span>
     );
-  if (type === "po")
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-        âœ“ PO Match
-      </span>
-    );
   if (type === "name")
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
         ~ Name Match
+      </span>
+    );
+  if (type === "customer")
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+        ✓ Customer Found
       </span>
     );
   return (
@@ -340,7 +392,7 @@ function StatusBadge({ status }: { status: string }) {
 
 // â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-type FilterTab = "all" | "cancelled" | "manual" | "po" | "name" | "none";
+type FilterTab = "all" | "cancelled" | "manual" | "name" | "customer" | "none";
 
 export default function ShopifyReconcilePage() {
   const [startDate, setStartDate] = useState("");
@@ -350,12 +402,22 @@ export default function ShopifyReconcilePage() {
 
   const [shopifyOrders, setShopifyOrders] = useState<ShopifyOrder[]>([]);
   const [qboInvoices, setQboInvoices] = useState<QboInvoice[]>([]);
+  const [qboCustomerNames, setQboCustomerNames] = useState<string[]>([]);
   const [manualMappings, setManualMappings] = useState<ManualMapping[]>([]);
   const [loadingShopify, setLoadingShopify] = useState(false);
   const [loadingQbo, setLoadingQbo] = useState(false);
   const [loadingMappings, setLoadingMappings] = useState(false);
   const [errorShopify, setErrorShopify] = useState<string | null>(null);
   const [errorQbo, setErrorQbo] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [creatingInvoiceFor, setCreatingInvoiceFor] = useState<string | null>(null);
+  const [qboItems, setQboItems] = useState<QboItemOption[]>([]);
+  const [productMappings, setProductMappings] = useState<ProductMappingRow[]>([]);
+  const [productMappingSelection, setProductMappingSelection] = useState<Record<string, string>>({});
+  const [loadingProductMappings, setLoadingProductMappings] = useState(false);
+  const [savingProductMappingSku, setSavingProductMappingSku] = useState<string | null>(null);
+  const [productMappingError, setProductMappingError] = useState<string | null>(null);
+  const [showMappedProducts, setShowMappedProducts] = useState(false);
 
   const [linkTarget, setLinkTarget] = useState<MatchedRow | null>(null);
 
@@ -367,11 +429,51 @@ export default function ShopifyReconcilePage() {
     } finally { setLoadingMappings(false); }
   }, []);
 
+  const loadProductMappings = useCallback(async () => {
+    setLoadingProductMappings(true);
+    setProductMappingError(null);
+    try {
+      const [mappingRes, qboItemsRes] = await Promise.all([
+        fetch("/api/shopify/product-qbo-mappings"),
+        fetch("/api/qbo/item"),
+      ]);
+
+      const mappingData = await mappingRes.json().catch(() => ({}));
+      const qboItemsData = await qboItemsRes.json().catch(() => ({}));
+
+      if (!mappingRes.ok) {
+        throw new Error(mappingData?.error || "Failed to load Shopify/QBO product mappings");
+      }
+      if (!qboItemsRes.ok) {
+        throw new Error(qboItemsData?.error || "Failed to load QBO items");
+      }
+
+      const rows: ProductMappingRow[] = Array.isArray(mappingData?.mappings) ? mappingData.mappings : [];
+      const qboList: QboItemOption[] = Array.isArray(qboItemsData?.items) ? qboItemsData.items : [];
+
+      setProductMappings(rows);
+      setQboItems(qboList);
+
+      const nextSelection: Record<string, string> = {};
+      rows.forEach((row) => {
+        if (row.mappedQboItemId) {
+          nextSelection[row.sku] = row.mappedQboItemId;
+        }
+      });
+      setProductMappingSelection(nextSelection);
+    } catch (err: any) {
+      setProductMappingError(err?.message || "Failed to load product mappings");
+    } finally {
+      setLoadingProductMappings(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoadingShopify(true);
     setLoadingQbo(true);
     setErrorShopify(null);
     setErrorQbo(null);
+    setActionError(null);
 
     const params = new URLSearchParams();
     if (startDate) params.set("startDate", startDate);
@@ -398,7 +500,7 @@ export default function ShopifyReconcilePage() {
     }
     setLoadingShopify(false);
 
-    // QBO
+    // QBO invoices
     if (qboRes.status === "fulfilled") {
       const data = await qboRes.value.json().catch(() => ({}));
       if (qboRes.value.ok) {
@@ -411,23 +513,46 @@ export default function ShopifyReconcilePage() {
       setErrorQbo("Network error loading QBO invoices");
       setQboInvoices([]);
     }
+
     setLoadingQbo(false);
+
+    fetch(`/api/qbo/query?resource=Customer&limit=1000`)
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setQboCustomerNames([]);
+          return;
+        }
+        const customers = data?.data?.QueryResponse?.Customer || [];
+        setQboCustomerNames(
+          customers
+            .map((c: any) => String(c?.DisplayName || c?.FullyQualifiedName || "").trim())
+            .filter(Boolean)
+        );
+      })
+      .catch(() => {
+        setQboCustomerNames([]);
+      });
   }, [startDate, endDate]);
 
   useEffect(() => {
     load(); loadMappings();
   }, [load, loadMappings]);
 
+  useEffect(() => {
+    loadProductMappings();
+  }, [loadProductMappings]);
+
   // â”€â”€ Matching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { rows } = useMemo(
-    () => buildMatchedRows(shopifyOrders, qboInvoices, manualMappings),
-    [shopifyOrders, qboInvoices, manualMappings]
+    () => buildMatchedRows(shopifyOrders, qboInvoices, manualMappings, qboCustomerNames),
+    [shopifyOrders, qboInvoices, manualMappings, qboCustomerNames]
   );
 
   const countManual = rows.filter((r) => r.matchType === "manual").length;
   const countCancelled = rows.filter((r) => r.matchType === "cancelled").length;
-  const countPo = rows.filter((r) => r.matchType === "po").length;
   const countName = rows.filter((r) => r.matchType === "name").length;
+  const countCustomer = rows.filter((r) => r.matchType === "customer").length;
   const countNone = rows.filter((r) => r.matchType === "none").length;
 
   const manualMapById = useMemo(() => {
@@ -470,6 +595,29 @@ export default function ShopifyReconcilePage() {
     await loadMappings();
   };
 
+  const handleCreateNewInvoice = async (shopifyOrder: ShopifyOrder) => {
+    const orderId = String(shopifyOrder.id);
+    setCreatingInvoiceFor(orderId);
+    setActionError(null);
+    try {
+      const res = await fetch("/api/shopify/reconcile-create-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopify_order_id: orderId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to create QBO invoice");
+      }
+
+      await Promise.all([load(), loadMappings()]);
+    } catch (err: any) {
+      setActionError(err?.message || "Failed to create invoice for this order");
+    } finally {
+      setCreatingInvoiceFor(null);
+    }
+  };
+
   // â”€â”€ Filtering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filtered = useMemo(() => {
     let base = rows;
@@ -497,6 +645,36 @@ export default function ShopifyReconcilePage() {
     setEndDate("");
   };
 
+  const handleSaveProductMapping = async (sku: string) => {
+    const qboItemId = productMappingSelection[sku] || "";
+    setSavingProductMappingSku(sku);
+    setProductMappingError(null);
+    try {
+      const res = await fetch("/api/shopify/product-qbo-mappings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sku, qbo_item_id: qboItemId || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to save product mapping");
+      }
+
+      await Promise.all([loadProductMappings(), load()]);
+    } catch (err: any) {
+      setProductMappingError(err?.message || "Failed to save product mapping");
+    } finally {
+      setSavingProductMappingSku(null);
+    }
+  };
+
+  const visibleProductMappings = useMemo(() => {
+    if (showMappedProducts) return productMappings;
+    return productMappings.filter((row) => row.mappingSource === "none");
+  }, [productMappings, showMappedProducts]);
+
+  const unmappedCount = productMappings.filter((row) => row.mappingSource === "none").length;
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
@@ -510,8 +688,8 @@ export default function ShopifyReconcilePage() {
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">Admin</p>
               <h1 className="text-2xl font-semibold text-slate-900">Shopify â†” QuickBooks Reconciliation</h1>
               <p className="mt-1 text-sm text-slate-500">
-                Auto-matches by <strong>PO #</strong> or <strong>customer name</strong>. Use{" "}
-                <strong className="text-blue-700">Link Invoice</strong> to manually connect any order to a QBO invoice when names differ.
+                Auto-matches by <strong>customer name only</strong>. If a QuickBooks customer with the same name exists, it is treated as matched.
+                Use <strong className="text-blue-700">Link Invoice</strong> to manually connect a specific invoice.
               </p>
             </header>
 
@@ -572,6 +750,125 @@ export default function ShopifyReconcilePage() {
                 <strong>QuickBooks:</strong> {errorQbo}
               </div>
             )}
+            {actionError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <strong>Action:</strong> {actionError}
+              </div>
+            )}
+
+            {/* Product Mapping */}
+            <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <div className="border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-800">Shopify Product → QBO Item Mapping</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Map missing Shopify SKUs to QuickBooks items before creating invoices.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-red-600">Unmapped: {unmappedCount}</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowMappedProducts((v) => !v)}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    {showMappedProducts ? "Show Unmapped Only" : "Show All"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={loadProductMappings}
+                    disabled={loadingProductMappings}
+                    className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {loadingProductMappings ? "Loading…" : "Refresh Products"}
+                  </button>
+                </div>
+              </div>
+
+              {productMappingError && (
+                <div className="mx-4 mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {productMappingError}
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[850px] text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">SKU</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Shopify Product</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Current Mapping</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">QBO Item</th>
+                      <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase text-slate-500">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {loadingProductMappings ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-5 text-center text-slate-400">Loading product mappings…</td>
+                      </tr>
+                    ) : visibleProductMappings.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-5 text-center text-slate-400">No SKUs to map.</td>
+                      </tr>
+                    ) : (
+                      visibleProductMappings.slice(0, 100).map((row) => {
+                        const selected = productMappingSelection[row.sku] || "";
+                        return (
+                          <tr key={`${row.sku}-${row.variantId}`}>
+                            <td className="px-4 py-2.5 font-mono text-slate-800">{row.sku}</td>
+                            <td className="px-4 py-2.5 text-slate-700">
+                              {row.productTitle}
+                              {row.variantTitle && row.variantTitle !== "Default Title" && (
+                                <span className="text-xs text-slate-500"> · {row.variantTitle}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs">
+                              {row.mappingSource === "none" ? (
+                                <span className="rounded bg-red-100 px-2 py-0.5 font-medium text-red-700">Not mapped</span>
+                              ) : row.mappingSource === "explicit" ? (
+                                <span className="rounded bg-blue-100 px-2 py-0.5 font-medium text-blue-700">Explicit map</span>
+                              ) : (
+                                <span className="rounded bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">Price list map</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <select
+                                value={selected}
+                                onChange={(e) =>
+                                  setProductMappingSelection((prev) => ({
+                                    ...prev,
+                                    [row.sku]: e.target.value,
+                                  }))
+                                }
+                                className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                              >
+                                <option value="">Select QBO item…</option>
+                                {qboItems.map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    {item.sku ? `${item.sku} — ` : ""}{item.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-4 py-2.5 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveProductMapping(row.sku)}
+                                disabled={savingProductMappingSku === row.sku || !selected}
+                                className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                              >
+                                {savingProductMappingSku === row.sku ? "Saving…" : "Save Mapping"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
             {/* Summary cards */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-6">
@@ -587,13 +884,13 @@ export default function ShopifyReconcilePage() {
                 <p className="text-xs font-medium text-blue-600">Manually Linked</p>
                 <p className="mt-1 text-2xl font-bold text-blue-700">{loading ? "â€¦" : countManual}</p>
               </div>
-              <div className="bg-white border border-emerald-200 rounded-lg p-4">
-                <p className="text-xs font-medium text-emerald-600">PO Matched</p>
-                <p className="mt-1 text-2xl font-bold text-emerald-700">{loading ? "â€¦" : countPo}</p>
-              </div>
               <div className="bg-white border border-amber-200 rounded-lg p-4">
-                <p className="text-xs font-medium text-amber-600">Name Matched</p>
+                <p className="text-xs font-medium text-amber-600">Name Matched (Invoice)</p>
                 <p className="mt-1 text-2xl font-bold text-amber-600">{loading ? "â€¦" : countName}</p>
+              </div>
+              <div className="bg-white border border-emerald-200 rounded-lg p-4">
+                <p className="text-xs font-medium text-emerald-600">Customer Found</p>
+                <p className="mt-1 text-2xl font-bold text-emerald-700">{loading ? "â€¦" : countCustomer}</p>
               </div>
               <div className="bg-white border border-red-200 rounded-lg p-4">
                 <p className="text-xs font-medium text-red-600">Not in QBO</p>
@@ -609,8 +906,8 @@ export default function ShopifyReconcilePage() {
                   { key: "cancelled", label: `Cancelled (${countCancelled})` },
                   { key: "none", label: `âš  Unmatched (${countNone})` },
                   { key: "manual", label: `â˜… Manual (${countManual})` },
-                  { key: "po", label: `âœ“ PO Match (${countPo})` },
                   { key: "name", label: `~ Name Match (${countName})` },
+                  { key: "customer", label: `✓ Customer Found (${countCustomer})` },
                 ] as { key: FilterTab; label: string }[]
               ).map((tab) => (
                 <button
@@ -697,10 +994,10 @@ export default function ShopifyReconcilePage() {
                             ? "bg-slate-100"
                             : row.matchType === "manual"
                             ? "bg-blue-50/50"
-                            : row.matchType === "po"
-                            ? "bg-emerald-50/60"
                             : row.matchType === "name"
                             ? "bg-amber-50/60"
+                            : row.matchType === "customer"
+                            ? "bg-emerald-50/60"
                             : "bg-red-50/60";
 
                         return (
@@ -749,8 +1046,18 @@ export default function ShopifyReconcilePage() {
                             ) : (
                               <td
                                 colSpan={5}
-                                className={`px-4 py-3 text-center text-sm font-medium ${row.matchType === "cancelled" ? "text-slate-500" : "text-red-500"}`}>
-                                {row.matchType === "cancelled" ? "Marked as cancelled" : "â€” Invoice not found in QuickBooks â€”"}
+                                className={`px-4 py-3 text-center text-sm font-medium ${
+                                  row.matchType === "cancelled"
+                                    ? "text-slate-500"
+                                    : row.matchType === "customer"
+                                    ? "text-emerald-700"
+                                    : "text-red-500"
+                                }`}>
+                                {row.matchType === "cancelled"
+                                  ? "Marked as cancelled"
+                                  : row.matchType === "customer"
+                                  ? "â€” Matching customer found in QuickBooks (no invoice linked yet) â€”"
+                                  : "â€” Invoice not found in QuickBooks â€”"}
                               </td>
                             )}
                             <td className="px-4 py-3 text-center">
@@ -773,6 +1080,18 @@ export default function ShopifyReconcilePage() {
                                 >
                                   {row.matchType === "cancelled" ? "Undo Cancel" : "Mark Cancelled"}
                                 </button>
+                                {!row.qbo && row.matchType !== "cancelled" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCreateNewInvoice(row.shopify)}
+                                    disabled={creatingInvoiceFor === String(row.shopify.id)}
+                                    className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                  >
+                                    {creatingInvoiceFor === String(row.shopify.id)
+                                      ? "Creating…"
+                                      : "Create New QBO Invoice"}
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
