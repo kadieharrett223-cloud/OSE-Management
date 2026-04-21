@@ -113,6 +113,16 @@ function isDeliveredToWashington(order: ShopifyOrder) {
   return state === "wa" || state === "washington";
 }
 
+async function resolveShopifyPaymentMethodId(storedId: string | null, storedName: string | null): Promise<string | null> {
+  if (storedId) return storedId;
+  const name = (storedName || "Shopify").toLowerCase().trim();
+  const query = "SELECT Id, Name FROM PaymentMethod MAXRESULTS 200";
+  const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
+  const methods = Array.isArray(res?.QueryResponse?.PaymentMethod) ? res.QueryResponse.PaymentMethod : [];
+  const match = methods.find((m: any) => String(m?.Name || "").toLowerCase().trim() === name);
+  return match?.Id ? String(match.Id) : null;
+}
+
 async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
   const query = "SELECT Id, Name FROM TaxCode MAXRESULTS 1000";
   const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
@@ -470,11 +480,34 @@ export async function POST(req: NextRequest) {
         { onConflict: "shopify_order_id" }
       );
 
+    // Record full payment via Shopify payment method
+    let paymentId: string | null = null;
+    const payAmount = Number(order.total_price);
+    if (payAmount > 0) {
+      const pmId = await resolveShopifyPaymentMethodId(
+        settingsData?.qbo_payment_method_id || null,
+        settingsData?.qbo_payment_method_name || null
+      );
+      const paymentPayload: any = {
+        CustomerRef: { value: customerId },
+        TotalAmt: payAmount,
+        TxnDate: new Date().toISOString().slice(0, 10),
+        Line: [{ Amount: payAmount, LinkedTxn: [{ TxnId: invoice.Id, TxnType: "Invoice" }] }],
+      };
+      if (pmId) paymentPayload.PaymentMethodRef = { value: pmId };
+      if (settingsData?.qbo_deposit_account_id) paymentPayload.DepositToAccountRef = { value: settingsData.qbo_deposit_account_id };
+      const paymentRes = await authorizedQboFetch<any>("/payment?minorversion=65", {
+        method: "POST",
+        body: JSON.stringify(paymentPayload),
+      });
+      paymentId = paymentRes?.Payment?.Id ? String(paymentRes.Payment.Id) : null;
+    }
+
     return NextResponse.json({
       ok: true,
       invoiceId: invoice.Id,
       invoiceNumber: invoice.DocNumber || null,
-      paymentId: null,
+      paymentId,
       sentToEmail,
       shopifyOrderId: String(order.id),
     });

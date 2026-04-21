@@ -207,6 +207,16 @@ function isDeliveredToWashington(order: ShopifyOrder) {
   return state === "wa" || state === "washington";
 }
 
+async function resolveShopifyPaymentMethodId(settings: ShopifySyncSettings): Promise<string | null> {
+  if (settings.qbo_payment_method_id) return settings.qbo_payment_method_id;
+  const name = (settings.qbo_payment_method_name || "Shopify").toLowerCase().trim();
+  const query = "SELECT Id, Name FROM PaymentMethod MAXRESULTS 200";
+  const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
+  const methods = Array.isArray(res?.QueryResponse?.PaymentMethod) ? res.QueryResponse.PaymentMethod : [];
+  const match = methods.find((m: any) => String(m?.Name || "").toLowerCase().trim() === name);
+  return match?.Id ? String(match.Id) : null;
+}
+
 async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
   const query = "SELECT Id, Name FROM TaxCode MAXRESULTS 1000";
   const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
@@ -650,6 +660,26 @@ export async function syncShopifyOrdersToQbo(params?: {
             { onConflict: "shopify_order_id" }
           );
 
+        // Record full payment via Shopify payment method
+        let paymentId: string | undefined;
+        const payAmount = Number(order.total_price);
+        if (payAmount > 0) {
+          const pmId = await resolveShopifyPaymentMethodId(settings);
+          const paymentPayload: any = {
+            CustomerRef: { value: customerId },
+            TotalAmt: payAmount,
+            TxnDate: syncDate,
+            Line: [{ Amount: payAmount, LinkedTxn: [{ TxnId: invoice.Id, TxnType: "Invoice" }] }],
+          };
+          if (pmId) paymentPayload.PaymentMethodRef = { value: pmId };
+          if (settings.qbo_deposit_account_id) paymentPayload.DepositToAccountRef = { value: settings.qbo_deposit_account_id };
+          const paymentRes = await authorizedQboFetch<any>("/payment?minorversion=65", {
+            method: "POST",
+            body: JSON.stringify(paymentPayload),
+          });
+          paymentId = paymentRes?.Payment?.Id ? String(paymentRes.Payment.Id) : undefined;
+        }
+
         result.synced += 1;
         result.results.push({
           shopifyOrderId: orderId,
@@ -657,6 +687,7 @@ export async function syncShopifyOrdersToQbo(params?: {
           status: "synced",
           invoiceId: invoice.Id,
           invoiceNumber: invoice.DocNumber,
+          paymentId,
         });
       } catch (err: any) {
         result.failed += 1;
