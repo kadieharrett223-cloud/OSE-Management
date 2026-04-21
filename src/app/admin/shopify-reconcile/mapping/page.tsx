@@ -1,7 +1,86 @@
 "use client";
 
+
+// ── QBO item combobox (searchable typeahead) ──────────────────────────────
+
+interface QboComboboxProps {
+  items: QboItemOption[];
+  value: string;
+  onChange: (id: string) => void;
+}
+
+function QboCombobox({ items, value, onChange }: QboComboboxProps) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const selected = items.find((i) => i.id === value) ?? null;
+  const displayText = open ? query : (selected ? `${selected.sku ? selected.sku + " — " : ""}${selected.name}` : "");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items.slice(0, 80);
+    return items.filter(
+      (i) =>
+        i.name.toLowerCase().includes(q) ||
+        (i.sku && i.sku.toLowerCase().includes(q))
+    ).slice(0, 80);
+  }, [items, query]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSelect = (id: string) => { onChange(id); setOpen(false); setQuery(""); };
+  const handleClear = (e: React.MouseEvent) => { e.stopPropagation(); onChange(""); setQuery(""); setOpen(false); };
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="flex items-center rounded-md border border-slate-300 bg-white">
+        <input
+          type="text"
+          className="flex-1 min-w-0 px-2 py-1.5 text-xs text-slate-700 bg-transparent outline-none"
+          placeholder="Search QBO item…"
+          value={displayText}
+          onFocus={() => { setOpen(true); setQuery(""); }}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        />
+        {value && (
+          <button type="button" onClick={handleClear} className="px-1.5 text-slate-400 hover:text-slate-600 text-sm leading-none" title="Clear">×</button>
+        )}
+        <button type="button" onClick={() => setOpen((v) => !v)} className="px-1.5 text-slate-400 hover:text-slate-600 text-xs">▾</button>
+      </div>
+      {open && (
+        <ul className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg text-xs">
+          <li className="px-3 py-2 cursor-pointer text-slate-400 hover:bg-slate-50 italic" onMouseDown={() => handleSelect("")}>— None (clear mapping) —</li>
+          {filtered.length === 0 ? (
+            <li className="px-3 py-2 text-slate-400">No results</li>
+          ) : (
+            filtered.map((item) => (
+              <li
+                key={item.id}
+                onMouseDown={() => handleSelect(item.id)}
+                className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${value === item.id ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-700"}`}
+              >
+                {item.sku ? <span className="font-mono text-slate-500 mr-1">{item.sku}</span> : null}
+                {item.name}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
 interface QboItemOption {
@@ -338,20 +417,11 @@ export default function ShopifyReconcileMappingPage() {
                               )}
                             </td>
                             <td className="px-4 py-2.5">
-                              <select
+                              <QboCombobox
+                                items={qboItems}
                                 value={selected}
-                                onChange={(e) =>
-                                  setSelection((prev) => ({ ...prev, [row.sku]: e.target.value }))
-                                }
-                                className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
-                              >
-                                <option value="">— None (clear mapping) —</option>
-                                {qboItems.map((item) => (
-                                  <option key={item.id} value={item.id}>
-                                    {item.sku ? `${item.sku} — ` : ""}{item.name}
-                                  </option>
-                                ))}
-                              </select>
+                                onChange={(id) => setSelection((prev) => ({ ...prev, [row.sku]: id }))}
+                              />
                               {errMsg && <p className="mt-0.5 text-[10px] text-red-600">{errMsg}</p>}
                             </td>
                             <td className="px-4 py-2.5 text-center">
