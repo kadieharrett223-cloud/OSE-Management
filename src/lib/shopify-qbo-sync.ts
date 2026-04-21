@@ -207,15 +207,24 @@ function isDeliveredToWashington(order: ShopifyOrder) {
   return state === "wa" || state === "washington";
 }
 
-async function resolveSalesRepCustomFieldDefId(): Promise<string | null> {
+async function resolveTransactionCustomFieldDefIds(): Promise<{
+  salesRep: string | null;
+  email: string | null;
+  phone: string | null;
+}> {
   const query = "SELECT * FROM CustomFieldDefinition MAXRESULTS 100";
   const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`).catch(() => null);
   const defs = Array.isArray(res?.QueryResponse?.CustomFieldDefinition) ? res.QueryResponse.CustomFieldDefinition : [];
-  const found = defs.find((d: any) => {
-    const n = String(d?.Name || "").toLowerCase().trim();
-    return n === "sales rep" || n === "salesrep" || n === "rep";
-  });
-  return found?.Id ? String(found.Id) : null;
+  const findId = (...names: string[]) => {
+    const found = defs.find((d: any) => names.includes(String(d?.Name || "").toLowerCase().trim()));
+    return found?.Id ? String(found.Id) : null;
+  };
+
+  return {
+    salesRep: findId("sales rep", "salesrep", "rep"),
+    email: findId("email"),
+    phone: findId("phone"),
+  };
 }
 
 async function resolveShopifyPaymentMethodId(settings: ShopifySyncSettings): Promise<string | null> {
@@ -520,7 +529,9 @@ export async function syncShopifyOrdersToQbo(params?: {
     const syncDate = new Date().toISOString().slice(0, 10);
     let nextDocNumber = await getNextSequentialInvoiceDocNumber();
     const requiresOutOfStateTaxCode = filteredOrders.some((order) => !isDeliveredToWashington(order));
-    const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;        const salesRepDefId = await resolveSalesRepCustomFieldDefId();    if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
+    const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
+    const customFieldDefIds = await resolveTransactionCustomFieldDefIds();
+    if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
       throw new Error("QuickBooks tax code 'Out of State' was not found. Create it in QBO before syncing non-WA invoices.");
     }
 
@@ -584,6 +595,9 @@ export async function syncShopifyOrdersToQbo(params?: {
         }
 
         const shippingTotal = Number(orderShippingTotal(order).toFixed(2));
+        if (shippingTotal > 0 && !settings.qbo_shipping_item_id) {
+          throw new Error("Invoice not created — this Shopify order has a shipping charge, but no QBO shipping item is configured in Settings.");
+        }
         if (shippingTotal > 0 && settings.qbo_shipping_item_id) {
           qboLines.push({
             DetailType: "SalesItemLineDetail",
@@ -599,11 +613,7 @@ export async function syncShopifyOrdersToQbo(params?: {
 
         const billAddr = buildQboAddress(order.billing_address || null, { includeContact: false });
         const shippingAddrSource = order.shipping_address || order.billing_address || null;
-        const shipAddr = buildQboAddress(shippingAddrSource, {
-          includeContact: true,
-          email: customerEmail(order) || null,
-          phone: customerPhone(order) || null,
-        });
+        const shipAddr = buildQboAddress(shippingAddrSource, { includeContact: false });
 
         const invoicePayload: any = {
           CustomerRef: { value: customerId },
@@ -632,8 +642,19 @@ export async function syncShopifyOrdersToQbo(params?: {
             TxnTaxCodeRef: { value: outOfStateTaxCodeId },
           };
         }
-        if (salesRepDefId) {
-          invoicePayload.CustomField = [{ DefinitionId: salesRepDefId, Name: "Sales Rep", Type: "StringType", StringValue: "KLH" }];
+        const customFields = [
+          customFieldDefIds.salesRep
+            ? { DefinitionId: customFieldDefIds.salesRep, Name: "Sales Rep", Type: "StringType", StringValue: "KLH" }
+            : null,
+          customFieldDefIds.email && customerEmail(order)
+            ? { DefinitionId: customFieldDefIds.email, Name: "email", Type: "StringType", StringValue: customerEmail(order) }
+            : null,
+          customFieldDefIds.phone && customerPhone(order)
+            ? { DefinitionId: customFieldDefIds.phone, Name: "Phone", Type: "StringType", StringValue: customerPhone(order) }
+            : null,
+        ].filter(Boolean);
+        if (customFields.length > 0) {
+          invoicePayload.CustomField = customFields;
         }
 
         let invoice: any = null;
