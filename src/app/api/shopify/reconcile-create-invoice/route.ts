@@ -269,7 +269,7 @@ export async function POST(req: NextRequest) {
       order,
       customerMap,
       defaultCustomerId: settingsData?.qbo_default_customer_id || null,
-      createMissingCustomers: Boolean(settingsData?.create_missing_customers),
+      createMissingCustomers: true,
     });
 
     if (!customerId) {
