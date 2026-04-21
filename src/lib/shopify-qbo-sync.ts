@@ -207,6 +207,17 @@ function isDeliveredToWashington(order: ShopifyOrder) {
   return state === "wa" || state === "washington";
 }
 
+async function resolveSalesRepCustomFieldDefId(): Promise<string | null> {
+  const query = "SELECT * FROM CustomFieldDefinition MAXRESULTS 100";
+  const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`).catch(() => null);
+  const defs = Array.isArray(res?.QueryResponse?.CustomFieldDefinition) ? res.QueryResponse.CustomFieldDefinition : [];
+  const found = defs.find((d: any) => {
+    const n = String(d?.Name || "").toLowerCase().trim();
+    return n === "sales rep" || n === "salesrep" || n === "rep";
+  });
+  return found?.Id ? String(found.Id) : null;
+}
+
 async function resolveShopifyPaymentMethodId(settings: ShopifySyncSettings): Promise<string | null> {
   if (settings.qbo_payment_method_id) return settings.qbo_payment_method_id;
   const name = (settings.qbo_payment_method_name || "Shopify").toLowerCase().trim();
@@ -509,8 +520,7 @@ export async function syncShopifyOrdersToQbo(params?: {
     const syncDate = new Date().toISOString().slice(0, 10);
     let nextDocNumber = await getNextSequentialInvoiceDocNumber();
     const requiresOutOfStateTaxCode = filteredOrders.some((order) => !isDeliveredToWashington(order));
-    const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
-    if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
+    const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;        const salesRepDefId = await resolveSalesRepCustomFieldDefId();    if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
       throw new Error("QuickBooks tax code 'Out of State' was not found. Create it in QBO before syncing non-WA invoices.");
     }
 
@@ -618,6 +628,9 @@ export async function syncShopifyOrdersToQbo(params?: {
           invoicePayload.TxnTaxDetail = {
             TxnTaxCodeRef: { value: outOfStateTaxCodeId },
           };
+        }
+        if (salesRepDefId) {
+          invoicePayload.CustomField = [{ DefinitionId: salesRepDefId, Name: "Sales Rep", Type: "StringType", StringValue: "KLH" }];
         }
 
         let invoice: any = null;

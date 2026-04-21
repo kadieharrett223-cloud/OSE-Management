@@ -113,6 +113,17 @@ function isDeliveredToWashington(order: ShopifyOrder) {
   return state === "wa" || state === "washington";
 }
 
+async function resolveSalesRepCustomFieldDefId(): Promise<string | null> {
+  const query = "SELECT * FROM CustomFieldDefinition MAXRESULTS 100";
+  const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`).catch(() => null);
+  const defs = Array.isArray(res?.QueryResponse?.CustomFieldDefinition) ? res.QueryResponse.CustomFieldDefinition : [];
+  const found = defs.find((d: any) => {
+    const n = String(d?.Name || "").toLowerCase().trim();
+    return n === "sales rep" || n === "salesrep" || n === "rep";
+  });
+  return found?.Id ? String(found.Id) : null;
+}
+
 async function resolveShopifyPaymentMethodId(storedId: string | null, storedName: string | null): Promise<string | null> {
   if (storedId) return storedId;
   const name = (storedName || "Shopify").toLowerCase().trim();
@@ -403,6 +414,7 @@ export async function POST(req: NextRequest) {
     });
     const requiresOutOfStateTaxCode = !isDeliveredToWashington(order);
     const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
+    const salesRepDefId = await resolveSalesRepCustomFieldDefId();
     if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
       throw new Error("QuickBooks tax code 'Out of State' was not found. Create it in QBO before creating non-WA invoices.");
     }
@@ -429,6 +441,9 @@ export async function POST(req: NextRequest) {
       invoicePayload.TxnTaxDetail = {
         TxnTaxCodeRef: { value: outOfStateTaxCodeId },
       };
+    }
+    if (salesRepDefId) {
+      invoicePayload.CustomField = [{ DefinitionId: salesRepDefId, Name: "Sales Rep", Type: "StringType", StringValue: "KLH" }];
     }
 
     let nextDocNumber = await getNextSequentialInvoiceDocNumber();
