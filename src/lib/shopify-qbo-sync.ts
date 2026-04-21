@@ -30,6 +30,10 @@ type ShopifyOrderLine = {
   sku: string | null;
   quantity: number;
   price: string;
+  properties?: Array<{
+    name?: string | null;
+    value?: string | null;
+  }>;
 };
 
 type ShopifyOrder = {
@@ -120,6 +124,36 @@ function orderShippingTotal(order: ShopifyOrder): number {
     const v = Number(line?.price || 0);
     return sum + (Number.isFinite(v) ? v : 0);
   }, 0);
+}
+
+function normalizeToken(value: string | null | undefined): string {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function mappingKeysForLine(line: ShopifyOrderLine): string[] {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  const add = (key: string) => {
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    keys.push(key);
+  };
+
+  const sku = normalizeToken(line.sku);
+  if (sku) add(sku);
+
+  const title = normalizeToken(line.title);
+  if (title) add(`title:${title}`);
+
+  for (const prop of line.properties || []) {
+    const name = normalizeToken(prop?.name);
+    const value = normalizeToken(prop?.value);
+    if (!value) continue;
+    if (name) add(`prop:${name}:${value}`);
+    add(`propvalue:${value}`);
+  }
+
+  return keys;
 }
 
 async function fetchShopifyOrdersSince(since: string): Promise<ShopifyOrder[]> {
@@ -229,14 +263,16 @@ async function findOrCreateCustomerId(
 
 function buildInvoiceLines(order: ShopifyOrder, lineMap: JsonMap, skuToQboItemMap: JsonMap, defaultItemId: string | null) {
   return (order.line_items || []).map((line) => {
-    const sku = String(line.sku || "").trim();
+    const sku = normalizeToken(line.sku);
     const price = Number(line.price || 0);
     const qty = Number(line.quantity || 0);
     const amount = Number((price * qty).toFixed(2));
-    const mappedItemId = (sku && (lineMap[sku.toLowerCase()] || skuToQboItemMap[sku.toLowerCase()])) || defaultItemId;
+    const lineKeys = mappingKeysForLine(line);
+    const explicitItemId = lineKeys.map((key) => lineMap[key]).find(Boolean) || null;
+    const mappedItemId = explicitItemId || (sku && skuToQboItemMap[sku]) || defaultItemId;
 
     if (!mappedItemId) {
-      throw new Error(`No QBO item mapping for SKU \"${sku || line.title}\"`);
+      throw new Error(`No QBO item mapping for line "${line.title || sku || "Shopify line item"}"`);
     }
 
     return {

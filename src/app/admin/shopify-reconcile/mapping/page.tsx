@@ -290,7 +290,7 @@ export default function ShopifyReconcileMappingPage() {
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">Admin</p>
               <h1 className="text-2xl font-semibold text-slate-900">Shopify Reconcile Product Mapping</h1>
               <p className="mt-1 text-sm text-slate-500">
-                Map Shopify SKUs to QuickBooks items used during reconcile invoice creation.
+                Map Shopify SKUs and app option keys (dropdown values) to QuickBooks items used during reconcile invoice creation.
               </p>
               <div className="mt-3">
                 <Link
@@ -366,7 +366,7 @@ export default function ShopifyReconcileMappingPage() {
                 <table className="w-full min-w-[850px] text-sm">
                   <thead className="bg-slate-50 border-b border-slate-100">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">SKU</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Mapping Key</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Shopify Product</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Status</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">QBO Item</th>

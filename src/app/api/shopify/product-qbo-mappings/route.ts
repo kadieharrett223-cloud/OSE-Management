@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
-import { getShopifyProducts } from "@/lib/shopify";
+import { getShopifyProducts, getShopifyTokens } from "@/lib/shopify";
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -30,6 +30,38 @@ async function requireAdmin() {
   const session: any = await getSession();
   const role = (session?.user?.role ?? "").toString().toLowerCase();
   return role === "admin";
+}
+
+function normalizeToken(value: string | null | undefined): string {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function parseMappingKeyLabel(key: string): { productTitle: string; variantTitle: string } {
+  if (key.startsWith("prop:")) {
+    const parts = key.split(":");
+    const optionName = parts[1] || "option";
+    const optionValue = parts.slice(2).join(":") || "value";
+    return {
+      productTitle: "Shopify App Option",
+      variantTitle: `${optionName} = ${optionValue}`,
+    };
+  }
+  if (key.startsWith("propvalue:")) {
+    return {
+      productTitle: "Shopify App Option Value",
+      variantTitle: key.slice("propvalue:".length) || "value",
+    };
+  }
+  if (key.startsWith("title:")) {
+    return {
+      productTitle: "Shopify Line Title",
+      variantTitle: key.slice("title:".length) || "line item",
+    };
+  }
+  return {
+    productTitle: "Shopify Mapping Key",
+    variantTitle: key,
+  };
 }
 
 export async function GET() {
@@ -115,6 +147,73 @@ export async function GET() {
           mappingSource: explicit ? "explicit" : priceList ? "price_list" : "none",
         });
       }
+    }
+
+    // Include app-driven line item option/title keys discovered from recent Shopify orders
+    const customKeySet = new Set<string>();
+    try {
+      const tokens = await getShopifyTokens();
+      if (tokens) {
+        const createdAtMin = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString();
+        const params = new URLSearchParams({
+          limit: "250",
+          status: "any",
+          created_at_min: createdAtMin,
+          fields: "id,line_items",
+        });
+
+        const ordersRes = await fetch(
+          `https://${tokens.shop}/admin/api/2024-01/orders.json?${params.toString()}`,
+          {
+            headers: {
+              "X-Shopify-Access-Token": tokens.access_token,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (ordersRes.ok) {
+          const payload = (await ordersRes.json()) as { orders?: any[] };
+          for (const order of payload.orders || []) {
+            for (const line of order?.line_items || []) {
+              const sku = normalizeToken(line?.sku);
+              const title = normalizeToken(line?.title);
+              if (!sku && title) customKeySet.add(`title:${title}`);
+
+              for (const prop of line?.properties || []) {
+                const name = normalizeToken(prop?.name);
+                const value = normalizeToken(prop?.value);
+                if (!value) continue;
+                if (name) customKeySet.add(`prop:${name}:${value}`);
+                customKeySet.add(`propvalue:${value}`);
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Non-fatal: custom keys simply won't be auto-discovered this time.
+    }
+
+    // Also include any existing explicit non-SKU keys so they remain editable.
+    for (const key of Object.keys(explicitMap)) {
+      if (key.startsWith("title:") || key.startsWith("prop:") || key.startsWith("propvalue:")) {
+        customKeySet.add(key);
+      }
+    }
+
+    let syntheticId = -1;
+    for (const key of Array.from(customKeySet)) {
+      const explicit = explicitMap[key] || null;
+      const labels = parseMappingKeyLabel(key);
+      rows.push({
+        sku: key,
+        variantId: syntheticId--,
+        productTitle: labels.productTitle,
+        variantTitle: labels.variantTitle,
+        mappedQboItemId: explicit,
+        mappingSource: explicit ? "explicit" : "none",
+      });
     }
 
     rows.sort((a, b) => a.sku.localeCompare(b.sku));

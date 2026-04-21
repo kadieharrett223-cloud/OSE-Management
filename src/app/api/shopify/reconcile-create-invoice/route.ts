@@ -32,6 +32,10 @@ type ShopifyOrder = {
     sku: string | null;
     quantity: number;
     price: string;
+    properties?: Array<{
+      name?: string | null;
+      value?: string | null;
+    }>;
   }>;
   shipping_lines?: Array<{ price?: string | number | null }>;
 };
@@ -64,6 +68,36 @@ function shippingTotal(order: ShopifyOrder) {
       .reduce((sum, line) => sum + (Number(line?.price || 0) || 0), 0)
       .toFixed(2)
   );
+}
+
+function normalizeToken(value: string | null | undefined): string {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function mappingKeysForLine(line: ShopifyOrder["line_items"][number]): string[] {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  const add = (key: string) => {
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    keys.push(key);
+  };
+
+  const sku = normalizeToken(line.sku);
+  if (sku) add(sku);
+
+  const title = normalizeToken(line.title);
+  if (title) add(`title:${title}`);
+
+  for (const prop of line.properties || []) {
+    const name = normalizeToken(prop?.name);
+    const value = normalizeToken(prop?.value);
+    if (!value) continue;
+    if (name) add(`prop:${name}:${value}`);
+    add(`propvalue:${value}`);
+  }
+
+  return keys;
 }
 
 async function resolvePaymentMethodId(explicitId: string | null, methodName: string | null) {
@@ -231,10 +265,12 @@ export async function POST(req: NextRequest) {
 
     const defaultItemId = settingsData?.qbo_default_item_id || null;
     const invoiceLines = (order.line_items || []).map((line) => {
-      const sku = String(line.sku || "").trim().toLowerCase();
-      const itemId = (sku && (lineMap[sku] || skuMap[sku])) || defaultItemId;
+      const sku = normalizeToken(line.sku);
+      const lineKeys = mappingKeysForLine(line);
+      const explicitItemId = lineKeys.map((key) => lineMap[key]).find(Boolean) || null;
+      const itemId = explicitItemId || (sku && skuMap[sku]) || defaultItemId;
       if (!itemId) {
-        throw new Error(`No QBO item mapping for SKU \"${line.sku || line.title}\"`);
+        throw new Error(`No QBO item mapping for line "${line.title || line.sku || "Shopify line item"}"`);
       }
 
       const qty = Number(line.quantity || 0);
