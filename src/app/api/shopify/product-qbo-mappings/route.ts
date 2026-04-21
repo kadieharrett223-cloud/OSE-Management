@@ -139,6 +139,74 @@ export async function GET() {
   }
 }
 
+/** PUT /api/shopify/product-qbo-mappings — bulk save multiple SKU→item pairs at once */
+export async function PUT(req: NextRequest) {
+  try {
+    const isAdmin = await requireAdmin();
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Admin role required" }, { status: 403 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const entries: { sku: string; qbo_item_id: string | null }[] = Array.isArray(body?.mappings)
+      ? body.mappings
+      : [];
+
+    if (entries.length === 0) {
+      return NextResponse.json({ error: "mappings array is required and must not be empty" }, { status: 400 });
+    }
+
+    const supabase = getServerSupabaseClient();
+
+    const { data: existing, error: existingError } = await supabase
+      .from("shopify_settings")
+      .select("line_item_mapping_json")
+      .eq("id", SETTINGS_ID)
+      .maybeSingle();
+    if (existingError) {
+      if (isMissingLineItemMappingColumn(existingError)) {
+        return NextResponse.json(
+          { error: "Database is missing shopify_settings.line_item_mapping_json. Run the latest Supabase migrations first." },
+          { status: 400 }
+        );
+      }
+      throw existingError;
+    }
+
+    const map = toMap(existing?.line_item_mapping_json);
+    for (const { sku, qbo_item_id } of entries) {
+      const skuKey = String(sku || "").trim().toLowerCase();
+      if (!skuKey) continue;
+      const itemId = qbo_item_id ? String(qbo_item_id).trim() : null;
+      if (itemId) {
+        map[skuKey] = itemId;
+      } else {
+        delete map[skuKey];
+      }
+    }
+
+    const { error: upsertError } = await supabase
+      .from("shopify_settings")
+      .upsert({ id: SETTINGS_ID, line_item_mapping_json: map, updated_at: new Date().toISOString() });
+    if (upsertError) {
+      if (isMissingLineItemMappingColumn(upsertError)) {
+        return NextResponse.json(
+          { error: "Database is missing shopify_settings.line_item_mapping_json. Run the latest Supabase migrations first." },
+          { status: 400 }
+        );
+      }
+      throw upsertError;
+    }
+
+    return NextResponse.json({ ok: true, saved: entries.length });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || "Failed to bulk-save Shopify/QBO product mappings" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const isAdmin = await requireAdmin();
