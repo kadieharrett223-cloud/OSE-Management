@@ -490,10 +490,19 @@ export async function POST(req: NextRequest) {
     let sentToEmail: string | null = null;
     if (sendInvoice) {
       const sendTo = sendToEmailInput || customerEmail(order) || String(settingsData?.auto_send_to_email || "").trim().toLowerCase();
-      const query = sendTo ? `?sendTo=${encodeURIComponent(sendTo)}&minorversion=65` : "?minorversion=65";
-      await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send${query}`, {
+      const sendPayload = sendTo
+        ? {
+            DeliveryInfo: {
+              DeliveryType: "Email",
+              DeliveryAddress: {
+                Address: sendTo,
+              },
+            },
+          }
+        : {};
+      await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send?minorversion=65`, {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify(sendPayload),
       });
       sentToEmail = sendTo || null;
     }
