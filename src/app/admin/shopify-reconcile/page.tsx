@@ -381,8 +381,10 @@ function StatusBadge({ status }: { status: string }) {
 type FilterTab = "all" | "cancelled" | "manual" | "name" | "customer" | "none";
 
 export default function ShopifyReconcilePage() {
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const defaultEnd = toYmd(new Date());
+  const defaultStart = toYmd(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const [startDate, setStartDate] = useState(defaultStart);
+  const [endDate, setEndDate] = useState(defaultEnd);
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
 
