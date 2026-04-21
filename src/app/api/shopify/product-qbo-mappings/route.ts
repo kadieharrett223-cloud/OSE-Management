@@ -9,6 +9,11 @@ const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 
 type JsonMap = Record<string, string>;
 
+function isMissingLineItemMappingColumn(error: any) {
+  const text = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+  return text.includes("line_item_mapping_json") && text.includes("does not exist");
+}
+
 function toMap(input: unknown): JsonMap {
   if (!input || typeof input !== "object" || Array.isArray(input)) return {};
   const out: JsonMap = {};
@@ -35,11 +40,28 @@ export async function GET() {
     }
 
     const supabase = getServerSupabaseClient();
-    const { data: settings, error: settingsError } = await supabase
+    let settings: any = null;
+    let settingsError: any = null;
+    let schemaWarning: string | null = null;
+    const fullSettingsResult = await supabase
       .from("shopify_settings")
       .select("allowed_collection_ids, line_item_mapping_json")
       .eq("id", SETTINGS_ID)
       .maybeSingle();
+
+    settings = fullSettingsResult.data;
+    settingsError = fullSettingsResult.error;
+
+    if (settingsError && isMissingLineItemMappingColumn(settingsError)) {
+      const fallback = await supabase
+        .from("shopify_settings")
+        .select("allowed_collection_ids")
+        .eq("id", SETTINGS_ID)
+        .maybeSingle();
+      settings = fallback.data;
+      settingsError = fallback.error;
+      schemaWarning = "Database is missing shopify_settings.line_item_mapping_json; explicit SKU mappings are disabled until migrations are applied.";
+    }
 
     if (settingsError) throw settingsError;
 
@@ -60,7 +82,7 @@ export async function GET() {
     });
 
     let products: any[] = [];
-    let warning: string | null = null;
+    let warning: string | null = schemaWarning;
     try {
       products = await getShopifyProductsByCollectionIds(allowedCollectionIds);
     } catch (shopifyError: any) {
@@ -141,7 +163,15 @@ export async function POST(req: NextRequest) {
       .select("line_item_mapping_json")
       .eq("id", SETTINGS_ID)
       .maybeSingle();
-    if (existingError) throw existingError;
+    if (existingError) {
+      if (isMissingLineItemMappingColumn(existingError)) {
+        return NextResponse.json(
+          { error: "Database is missing shopify_settings.line_item_mapping_json. Run the latest Supabase migrations first." },
+          { status: 400 }
+        );
+      }
+      throw existingError;
+    }
 
     const map = toMap(existing?.line_item_mapping_json);
     if (qboItemId) {
@@ -157,7 +187,15 @@ export async function POST(req: NextRequest) {
         line_item_mapping_json: map,
         updated_at: new Date().toISOString(),
       });
-    if (upsertError) throw upsertError;
+    if (upsertError) {
+      if (isMissingLineItemMappingColumn(upsertError)) {
+        return NextResponse.json(
+          { error: "Database is missing shopify_settings.line_item_mapping_json. Run the latest Supabase migrations first." },
+          { status: 400 }
+        );
+      }
+      throw upsertError;
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
