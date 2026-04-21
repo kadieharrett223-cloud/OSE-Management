@@ -530,7 +530,9 @@ export async function syncShopifyOrdersToQbo(params?: {
 
       try {
         const existing = existingByOrderId.get(orderId);
-        if (existing?.is_cancelled) {
+        // Only skip if cancelled AND already linked to an invoice — a cancelled-only flag
+        // without an invoice means the user accidentally hit Cancel; let the sync proceed.
+        if (existing?.is_cancelled && existing?.qbo_invoice_id) {
           result.skipped += 1;
           result.results.push({
             shopifyOrderId: orderId,
