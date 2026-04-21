@@ -3,7 +3,7 @@ import { authorizedQboFetch } from "@/lib/qbo";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const fetchCache = "force-no-store";
+export const revalidate = 300; // cache QBO items for 5 minutes
 
 export async function GET(req: NextRequest) {
   try {

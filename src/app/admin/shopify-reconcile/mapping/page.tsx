@@ -27,6 +27,9 @@ export default function ShopifyReconcileMappingPage() {
   const [savingProductMappingSku, setSavingProductMappingSku] = useState<string | null>(null);
   const [productMappingError, setProductMappingError] = useState<string | null>(null);
   const [showMappedProducts, setShowMappedProducts] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   const loadProductMappings = useCallback(async () => {
     setLoadingProductMappings(true);
@@ -102,12 +105,38 @@ export default function ShopifyReconcileMappingPage() {
     }
   };
 
-  const visibleProductMappings = useMemo(() => {
-    if (showMappedProducts) return productMappings;
-    return productMappings.filter((row) => row.mappingSource === "none");
-  }, [productMappings, showMappedProducts]);
+  const filteredProductMappings = useMemo(() => {
+    let rows = showMappedProducts ? productMappings : productMappings.filter((row) => row.mappingSource === "none");
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      rows = rows.filter(
+        (row) =>
+          row.sku.toLowerCase().includes(q) ||
+          row.productTitle.toLowerCase().includes(q) ||
+          row.variantTitle.toLowerCase().includes(q)
+      );
+    }
+    return rows;
+  }, [productMappings, showMappedProducts, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProductMappings.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const visibleProductMappings = useMemo(
+    () => filteredProductMappings.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [filteredProductMappings, safePage]
+  );
 
   const unmappedCount = productMappings.filter((row) => row.mappingSource === "none").length;
+
+  // Reset to page 1 whenever filter/toggle changes
+  const handleToggleMapped = () => {
+    setShowMappedProducts((v) => !v);
+    setCurrentPage(1);
+  };
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -141,10 +170,17 @@ export default function ShopifyReconcileMappingPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <input
+                    type="search"
+                    placeholder="Search SKU / product…"
+                    value={searchQuery}
+                    onChange={handleSearch}
+                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 w-44"
+                  />
                   <span className="text-xs font-medium text-red-600">Unmapped: {unmappedCount}</span>
                   <button
                     type="button"
-                    onClick={() => setShowMappedProducts((v) => !v)}
+                    onClick={handleToggleMapped}
                     className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
                     {showMappedProducts ? "Show Unmapped Only" : "Show All"}
@@ -243,6 +279,34 @@ export default function ShopifyReconcileMappingPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
+                  <span className="text-xs text-slate-500">
+                    Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredProductMappings.length)} of {filteredProductMappings.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={safePage === 1}
+                      className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    >
+                      ← Prev
+                    </button>
+                    <span className="px-2 text-xs text-slate-500">Page {safePage} / {totalPages}</span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={safePage === totalPages}
+                      className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
           </div>
         </main>
