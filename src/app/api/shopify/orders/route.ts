@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getShopifyTokens } from "@/lib/shopify";
+import { getSession } from "@/lib/auth";
+import { syncShopifyOrdersToQbo } from "@/lib/shopify-qbo-sync";
 
 const SHOPIFY_API_VERSION = "2024-01";
 
@@ -27,6 +29,23 @@ export interface ShopifyOrderSummary {
   customerName: string;
   customerEmail: string;
   note: string | null;
+  deliveryStateCode: string | null;
+  isWashingtonDelivery: boolean;
+}
+
+function getDeliveryStateCode(order: any): string {
+  const raw =
+    order?.shipping_address?.province_code ||
+    order?.shipping_address?.province ||
+    order?.billing_address?.province_code ||
+    order?.billing_address?.province ||
+    "";
+  return String(raw).trim();
+}
+
+function isWashingtonState(value: string): boolean {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "wa" || normalized === "washington";
 }
 
 export async function GET(req: NextRequest) {
@@ -76,6 +95,7 @@ export async function GET(req: NextRequest) {
       const customerName = [firstName, lastName].filter(Boolean).join(" ").trim() || o.email || "Unknown";
       // Strip leading # from order name to get numeric string
       const orderNumber = String(o.name || "").replace(/^#/, "").trim();
+      const deliveryStateCode = getDeliveryStateCode(o);
 
       return {
         id: Number(o.id),
@@ -88,6 +108,8 @@ export async function GET(req: NextRequest) {
         customerName,
         customerEmail: o.customer?.email || o.email || "",
         note: o.note || null,
+        deliveryStateCode: deliveryStateCode || null,
+        isWashingtonDelivery: isWashingtonState(deliveryStateCode),
       };
     });
 
@@ -95,5 +117,41 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     console.error("[shopify/orders] Error:", err);
     return NextResponse.json({ error: err.message || "Failed to fetch Shopify orders" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers.get("authorization") || "";
+    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const providedSecret = bearer || req.headers.get("x-cron-secret") || req.nextUrl.searchParams.get("secret");
+    const cronAuthorized = !!cronSecret && providedSecret === cronSecret;
+
+    if (!cronAuthorized) {
+      const session: any = await getSession();
+      const role = (session?.user?.role ?? "").toString().toLowerCase();
+      if (role !== "admin") {
+        return NextResponse.json({ error: "Admin role required" }, { status: 403 });
+      }
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const since = typeof body?.since === "string" ? body.since : undefined;
+    const force = Boolean(body?.force || body?.manualImport);
+
+    const result = await syncShopifyOrdersToQbo({
+      since,
+      force,
+      triggerSource: cronAuthorized ? "cron" : "manual",
+    });
+
+    return NextResponse.json({ ok: true, ...result });
+  } catch (err: any) {
+    console.error("[shopify/orders] POST sync error:", err);
+    return NextResponse.json(
+      { error: err.message || "Failed to sync Shopify orders to QuickBooks" },
+      { status: 500 }
+    );
   }
 }

@@ -17,6 +17,8 @@ interface ShopifyOrder {
   customerName: string;
   customerEmail: string;
   note: string | null;
+  deliveryStateCode?: string | null;
+  isWashingtonDelivery?: boolean;
 }
 
 interface QboInvoice {
@@ -378,7 +380,7 @@ function StatusBadge({ status }: { status: string }) {
 
 // â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-type FilterTab = "all" | "cancelled" | "manual" | "name" | "customer" | "none";
+type FilterTab = "all" | "cancelled" | "manual" | "name" | "customer" | "none" | "wa";
 
 export default function ShopifyReconcilePage() {
   const defaultEnd = toYmd(new Date());
@@ -492,6 +494,7 @@ export default function ShopifyReconcilePage() {
   const countName = rows.filter((r) => r.matchType === "name").length;
   const countCustomer = rows.filter((r) => r.matchType === "customer").length;
   const countNone = rows.filter((r) => r.matchType === "none").length;
+  const countWa = rows.filter((r) => r.shopify.isWashingtonDelivery).length;
 
   const manualMapById = useMemo(() => {
     const m = new Map<string, ManualMapping>();
@@ -576,7 +579,11 @@ export default function ShopifyReconcilePage() {
   // â”€â”€ Filtering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filtered = useMemo(() => {
     let base = rows;
-    if (filterTab !== "all") base = base.filter((r) => r.matchType === filterTab);
+    if (filterTab === "wa") {
+      base = base.filter((r) => r.shopify.isWashingtonDelivery);
+    } else if (filterTab !== "all") {
+      base = base.filter((r) => r.matchType === filterTab);
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       base = base.filter(
@@ -723,6 +730,7 @@ export default function ShopifyReconcilePage() {
                 [
                   { key: "all", label: `All (${rows.length})` },
                   { key: "cancelled", label: `Cancelled (${countCancelled})` },
+                  { key: "wa", label: `WA Tax Review (${countWa})` },
                   { key: "none", label: `Unmatched (${countNone})` },
                   { key: "manual", label: `Manual (${countManual})` },
                   { key: "name", label: `~ Name Match (${countName})` },
@@ -825,6 +833,13 @@ export default function ShopifyReconcilePage() {
                             <td className="px-4 py-2 font-mono font-semibold text-slate-800">{row.shopify.name}</td>
                             <td className="px-4 py-2 text-slate-800">
                               {row.shopify.customerName}
+                              {row.shopify.isWashingtonDelivery && (
+                                <div className="mt-1">
+                                  <span className="inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+                                    WA Tax Review
+                                  </span>
+                                </div>
+                              )}
                               {manualMapById.get(String(row.shopify.id))?.note && (
                                 <div className="text-[10px] text-blue-600 mt-0.5 italic">
                                   Note: {manualMapById.get(String(row.shopify.id))?.note}
