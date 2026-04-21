@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     let start = 1;
     const pageSize = 1000; // QBO maxresults limit
     while (true) {
-      const query = `SELECT * FROM Item WHERE Active IN (true,false) STARTPOSITION ${start} MAXRESULTS ${pageSize}`;
+      const query = `SELECT * FROM Item WHERE Active = true STARTPOSITION ${start} MAXRESULTS ${pageSize}`;
       const data = await authorizedQboFetch<any>(
         `/query?query=${encodeURIComponent(query)}&minorversion=65`
       );
