@@ -107,6 +107,20 @@ function titleMappingKey(value: string | null | undefined): string | null {
   return title ? `title:${title}` : null;
 }
 
+function isDeliveredToWashington(order: ShopifyOrder) {
+  const addr = order.shipping_address || order.billing_address;
+  const state = normalizeToken(addr?.province_code || addr?.province);
+  return state === "wa" || state === "washington";
+}
+
+async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
+  const query = "SELECT Id, Name FROM TaxCode MAXRESULTS 1000";
+  const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
+  const taxCodes = Array.isArray(res?.QueryResponse?.TaxCode) ? res.QueryResponse.TaxCode : [];
+  const outOfState = taxCodes.find((code: any) => normalizeToken(code?.Name) === "out of state");
+  return outOfState?.Id ? String(outOfState.Id) : null;
+}
+
 function customerPhone(order: ShopifyOrder) {
   return String(order.phone || order.customer?.phone || order.shipping_address?.phone || order.billing_address?.phone || "").trim();
 }
@@ -377,6 +391,11 @@ export async function POST(req: NextRequest) {
       email: customerEmail(order) || null,
       phone: customerPhone(order) || null,
     });
+    const requiresOutOfStateTaxCode = !isDeliveredToWashington(order);
+    const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
+    if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
+      throw new Error("QuickBooks tax code 'Out of State' was not found. Create it in QBO before creating non-WA invoices.");
+    }
 
     const invoicePayload: any = {
       CustomerRef: { value: customerId },
@@ -396,6 +415,11 @@ export async function POST(req: NextRequest) {
     }
     if (billAddr) invoicePayload.BillAddr = billAddr;
     if (shipAddr) invoicePayload.ShipAddr = shipAddr;
+    if (outOfStateTaxCodeId) {
+      invoicePayload.TxnTaxDetail = {
+        TxnTaxCodeRef: { value: outOfStateTaxCodeId },
+      };
+    }
 
     let nextDocNumber = await getNextSequentialInvoiceDocNumber();
     let invoice: any = null;

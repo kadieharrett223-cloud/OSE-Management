@@ -201,6 +201,20 @@ function titleMappingKey(value: string | null | undefined): string | null {
   return title ? `title:${title}` : null;
 }
 
+function isDeliveredToWashington(order: ShopifyOrder) {
+  const addr = order.shipping_address || order.billing_address;
+  const state = normalizeToken(addr?.province_code || addr?.province);
+  return state === "wa" || state === "washington";
+}
+
+async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
+  const query = "SELECT Id, Name FROM TaxCode MAXRESULTS 1000";
+  const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
+  const taxCodes = Array.isArray(res?.QueryResponse?.TaxCode) ? res.QueryResponse.TaxCode : [];
+  const outOfState = taxCodes.find((code: any) => normalizeToken(code?.Name) === "out of state");
+  return outOfState?.Id ? String(outOfState.Id) : null;
+}
+
 async function fetchShopifyOrdersSince(since: string): Promise<ShopifyOrder[]> {
   const tokens = await getShopifyTokens();
   if (!tokens) {
@@ -484,6 +498,11 @@ export async function syncShopifyOrdersToQbo(params?: {
     (existingMappings || []).forEach((m: any) => existingByOrderId.set(String(m.shopify_order_id), m));
     const syncDate = new Date().toISOString().slice(0, 10);
     let nextDocNumber = await getNextSequentialInvoiceDocNumber();
+    const requiresOutOfStateTaxCode = filteredOrders.some((order) => !isDeliveredToWashington(order));
+    const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
+    if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
+      throw new Error("QuickBooks tax code 'Out of State' was not found. Create it in QBO before syncing non-WA invoices.");
+    }
 
     for (const order of filteredOrders) {
       const orderId = String(order.id);
@@ -585,6 +604,11 @@ export async function syncShopifyOrdersToQbo(params?: {
         }
         if (billAddr) invoicePayload.BillAddr = billAddr;
         if (shipAddr) invoicePayload.ShipAddr = shipAddr;
+        if (!isDeliveredToWashington(order) && outOfStateTaxCodeId) {
+          invoicePayload.TxnTaxDetail = {
+            TxnTaxCodeRef: { value: outOfStateTaxCodeId },
+          };
+        }
 
         let invoice: any = null;
         for (let attempt = 0; attempt < 5; attempt += 1) {
