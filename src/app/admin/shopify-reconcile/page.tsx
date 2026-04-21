@@ -188,7 +188,7 @@ function MatchBadge({ type }: { type: MatchType }) {
   if (type === "manual")
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
-        â˜… Manual
+        Manual
       </span>
     );
   if (type === "name")
@@ -205,7 +205,7 @@ function MatchBadge({ type }: { type: MatchType }) {
     );
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-      âœ— No Match
+      No Match
     </span>
   );
 }
@@ -723,8 +723,8 @@ export default function ShopifyReconcilePage() {
                 [
                   { key: "all", label: `All (${rows.length})` },
                   { key: "cancelled", label: `Cancelled (${countCancelled})` },
-                  { key: "none", label: `âš  Unmatched (${countNone})` },
-                  { key: "manual", label: `â˜… Manual (${countManual})` },
+                  { key: "none", label: `Unmatched (${countNone})` },
+                  { key: "manual", label: `Manual (${countManual})` },
                   { key: "name", label: `~ Name Match (${countName})` },
                   { key: "customer", label: `✓ Customer Found (${countCustomer})` },
                 ] as { key: FilterTab; label: string }[]
@@ -749,9 +749,7 @@ export default function ShopifyReconcilePage() {
                 <h2 className="text-sm font-semibold text-slate-800">
                   Shopify Orders {filtered.length !== rows.length && `(${filtered.length} shown)`}
                 </h2>
-                {loading && (
-                  <span className="text-xs text-slate-500 animate-pulse">Loading dataâ€¦</span>
-                )}
+                {loading && <span className="text-xs text-slate-500 animate-pulse">Loading data...</span>}
               </div>
 
               <div className="overflow-x-auto">
@@ -759,34 +757,34 @@ export default function ShopifyReconcilePage() {
                   <thead className="bg-slate-50 border-b border-slate-100">
                     <tr>
                       {/* Shopify side */}
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500 w-28">
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500 w-28">
                         Shopify #
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">
                         Customer
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500 w-28">
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500 w-28">
                         Date
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500 w-28">
+                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-slate-500 w-28">
                         Amount
                       </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500 w-24">
+                      <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-slate-500 w-24">
                         Shopify Status
                       </th>
 
                       {/* Match column */}
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500 w-32">
+                      <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-slate-500 w-32">
                         Match
                       </th>
 
                       {/* QBO side */}
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500 w-28">QBO Invoice</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">QBO Customer</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500 w-40">QBO Rep Tags</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500 w-28">QBO Amount</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500 w-24">QBO Status</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-500 w-28">Action</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500 w-28">QBO Invoice</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">QBO Customer</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500 w-40">QBO Rep Tags</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-slate-500 w-28">QBO Amount</th>
+                      <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-slate-500 w-24">QBO Status</th>
+                      <th className="px-4 py-2 text-center text-xs font-semibold uppercase text-slate-500 w-44">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -794,7 +792,7 @@ export default function ShopifyReconcilePage() {
                       Array.from({ length: 8 }).map((_, i) => (
                         <tr key={i}>
                           {Array.from({ length: 12 }).map((__, j) => (
-                            <td key={j} className="px-4 py-3">
+                            <td key={j} className="px-4 py-2">
                               <div className="h-4 rounded bg-slate-100 animate-pulse" />
                             </td>
                           ))}
@@ -824,8 +822,8 @@ export default function ShopifyReconcilePage() {
                             key={row.shopify.id}
                             className={`${rowBg} hover:brightness-95 transition-all`}
                           >
-                            <td className="px-4 py-3 font-mono font-semibold text-slate-800">{row.shopify.name}</td>
-                            <td className="px-4 py-3 text-slate-800">
+                            <td className="px-4 py-2 font-mono font-semibold text-slate-800">{row.shopify.name}</td>
+                            <td className="px-4 py-2 text-slate-800">
                               {row.shopify.customerName}
                               {manualMapById.get(String(row.shopify.id))?.note && (
                                 <div className="text-[10px] text-blue-600 mt-0.5 italic">
@@ -833,20 +831,20 @@ export default function ShopifyReconcilePage() {
                                 </div>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{row.shopify.created_at?.slice(0, 10)}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-slate-800">{money(row.shopify.total_price)}</td>
-                            <td className="px-4 py-3 text-center"><StatusBadge status={row.shopify.financial_status} /></td>
-                            <td className="px-4 py-3 text-center"><MatchBadge type={row.matchType} /></td>
+                            <td className="px-4 py-2 text-slate-600 whitespace-nowrap">{row.shopify.created_at?.slice(0, 10)}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-slate-800">{money(row.shopify.total_price)}</td>
+                            <td className="px-4 py-2 text-center"><StatusBadge status={row.shopify.financial_status} /></td>
+                            <td className="px-4 py-2 text-center"><MatchBadge type={row.matchType} /></td>
                             {row.qbo ? (
                               <>
-                                <td className="px-4 py-3 font-mono text-slate-700">
+                                <td className="px-4 py-2 font-mono text-slate-700">
                                   <div>#{row.qbo.docNumber}</div>
                                   {row.qbo.poNumber && (
                                     <div className="text-[10px] text-slate-500">PO: {row.qbo.poNumber}</div>
                                   )}
                                 </td>
-                                <td className="px-4 py-3 text-slate-700">{row.qbo.customerName}</td>
-                                <td className="px-4 py-3 text-slate-700">
+                                <td className="px-4 py-2 text-slate-700">{row.qbo.customerName}</td>
+                                <td className="px-4 py-2 text-slate-700">
                                   {row.qbo.salesRepTags?.length ? (
                                     <div className="flex flex-wrap gap-1">
                                       {row.qbo.salesRepTags.map((tag) => (
@@ -859,13 +857,13 @@ export default function ShopifyReconcilePage() {
                                     <span className="text-xs text-slate-400">—</span>
                                   )}
                                 </td>
-                                <td className="px-4 py-3 text-right font-semibold text-slate-800">{money(row.qbo.totalAmt)}</td>
-                                <td className="px-4 py-3 text-center"><StatusBadge status={row.qbo.status} /></td>
+                                <td className="px-4 py-2 text-right font-semibold text-slate-800">{money(row.qbo.totalAmt)}</td>
+                                <td className="px-4 py-2 text-center"><StatusBadge status={row.qbo.status} /></td>
                               </>
                             ) : (
                               <td
                                 colSpan={5}
-                                className={`px-4 py-3 text-center text-sm font-medium ${
+                                className={`px-4 py-2 text-center text-sm font-medium ${
                                   row.matchType === "cancelled"
                                     ? "text-slate-500"
                                     : row.matchType === "customer"
@@ -875,18 +873,18 @@ export default function ShopifyReconcilePage() {
                                 {row.matchType === "cancelled"
                                   ? "Marked as cancelled"
                                   : row.matchType === "customer"
-                                  ? "â€” Matching customer found in QuickBooks (no invoice linked yet) â€”"
-                                  : "â€” Invoice not found in QuickBooks â€”"}
+                                  ? "- Matching customer found in QuickBooks (no invoice linked yet) -"
+                                  : "- Invoice not found in QuickBooks -"}
                               </td>
                             )}
-                            <td className="px-4 py-3 text-center">
-                              <div className="flex flex-col items-center gap-1">
+                            <td className="px-4 py-2 text-center">
+                              <div className="flex flex-wrap items-center justify-center gap-1">
                                 <button
                                   type="button"
                                   onClick={() => setLinkTarget(row)}
-                                  className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                                  className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
                                 >
-                                  {row.qbo ? "Linked" : "Link Invoice"}
+                                  {row.qbo ? "Linked" : "Link"}
                                 </button>
                                 <button
                                   type="button"
@@ -895,9 +893,9 @@ export default function ShopifyReconcilePage() {
                                       ? handleUnlink(row.shopify.id)
                                       : handleMarkCancelled(row.shopify)
                                   }
-                                  className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                                  className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                                 >
-                                  {row.matchType === "cancelled" ? "Undo Cancel" : "Mark Cancelled"}
+                                  {row.matchType === "cancelled" ? "Undo" : "Cancel"}
                                 </button>
                                 {!row.qbo && row.matchType !== "cancelled" && (
                                   <>
@@ -905,21 +903,21 @@ export default function ShopifyReconcilePage() {
                                       type="button"
                                       onClick={() => handleCreateNewInvoice(row.shopify)}
                                       disabled={creatingInvoiceFor === String(row.shopify.id)}
-                                      className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                      className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                                     >
                                       {creatingInvoiceFor === String(row.shopify.id)
                                         ? "Creating…"
-                                        : "Create New QBO Invoice"}
+                                        : "Create"}
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => handleCreateNewInvoice(row.shopify, true)}
                                       disabled={creatingInvoiceFor === String(row.shopify.id)}
-                                      className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50"
+                                      className="rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50"
                                     >
                                       {creatingInvoiceFor === String(row.shopify.id)
                                         ? "Creating…"
-                                        : "Create + Send To…"}
+                                        : "Create + Send"}
                                     </button>
                                   </>
                                 )}
