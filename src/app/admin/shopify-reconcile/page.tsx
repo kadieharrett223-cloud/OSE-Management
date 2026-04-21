@@ -401,6 +401,7 @@ export default function ShopifyReconcilePage() {
   const [errorQbo, setErrorQbo] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [creatingInvoiceFor, setCreatingInvoiceFor] = useState<string | null>(null);
+  const [sendToEmailInput, setSendToEmailInput] = useState("kadie@olympic-equipment.com");
 
   const [linkTarget, setLinkTarget] = useState<MatchedRow | null>(null);
 
@@ -543,15 +544,10 @@ export default function ShopifyReconcilePage() {
     try {
       let sendToEmail = "";
       if (sendInvoice) {
-        const input = window.prompt(
-          "Send QBO invoice to email (leave blank to use saved/default email):",
-          shopifyOrder.customerEmail || ""
-        );
-        if (input === null) {
-          setCreatingInvoiceFor(null);
-          return;
+        sendToEmail = String(sendToEmailInput || "").trim();
+        if (!sendToEmail) {
+          throw new Error("Enter an email in the Send To field before creating + sending.");
         }
-        sendToEmail = String(input || "").trim();
       }
 
       const res = await fetch("/api/shopify/reconcile-create-invoice", {
@@ -667,6 +663,16 @@ export default function ShopifyReconcilePage() {
                   placeholder="Order #, customer, invoiceâ€¦"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="min-w-[260px]">
+                <label className="block text-xs font-medium text-slate-500 mb-1">Send To (Create + Send)</label>
+                <input
+                  type="email"
+                  placeholder="name@company.com"
+                  value={sendToEmailInput}
+                  onChange={(e) => setSendToEmailInput(e.target.value)}
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
@@ -914,23 +920,23 @@ export default function ShopifyReconcilePage() {
                                   <>
                                     <button
                                       type="button"
-                                      onClick={() => handleCreateNewInvoice(row.shopify)}
+                                      onClick={() => handleCreateNewInvoice(row.shopify, true)}
                                       disabled={creatingInvoiceFor === String(row.shopify.id)}
                                       className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                                     >
                                       {creatingInvoiceFor === String(row.shopify.id)
                                         ? "Creating…"
-                                        : "Create"}
+                                        : "Create + Send"}
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleCreateNewInvoice(row.shopify, true)}
+                                      onClick={() => handleCreateNewInvoice(row.shopify)}
                                       disabled={creatingInvoiceFor === String(row.shopify.id)}
                                       className="rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50"
                                     >
                                       {creatingInvoiceFor === String(row.shopify.id)
                                         ? "Creating…"
-                                        : "Create + Send"}
+                                        : "Create Only"}
                                     </button>
                                   </>
                                 )}
