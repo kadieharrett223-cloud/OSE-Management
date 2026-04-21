@@ -594,16 +594,17 @@ export async function syncShopifyOrdersToQbo(params?: {
         }
 
         const shippingTotal = Number(orderShippingTotal(order).toFixed(2));
-        if (shippingTotal > 0 && !settings.qbo_shipping_item_id) {
-          throw new Error("Invoice not created — this Shopify order has a shipping charge, but no QBO shipping item is configured in Settings.");
+        const shippingItemId = (settings.line_item_mapping_json || {})["title:shipping"] || null;
+        if (shippingTotal > 0 && !shippingItemId) {
+          throw new Error("Invoice not created — this Shopify order has a shipping charge, but 'Shipping' is not mapped in Product Mapping.");
         }
-        if (shippingTotal > 0 && settings.qbo_shipping_item_id) {
+        if (shippingTotal > 0 && shippingItemId) {
           qboLines.push({
             DetailType: "SalesItemLineDetail",
             Amount: shippingTotal,
             Description: "Shipping",
             SalesItemLineDetail: {
-              ItemRef: { value: settings.qbo_shipping_item_id },
+              ItemRef: { value: shippingItemId },
               Qty: 1,
               UnitPrice: shippingTotal,
             },

@@ -399,10 +399,10 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    const shippingItemId = settingsData?.qbo_shipping_item_id || null;
+    const shippingItemId = lineMap["title:shipping"] || null;
     const shippingAmt = shippingTotal(order);
     if (shippingAmt > 0 && !shippingItemId) {
-      throw new Error("Invoice not created — this Shopify order has a shipping charge, but no QBO shipping item is configured in Settings.");
+      throw new Error("Invoice not created — this Shopify order has a shipping charge, but 'Shipping' is not mapped in Product Mapping.");
     }
     if (shippingAmt > 0 && shippingItemId) {
       invoiceLines.push({

@@ -6,6 +6,7 @@ import { getServerSupabaseClient } from "@/lib/supabase";
 import { getShopifyProducts, getShopifyTokens } from "@/lib/shopify";
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
+const SHIPPING_MAPPING_KEY = "title:shipping";
 
 type JsonMap = Record<string, string>;
 
@@ -198,6 +199,20 @@ export async function GET() {
       if (!orderTitleMap.has(key) && !seenTitleKeys.has(key)) {
         orderTitleMap.set(key, titleFromMappingKey(key));
       }
+    }
+
+    if (!seenTitleKeys.has(SHIPPING_MAPPING_KEY)) {
+      const explicit = explicitMap[SHIPPING_MAPPING_KEY] || null;
+      rows.push({
+        mappingKey: SHIPPING_MAPPING_KEY,
+        lineItemTitle: "Shipping",
+        variantId: -999999,
+        productTitle: "Shipping",
+        variantTitle: "Shopify shipping charge",
+        mappedQboItemId: explicit,
+        mappingSource: explicit ? "explicit" : "none",
+      });
+      seenTitleKeys.add(SHIPPING_MAPPING_KEY);
     }
 
     let syntheticId = -1;
