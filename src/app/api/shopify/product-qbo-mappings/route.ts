@@ -9,6 +9,16 @@ const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 
 type JsonMap = Record<string, string>;
 
+type MappingRow = {
+  mappingKey: string;
+  lineItemTitle: string;
+  variantId: number;
+  productTitle: string;
+  variantTitle: string;
+  mappedQboItemId: string | null;
+  mappingSource: "explicit" | "price_list" | "none";
+};
+
 function isMissingLineItemMappingColumn(error: any) {
   const text = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
   return text.includes("line_item_mapping_json") && text.includes("does not exist");
@@ -36,63 +46,25 @@ function normalizeToken(value: string | null | undefined): string {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function isLikelyInternalId(value: string): boolean {
-  if (!value) return true;
-  if (/^\d{8,}$/.test(value)) return true;
-  if (/^gid:\/\//.test(value)) return true;
-  if (/^image-dropdown-\d+$/i.test(value)) return true;
-  if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(value)) return true;
-  return false;
+function titleMappingKey(value: string | null | undefined): string | null {
+  const title = normalizeToken(value);
+  return title ? `title:${title}` : null;
 }
 
-function isLikelyMetaPropertyName(name: string): boolean {
-  if (!name) return true;
-  return (
-    name.startsWith("_") ||
-    name.startsWith("gpo_") ||
-    name.includes("gpo_parent") ||
-    name.includes("gpo_field_name") ||
-    name.includes("_bundle")
-  );
+function titleFromMappingKey(key: string): string {
+  return key.startsWith("title:") ? key.slice("title:".length) : key;
 }
 
-function isHumanReadableOptionValue(value: string): boolean {
-  if (!value) return false;
-  if (isLikelyInternalId(value)) return false;
-  if (!/[a-z]/i.test(value)) return false;
-  return value.length <= 120;
-}
+function buildVariantSummary(product: any): string {
+  const parts = (product?.variants || [])
+    .map((variant: any) => {
+      const sku = String(variant?.sku || "").trim();
+      const title = String(variant?.title || "").trim();
+      return [sku, title && title !== "Default Title" ? title : ""].filter(Boolean).join(" · ");
+    })
+    .filter(Boolean);
 
-function prettyLabel(raw: string): string {
-  return raw.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function parseMappingKeyLabel(key: string): { productTitle: string; variantTitle: string } {
-  if (key.startsWith("prop:")) {
-    const parts = key.split(":");
-    const optionName = prettyLabel(parts[1] || "option");
-    const optionValue = prettyLabel(parts.slice(2).join(":") || "value");
-    return {
-      productTitle: "Shopify Dropdown",
-      variantTitle: `${optionName} = ${optionValue}`,
-    };
-  }
-  if (key.startsWith("propvalue:")) {
-    return {
-      productTitle: "Shopify Dropdown Value",
-      variantTitle: prettyLabel(key.slice("propvalue:".length) || "value"),
-    };
-  }
-  if (key.startsWith("title:")) {
-    return {
-      productTitle: "Shopify Line Title",
-      variantTitle: prettyLabel(key.slice("title:".length) || "line item"),
-    };
-  }
-  return {
-    productTitle: "Shopify Mapping Key",
-    variantTitle: key,
-  };
+  return parts.slice(0, 3).join(" | ");
 }
 
 export async function GET() {
@@ -123,7 +95,7 @@ export async function GET() {
         .maybeSingle();
       settings = fallback.data;
       settingsError = fallback.error;
-      schemaWarning = "Database is missing shopify_settings.line_item_mapping_json; explicit SKU mappings are disabled until migrations are applied.";
+      schemaWarning = "Database is missing shopify_settings.line_item_mapping_json; explicit title mappings are disabled until migrations are applied.";
     }
 
     if (settingsError) throw settingsError;
@@ -151,39 +123,38 @@ export async function GET() {
       warning = shopifyError?.message || "Unable to fetch Shopify products";
       products = [];
     }
-    const rows: Array<{
-      sku: string;
-      variantId: number;
-      productTitle: string;
-      variantTitle: string;
-      mappedQboItemId: string | null;
-      mappingSource: "explicit" | "price_list" | "none";
-    }> = [];
+
+    const rows: MappingRow[] = [];
+    const seenTitleKeys = new Set<string>();
 
     for (const product of products || []) {
+      const productTitle = String(product?.title || "").trim();
+      const mappingKey = titleMappingKey(productTitle);
+      if (!mappingKey || seenTitleKeys.has(mappingKey)) continue;
+
+      const variantPriceIds = new Set<string>();
       for (const variant of product?.variants || []) {
-        const sku = String(variant?.sku || "").trim();
-        if (!sku) continue;
-
-        const key = sku.toLowerCase();
-        const explicit = explicitMap[key] || null;
-        const priceList = priceMap[key] || null;
-
-        rows.push({
-          sku,
-          variantId: Number(variant.id),
-          productTitle: String(product.title || ""),
-          variantTitle: String(variant.title || ""),
-          mappedQboItemId: explicit || priceList,
-          mappingSource: explicit ? "explicit" : priceList ? "price_list" : "none",
-        });
+        const sku = String(variant?.sku || "").trim().toLowerCase();
+        const qboItemId = sku ? priceMap[sku] : null;
+        if (qboItemId) variantPriceIds.add(qboItemId);
       }
+
+      const explicit = explicitMap[mappingKey] || null;
+      const priceList = variantPriceIds.size === 1 ? Array.from(variantPriceIds)[0] : null;
+
+      rows.push({
+        mappingKey,
+        lineItemTitle: productTitle,
+        variantId: Number(product?.id || rows.length + 1),
+        productTitle,
+        variantTitle: buildVariantSummary(product),
+        mappedQboItemId: explicit || priceList,
+        mappingSource: explicit ? "explicit" : priceList ? "price_list" : "none",
+      });
+      seenTitleKeys.add(mappingKey);
     }
 
-    // Include app-driven line item option/title keys discovered from recent Shopify orders
-    const customKeySet = new Set<string>();
-      // SKUs seen on actual order line items that may differ from product-catalog variant SKUs
-      const orderSkuTitles = new Map<string, string>(); // normalizedSku → line title
+    const orderTitleMap = new Map<string, string>();
     try {
       const tokens = await getShopifyTokens();
       if (tokens) {
@@ -209,78 +180,43 @@ export async function GET() {
           const payload = (await ordersRes.json()) as { orders?: any[] };
           for (const order of payload.orders || []) {
             for (const line of order?.line_items || []) {
-              const sku = normalizeToken(line?.sku);
-              const title = normalizeToken(line?.title);
-              if (!sku && title) customKeySet.add(`title:${title}`);
-                // Track every real-order SKU so we can surface it if missing from product catalog
-                if (sku && !orderSkuTitles.has(sku)) {
-                  orderSkuTitles.set(sku, String(line?.title || sku));
-                }
-
-              for (const prop of line?.properties || []) {
-                const name = normalizeToken(prop?.name);
-                const value = normalizeToken(prop?.value);
-                if (!value) continue;
-
-                const explicitPropKey = name ? `prop:${name}:${value}` : "";
-                const isExplicitMapped = explicitPropKey ? Boolean(explicitMap[explicitPropKey]) : false;
-
-                if (name && (isExplicitMapped || (!isLikelyMetaPropertyName(name) && isHumanReadableOptionValue(value)))) {
-                  customKeySet.add(explicitPropKey);
-                }
-
-                const valueOnlyKey = `propvalue:${value}`;
-                if (explicitMap[valueOnlyKey] || isHumanReadableOptionValue(value)) {
-                  customKeySet.add(valueOnlyKey);
-                }
+              const mappingKey = titleMappingKey(line?.title);
+              const lineItemTitle = String(line?.title || "").trim();
+              if (mappingKey && lineItemTitle && !orderTitleMap.has(mappingKey)) {
+                orderTitleMap.set(mappingKey, lineItemTitle);
               }
             }
           }
         }
       }
     } catch {
-      // Non-fatal: custom keys simply won't be auto-discovered this time.
+      // Non-fatal: recent order titles simply won't be auto-discovered this time.
     }
 
-    // Also include any existing explicit non-SKU keys so they remain editable.
     for (const key of Object.keys(explicitMap)) {
-      if (key.startsWith("title:") || key.startsWith("prop:") || key.startsWith("propvalue:")) {
-        customKeySet.add(key);
+      if (!key.startsWith("title:")) continue;
+      if (!orderTitleMap.has(key) && !seenTitleKeys.has(key)) {
+        orderTitleMap.set(key, titleFromMappingKey(key));
       }
     }
 
     let syntheticId = -1;
-    for (const key of Array.from(customKeySet)) {
-      const explicit = explicitMap[key] || null;
-      const labels = parseMappingKeyLabel(key);
+    for (const [mappingKey, lineItemTitle] of orderTitleMap) {
+      if (seenTitleKeys.has(mappingKey)) continue;
+      const explicit = explicitMap[mappingKey] || null;
       rows.push({
-        sku: key,
+        mappingKey,
+        lineItemTitle,
         variantId: syntheticId--,
-        productTitle: labels.productTitle,
-        variantTitle: labels.variantTitle,
+        productTitle: lineItemTitle,
+        variantTitle: "Seen on Shopify orders",
         mappedQboItemId: explicit,
         mappingSource: explicit ? "explicit" : "none",
       });
+      seenTitleKeys.add(mappingKey);
     }
 
-      // Add any order-seen SKUs that weren't in the product-catalog variants
-      const catalogKeys = new Set(rows.map((r) => r.sku.toLowerCase()));
-      for (const [orderSku, orderTitle] of orderSkuTitles) {
-        if (!catalogKeys.has(orderSku)) {
-          const explicit = explicitMap[orderSku] || null;
-          const priceList = priceMap[orderSku] || null;
-          rows.push({
-            sku: orderSku.toUpperCase(),
-            variantId: syntheticId--,
-            productTitle: orderTitle,
-            variantTitle: "",
-            mappedQboItemId: explicit || priceList,
-            mappingSource: explicit ? "explicit" : priceList ? "price_list" : "none",
-          });
-        }
-      }
-
-    rows.sort((a, b) => a.sku.localeCompare(b.sku));
+    rows.sort((a, b) => a.lineItemTitle.localeCompare(b.lineItemTitle));
 
     return NextResponse.json({
       ok: true,
@@ -302,7 +238,7 @@ export async function GET() {
   }
 }
 
-/** PUT /api/shopify/product-qbo-mappings — bulk save multiple SKU→item pairs at once */
+/** PUT /api/shopify/product-qbo-mappings — bulk save Shopify title→item pairs */
 export async function PUT(req: NextRequest) {
   try {
     const isAdmin = await requireAdmin();
@@ -311,7 +247,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const entries: { sku: string; qbo_item_id: string | null }[] = Array.isArray(body?.mappings)
+    const entries: { mappingKey?: string; sku?: string; qbo_item_id: string | null }[] = Array.isArray(body?.mappings)
       ? body.mappings
       : [];
 
@@ -337,15 +273,12 @@ export async function PUT(req: NextRequest) {
     }
 
     const map = toMap(existing?.line_item_mapping_json);
-    for (const { sku, qbo_item_id } of entries) {
-      const skuKey = String(sku || "").trim().toLowerCase();
-      if (!skuKey) continue;
+    for (const { mappingKey, sku, qbo_item_id } of entries) {
+      const key = String(mappingKey || sku || "").trim().toLowerCase();
+      if (!key) continue;
       const itemId = qbo_item_id ? String(qbo_item_id).trim() : null;
-      if (itemId) {
-        map[skuKey] = itemId;
-      } else {
-        delete map[skuKey];
-      }
+      if (itemId) map[key] = itemId;
+      else delete map[key];
     }
 
     const { error: upsertError } = await supabase
@@ -378,14 +311,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const rawSku = String(body?.sku || "").trim();
+    const rawKey = String(body?.mappingKey || body?.sku || "").trim();
     const qboItemId = body?.qbo_item_id ? String(body.qbo_item_id).trim() : null;
 
-    if (!rawSku) {
-      return NextResponse.json({ error: "sku is required" }, { status: 400 });
+    if (!rawKey) {
+      return NextResponse.json({ error: "mappingKey is required" }, { status: 400 });
     }
 
-    const skuKey = rawSku.toLowerCase();
+    const key = rawKey.toLowerCase();
     const supabase = getServerSupabaseClient();
 
     const { data: existing, error: existingError } = await supabase
@@ -404,11 +337,8 @@ export async function POST(req: NextRequest) {
     }
 
     const map = toMap(existing?.line_item_mapping_json);
-    if (qboItemId) {
-      map[skuKey] = qboItemId;
-    } else {
-      delete map[skuKey];
-    }
+    if (qboItemId) map[key] = qboItemId;
+    else delete map[key];
 
     const { error: upsertError } = await supabase
       .from("shopify_settings")

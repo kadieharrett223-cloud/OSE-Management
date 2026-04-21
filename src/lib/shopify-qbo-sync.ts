@@ -130,30 +130,9 @@ function normalizeToken(value: string | null | undefined): string {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function mappingKeysForLine(line: ShopifyOrderLine): string[] {
-  const keys: string[] = [];
-  const seen = new Set<string>();
-  const add = (key: string) => {
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    keys.push(key);
-  };
-
-  const sku = normalizeToken(line.sku);
-  if (sku) add(sku);
-
-  const title = normalizeToken(line.title);
-  if (title) add(`title:${title}`);
-
-  for (const prop of line.properties || []) {
-    const name = normalizeToken(prop?.name);
-    const value = normalizeToken(prop?.value);
-    if (!value) continue;
-    if (name) add(`prop:${name}:${value}`);
-    add(`propvalue:${value}`);
-  }
-
-  return keys;
+function titleMappingKey(value: string | null | undefined): string | null {
+  const title = normalizeToken(value);
+  return title ? `title:${title}` : null;
 }
 
 async function fetchShopifyOrdersSince(since: string): Promise<ShopifyOrder[]> {
@@ -270,14 +249,13 @@ function buildInvoiceLines(order: ShopifyOrder, lineMap: JsonMap, skuToQboItemMa
 
     // Resolution priority:
     // 1. Explicit SKU mapping (most specific — user set this directly)
-    // 2. Price-list SKU mapping
-    // 3. Explicit title/property mapping (fallback for lines with no SKU)
+    // 2. Legacy explicit SKU mapping
+    // 3. Price-list SKU mapping
     // 4. Default item
+    const explicitTitleItemId = (titleMappingKey(line.title) && lineMap[titleMappingKey(line.title)!]) || null;
     const explicitSkuItemId = (sku && lineMap[sku]) || null;
     const priceListItemId = (sku && skuToQboItemMap[sku]) || null;
-    const propKeys = mappingKeysForLine(line).filter((k) => k !== sku);
-    const propItemId = propKeys.map((key) => lineMap[key]).find(Boolean) || null;
-    const mappedItemId = explicitSkuItemId || priceListItemId || propItemId || defaultItemId;
+    const mappedItemId = explicitTitleItemId || explicitSkuItemId || priceListItemId || defaultItemId;
 
     if (!mappedItemId) {
       throw new Error(`No QBO item mapping for line "${line.title || sku || "Shopify line item"}"`);

@@ -90,7 +90,8 @@ interface QboItemOption {
 }
 
 interface ProductMappingRow {
-  sku: string;
+  mappingKey: string;
+  lineItemTitle: string;
   variantId: number;
   productTitle: string;
   variantTitle: string;
@@ -101,7 +102,7 @@ interface ProductMappingRow {
 export default function ShopifyReconcileMappingPage() {
   const [qboItems, setQboItems] = useState<QboItemOption[]>([]);
   const [productMappings, setProductMappings] = useState<ProductMappingRow[]>([]);
-  // Current dropdown selections (keyed by sku)
+  // Current dropdown selections (keyed by internal title mapping key)
   const [selection, setSelection] = useState<Record<string, string>>({});
   // Snapshot of selections as last saved/loaded — used to compute dirty set
   const [savedSelection, setSavedSelection] = useState<Record<string, string>>({});
@@ -152,7 +153,7 @@ export default function ShopifyReconcileMappingPage() {
       if (warnings.length > 0) setGlobalError(warnings.join(" • "));
 
       const init: Record<string, string> = {};
-      rows.forEach((row) => { if (row.mappedQboItemId) init[row.sku] = row.mappedQboItemId; });
+      rows.forEach((row) => { if (row.mappedQboItemId) init[row.mappingKey] = row.mappedQboItemId; });
       setSelection(init);
       setSavedSelection(init);
     } catch (err: any) {
@@ -166,68 +167,68 @@ export default function ShopifyReconcileMappingPage() {
 
   // ── Dirty set ─────────────────────────────────────────────────────────────
 
-  const dirtySkus = useMemo(() => {
+  const dirtyKeys = useMemo(() => {
     const dirty = new Set<string>();
-    const allSkus = new Set([...Object.keys(selection), ...Object.keys(savedSelection)]);
-    allSkus.forEach((sku) => {
-      const cur = selection[sku] || "";
-      const saved = savedSelection[sku] || "";
-      if (cur !== saved) dirty.add(sku);
+    const allKeys = new Set([...Object.keys(selection), ...Object.keys(savedSelection)]);
+    allKeys.forEach((key) => {
+      const cur = selection[key] || "";
+      const saved = savedSelection[key] || "";
+      if (cur !== saved) dirty.add(key);
     });
     return dirty;
   }, [selection, savedSelection]);
 
   // ── Save helpers ──────────────────────────────────────────────────────────
 
-  const applySuccess = useCallback((skus: string[]) => {
+  const applySuccess = useCallback((mappingKeys: string[]) => {
     setSavedSelection((prev) => {
       const next = { ...prev };
-      skus.forEach((sku) => {
-        const val = selection[sku] || "";
-        if (val) next[sku] = val;
-        else delete next[sku];
+      mappingKeys.forEach((mappingKey) => {
+        const val = selection[mappingKey] || "";
+        if (val) next[mappingKey] = val;
+        else delete next[mappingKey];
       });
       return next;
     });
     setProductMappings((prev) =>
       prev.map((row) => {
-        if (!skus.includes(row.sku)) return row;
-        const qboItemId = selection[row.sku] || null;
+        if (!mappingKeys.includes(row.mappingKey)) return row;
+        const qboItemId = selection[row.mappingKey] || null;
         return { ...row, mappedQboItemId: qboItemId, mappingSource: qboItemId ? "explicit" : "none" };
       })
     );
   }, [selection]);
 
-  const handleSaveSingle = async (sku: string) => {
-    const qboItemId = selection[sku] || null;
-    setRowStatus((p) => ({ ...p, [sku]: "saving" }));
-    setRowError((p) => { const n = { ...p }; delete n[sku]; return n; });
+  const handleSaveSingle = async (mappingKey: string) => {
+    const qboItemId = selection[mappingKey] || null;
+    setRowStatus((p) => ({ ...p, [mappingKey]: "saving" }));
+    setRowError((p) => { const n = { ...p }; delete n[mappingKey]; return n; });
     setGlobalError(null);
     try {
       const res = await fetch("/api/shopify/product-qbo-mappings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sku, qbo_item_id: qboItemId }),
+        body: JSON.stringify({ mappingKey, qbo_item_id: qboItemId }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed to save");
-      setRowStatus((p) => ({ ...p, [sku]: "saved" }));
-      applySuccess([sku]);
-      setTimeout(() => setRowStatus((p) => { const n = { ...p }; delete n[sku]; return n; }), 2500);
+      setRowStatus((p) => ({ ...p, [mappingKey]: "saved" }));
+      applySuccess([mappingKey]);
+      setTimeout(() => setRowStatus((p) => { const n = { ...p }; delete n[mappingKey]; return n; }), 2500);
     } catch (err: any) {
-      setRowStatus((p) => ({ ...p, [sku]: "error" }));
-      setRowError((p) => ({ ...p, [sku]: err?.message || "Save failed" }));
+      setRowStatus((p) => ({ ...p, [mappingKey]: "error" }));
+      setRowError((p) => ({ ...p, [mappingKey]: err?.message || "Save failed" }));
     }
   };
 
   const handleBulkSave = async () => {
-    if (dirtySkus.size === 0) return;
+    if (dirtyKeys.size === 0) return;
     setBulkSaving(true);
     setGlobalError(null);
     setGlobalSuccess(null);
-    const mappings = Array.from(dirtySkus).map((sku) => ({
-      sku,
-      qbo_item_id: selection[sku] || null,
+    const mappings = Array.from(dirtyKeys).map((mappingKey) => ({
+      mappingKey,
+      qbo_item_id: selection[mappingKey] || null,
     }));
     try {
       const res = await fetch("/api/shopify/product-qbo-mappings", {
@@ -237,7 +238,7 @@ export default function ShopifyReconcileMappingPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Bulk save failed");
-      applySuccess(Array.from(dirtySkus));
+      applySuccess(Array.from(dirtyKeys));
       setGlobalSuccess(`Saved ${mappings.length} mapping${mappings.length !== 1 ? "s" : ""} successfully.`);
       setTimeout(() => setGlobalSuccess(null), 3000);
     } catch (err: any) {
@@ -252,18 +253,18 @@ export default function ShopifyReconcileMappingPage() {
   const filteredProductMappings = useMemo(() => {
     let rows = showMappedProducts
       ? productMappings
-      : productMappings.filter((row) => row.mappingSource === "none" || dirtySkus.has(row.sku));
+      : productMappings.filter((row) => row.mappingSource === "none" || dirtyKeys.has(row.mappingKey));
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       rows = rows.filter(
         (row) =>
-          row.sku.toLowerCase().includes(q) ||
+          row.lineItemTitle.toLowerCase().includes(q) ||
           row.productTitle.toLowerCase().includes(q) ||
           row.variantTitle.toLowerCase().includes(q)
       );
     }
     return rows;
-  }, [productMappings, showMappedProducts, searchQuery, dirtySkus]);
+  }, [productMappings, showMappedProducts, searchQuery, dirtyKeys]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProductMappings.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
@@ -290,7 +291,7 @@ export default function ShopifyReconcileMappingPage() {
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">Admin</p>
               <h1 className="text-2xl font-semibold text-slate-900">Shopify Reconcile Product Mapping</h1>
               <p className="mt-1 text-sm text-slate-500">
-                Map Shopify SKUs and app option keys (dropdown values) to QuickBooks items used during reconcile invoice creation.
+                Map Shopify line item titles to QuickBooks items used during reconcile invoice creation.
               </p>
               <div className="mt-3">
                 <Link
@@ -308,20 +309,20 @@ export default function ShopifyReconcileMappingPage() {
                 <div>
                   <h2 className="text-sm font-semibold text-slate-800">Shopify Product → QBO Item Mapping</h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Select a QBO item per SKU, then save individually or use <strong>Save All Changes</strong>.
+                    Select a QBO item per Shopify line item title, then save individually or use <strong>Save All Changes</strong>.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     type="search"
-                    placeholder="Search SKU / product…"
+                    placeholder="Search title / product…"
                     value={searchQuery}
                     onChange={handleSearch}
                     className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 w-44"
                   />
                   <span className="text-xs font-medium text-red-600">Unmapped: {unmappedCount}</span>
-                  {dirtySkus.size > 0 && (
-                    <span className="text-xs font-medium text-amber-600">Unsaved: {dirtySkus.size}</span>
+                  {dirtyKeys.size > 0 && (
+                    <span className="text-xs font-medium text-amber-600">Unsaved: {dirtyKeys.size}</span>
                   )}
                   <button
                     type="button"
@@ -333,10 +334,10 @@ export default function ShopifyReconcileMappingPage() {
                   <button
                     type="button"
                     onClick={handleBulkSave}
-                    disabled={bulkSaving || dirtySkus.size === 0}
+                    disabled={bulkSaving || dirtyKeys.size === 0}
                     className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                   >
-                    {bulkSaving ? "Saving…" : `Save All Changes${dirtySkus.size > 0 ? ` (${dirtySkus.size})` : ""}`}
+                    {bulkSaving ? "Saving…" : `Save All Changes${dirtyKeys.size > 0 ? ` (${dirtyKeys.size})` : ""}`}
                   </button>
                   <button
                     type="button"
@@ -366,8 +367,8 @@ export default function ShopifyReconcileMappingPage() {
                 <table className="w-full min-w-[850px] text-sm">
                   <thead className="bg-slate-50 border-b border-slate-100">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Mapping Key</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Shopify Product</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Shopify Line Item Title</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Product Details</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Status</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">QBO Item</th>
                       <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase text-slate-500">Action</th>
@@ -380,27 +381,27 @@ export default function ShopifyReconcileMappingPage() {
                       </tr>
                     ) : visibleProductMappings.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-5 text-center text-slate-400">No SKUs to map.</td>
+                        <td colSpan={5} className="px-4 py-5 text-center text-slate-400">No Shopify titles to map.</td>
                       </tr>
                     ) : (
                       visibleProductMappings.map((row) => {
-                        const selected = selection[row.sku] || "";
-                        const isDirty = dirtySkus.has(row.sku);
-                        const status = rowStatus[row.sku];
-                        const errMsg = rowError[row.sku];
+                        const selected = selection[row.mappingKey] || "";
+                        const isDirty = dirtyKeys.has(row.mappingKey);
+                        const status = rowStatus[row.mappingKey];
+                        const errMsg = rowError[row.mappingKey];
                         return (
                           <tr
-                            key={`${row.sku}-${row.variantId}`}
+                            key={`${row.mappingKey}-${row.variantId}`}
                             className={isDirty ? "bg-amber-50" : undefined}
                           >
-                            <td className="px-4 py-2.5 font-mono text-slate-800">
-                              {row.sku}
+                            <td className="px-4 py-2.5 text-slate-800 font-medium">
+                              {row.lineItemTitle}
                               {isDirty && <span className="ml-1 text-amber-500 text-xs">●</span>}
                             </td>
                             <td className="px-4 py-2.5 text-slate-700">
                               {row.productTitle}
-                              {row.variantTitle && row.variantTitle !== "Default Title" && (
-                                <span className="text-xs text-slate-500"> · {row.variantTitle}</span>
+                              {row.variantTitle && (
+                                <span className="block text-xs text-slate-500 mt-0.5">{row.variantTitle}</span>
                               )}
                             </td>
                             <td className="px-4 py-2.5 text-xs">
@@ -420,14 +421,14 @@ export default function ShopifyReconcileMappingPage() {
                               <QboCombobox
                                 items={qboItems}
                                 value={selected}
-                                onChange={(id) => setSelection((prev) => ({ ...prev, [row.sku]: id }))}
+                                onChange={(id) => setSelection((prev) => ({ ...prev, [row.mappingKey]: id }))}
                               />
                               {errMsg && <p className="mt-0.5 text-[10px] text-red-600">{errMsg}</p>}
                             </td>
                             <td className="px-4 py-2.5 text-center">
                               <button
                                 type="button"
-                                onClick={() => handleSaveSingle(row.sku)}
+                                onClick={() => handleSaveSingle(row.mappingKey)}
                                 disabled={status === "saving" || !isDirty}
                                 className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-40"
                               >

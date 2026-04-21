@@ -74,30 +74,9 @@ function normalizeToken(value: string | null | undefined): string {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function mappingKeysForLine(line: ShopifyOrder["line_items"][number]): string[] {
-  const keys: string[] = [];
-  const seen = new Set<string>();
-  const add = (key: string) => {
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    keys.push(key);
-  };
-
-  const sku = normalizeToken(line.sku);
-  if (sku) add(sku);
-
-  const title = normalizeToken(line.title);
-  if (title) add(`title:${title}`);
-
-  for (const prop of line.properties || []) {
-    const name = normalizeToken(prop?.name);
-    const value = normalizeToken(prop?.value);
-    if (!value) continue;
-    if (name) add(`prop:${name}:${value}`);
-    add(`propvalue:${value}`);
-  }
-
-  return keys;
+function titleMappingKey(value: string | null | undefined): string | null {
+  const title = normalizeToken(value);
+  return title ? `title:${title}` : null;
 }
 
 async function resolvePaymentMethodId(explicitId: string | null, methodName: string | null) {
@@ -268,11 +247,10 @@ export async function POST(req: NextRequest) {
       const sku = normalizeToken(line.sku);
 
       // Resolution priority: explicit SKU → price-list SKU → prop/title keys → default
+      const explicitTitleItemId = (titleMappingKey(line.title) && lineMap[titleMappingKey(line.title)!]) || null;
       const explicitSkuItemId = (sku && lineMap[sku]) || null;
       const priceListItemId = (sku && skuMap[sku]) || null;
-      const propKeys = mappingKeysForLine(line).filter((k) => k !== sku);
-      const propItemId = propKeys.map((key) => lineMap[key]).find(Boolean) || null;
-      const itemId = explicitSkuItemId || priceListItemId || propItemId || defaultItemId;
+      const itemId = explicitTitleItemId || explicitSkuItemId || priceListItemId || defaultItemId;
 
       if (!itemId) {
         throw new Error(`No QBO item mapping for line "${line.title || line.sku || "Shopify line item"}"`);
