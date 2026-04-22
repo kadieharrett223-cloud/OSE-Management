@@ -401,6 +401,7 @@ export default function ShopifyReconcilePage() {
   const [errorQbo, setErrorQbo] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [creatingInvoiceFor, setCreatingInvoiceFor] = useState<string | null>(null);
+  const [resendingInvoiceFor, setResendingInvoiceFor] = useState<string | null>(null);
 
   const [linkTarget, setLinkTarget] = useState<MatchedRow | null>(null);
 
@@ -560,6 +561,26 @@ export default function ShopifyReconcilePage() {
       setActionError(err?.message || "Failed to create invoice for this order");
     } finally {
       setCreatingInvoiceFor(null);
+    }
+  };
+
+  const handleResendInvoice = async (qboInvoiceId: string) => {
+    setResendingInvoiceFor(qboInvoiceId);
+    setActionError(null);
+    try {
+      const res = await fetch("/api/shopify/reconcile-resend-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ qbo_invoice_id: qboInvoiceId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to resend QBO invoice");
+      }
+    } catch (err: any) {
+      setActionError(err?.message || "Failed to resend invoice");
+    } finally {
+      setResendingInvoiceFor(null);
     }
   };
 
@@ -890,6 +911,16 @@ export default function ShopifyReconcilePage() {
                                 >
                                   {row.qbo ? "Linked" : "Link"}
                                 </button>
+                                {row.qbo && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleResendInvoice(row.qbo!.id)}
+                                    disabled={resendingInvoiceFor === row.qbo.id}
+                                    className="rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50"
+                                  >
+                                    {resendingInvoiceFor === row.qbo.id ? "Sending…" : "Resend"}
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() =>
