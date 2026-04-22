@@ -668,7 +668,11 @@ export async function syncShopifyOrdersToQbo(params?: {
 
         const billAddr = buildQboAddress(order.billing_address || null, { includeContact: false });
         const shippingAddrSource = order.shipping_address || order.billing_address || null;
-        const shipAddr = buildQboAddress(shippingAddrSource, { includeContact: false });
+        const shipAddr = buildQboAddress(shippingAddrSource, {
+          includeContact: true,
+          email: customerEmail(order),
+          phone: customerPhone(order),
+        });
 
         const invoicePayload: any = {
           CustomerRef: { value: customerId },

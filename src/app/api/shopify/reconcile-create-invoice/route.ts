@@ -438,7 +438,11 @@ export async function POST(req: NextRequest) {
 
     const billAddr = buildQboAddress(order.billing_address || null, { includeContact: false });
     const shippingAddrSource = order.shipping_address || order.billing_address || null;
-    const shipAddr = buildQboAddress(shippingAddrSource, { includeContact: false });
+    const shipAddr = buildQboAddress(shippingAddrSource, {
+      includeContact: true,
+      email: customerEmail(order),
+      phone: customerPhone(order),
+    });
     const requiresOutOfStateTaxCode = !isDeliveredToWashington(order);
     const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
     const customFieldDefIds = await resolveTransactionCustomFieldDefIds();
