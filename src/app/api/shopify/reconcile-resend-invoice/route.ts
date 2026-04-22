@@ -24,12 +24,20 @@ export async function POST(req: NextRequest) {
     }
 
     const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
+    const sendPayload = {
+      DeliveryInfo: {
+        DeliveryType: "Email",
+        DeliveryAddress: {
+          Address: sendTo,
+        },
+      },
+    };
     const sendQuery = `?sendTo=${encodeURIComponent(sendTo)}&minorversion=65`;
 
     try {
       await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify(sendPayload),
       });
 
       return NextResponse.json({
@@ -58,7 +66,7 @@ export async function POST(req: NextRequest) {
 
       await authorizedQboFetch<any>(`/invoice/${invoiceId}/send?minorversion=65`, {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify(sendPayload),
       });
 
       return NextResponse.json({
