@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { authorizedQboFetch } from "@/lib/qbo";
 
-const FORCED_INVOICE_SEND_TO_EMAIL = "kadie@olympc-equipment.com";
+const FORCED_INVOICE_SEND_TO_EMAIL = "kadie@olympic-equipment.com";
 
 async function requireAdmin() {
   const session: any = await getSession();
