@@ -488,23 +488,41 @@ export async function POST(req: NextRequest) {
     }
 
     let sentToEmail: string | null = null;
+    let sendWarning: string | null = null;
     if (sendInvoice) {
       const sendTo = sendToEmailInput || customerEmail(order) || String(settingsData?.auto_send_to_email || "").trim().toLowerCase();
-      const sendPayload = sendTo
-        ? {
-            DeliveryInfo: {
-              DeliveryType: "Email",
-              DeliveryAddress: {
-                Address: sendTo,
-              },
-            },
+      if (sendTo) {
+        const sendQuery = `?sendTo=${encodeURIComponent(sendTo)}&minorversion=65`;
+        try {
+          await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send${sendQuery}`, {
+            method: "POST",
+            body: JSON.stringify({}),
+          });
+          sentToEmail = sendTo;
+        } catch (sendErr: any) {
+          try {
+            await authorizedQboFetch<any>("/invoice?minorversion=65", {
+              method: "POST",
+              body: JSON.stringify({
+                Id: invoice.Id,
+                SyncToken: invoice.SyncToken,
+                sparse: true,
+                BillEmail: { Address: sendTo },
+              }),
+            });
+
+            await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send?minorversion=65`, {
+              method: "POST",
+              body: JSON.stringify({}),
+            });
+            sentToEmail = sendTo;
+          } catch (retryErr: any) {
+            sendWarning = retryErr?.message || sendErr?.message || "Invoice email send failed";
           }
-        : {};
-      await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send?minorversion=65`, {
-        method: "POST",
-        body: JSON.stringify(sendPayload),
-      });
-      sentToEmail = sendTo || null;
+        }
+      } else {
+        sendWarning = "No recipient email available to send invoice";
+      }
     }
 
     await supabase
@@ -552,6 +570,7 @@ export async function POST(req: NextRequest) {
       invoiceNumber: invoice.DocNumber || null,
       paymentId,
       sentToEmail,
+      sendWarning,
       shopifyOrderId: String(order.id),
     });
   } catch (err: any) {
