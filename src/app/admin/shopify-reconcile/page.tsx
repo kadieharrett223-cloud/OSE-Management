@@ -400,6 +400,7 @@ export default function ShopifyReconcilePage() {
   const [errorShopify, setErrorShopify] = useState<string | null>(null);
   const [errorQbo, setErrorQbo] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [creatingInvoiceFor, setCreatingInvoiceFor] = useState<string | null>(null);
   const [resendingInvoiceFor, setResendingInvoiceFor] = useState<string | null>(null);
 
@@ -570,6 +571,7 @@ export default function ShopifyReconcilePage() {
   const handleResendInvoice = async (qboInvoiceId: string) => {
     setResendingInvoiceFor(qboInvoiceId);
     setActionError(null);
+    setActionSuccess(null);
     try {
       const res = await fetch("/api/shopify/reconcile-resend-invoice", {
         method: "POST",
@@ -583,6 +585,7 @@ export default function ShopifyReconcilePage() {
       if (data?.sendWarning) {
         throw new Error(`Resend not confirmed by QBO: ${data.sendWarning}`);
       }
+      setActionSuccess(`Invoice ${qboInvoiceId} sent to kadie@olympic-equipment.com — QBO confirmed EmailStatus: EmailSent`);
     } catch (err: any) {
       setActionError(err?.message || "Failed to resend invoice");
     } finally {
@@ -706,6 +709,11 @@ export default function ShopifyReconcilePage() {
             {errorQbo && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
                 <strong>QuickBooks:</strong> {errorQbo}
+              </div>
+            )}
+            {actionSuccess && (
+              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                <strong>Sent:</strong> {actionSuccess}
               </div>
             )}
             {actionError && (
