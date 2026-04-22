@@ -555,6 +555,9 @@ export default function ShopifyReconcilePage() {
       if (!res.ok) {
         throw new Error(data?.error || "Failed to create QBO invoice");
       }
+      if (data?.sendWarning) {
+        throw new Error(`Invoice created, but email send is not confirmed: ${data.sendWarning}`);
+      }
 
       await Promise.all([load(), loadMappings()]);
     } catch (err: any) {
@@ -576,6 +579,9 @@ export default function ShopifyReconcilePage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data?.error || "Failed to resend QBO invoice");
+      }
+      if (data?.sendWarning) {
+        throw new Error(`Resend not confirmed by QBO: ${data.sendWarning}`);
       }
     } catch (err: any) {
       setActionError(err?.message || "Failed to resend invoice");

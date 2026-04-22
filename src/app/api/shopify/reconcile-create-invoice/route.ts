@@ -152,6 +152,14 @@ async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
   return outOfState?.Id ? String(outOfState.Id) : null;
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function getInvoiceEmailStatus(invoiceId: string): Promise<string> {
+  const query = `SELECT Id, EmailStatus FROM Invoice WHERE Id = '${invoiceId.replace(/'/g, "''")}' MAXRESULTS 1`;
+  const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
+  return String(res?.QueryResponse?.Invoice?.[0]?.EmailStatus || "").trim();
+}
+
 function customerPhone(order: ShopifyOrder) {
   return String(order.phone || order.customer?.phone || order.shipping_address?.phone || order.billing_address?.phone || "").trim();
 }
@@ -494,6 +502,15 @@ export async function POST(req: NextRequest) {
       await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send${sendQuery}`, {
         method: "POST",
       });
+      let emailStatus = "";
+      for (let i = 0; i < 3; i += 1) {
+        await sleep(i === 0 ? 0 : 700);
+        emailStatus = await getInvoiceEmailStatus(invoice.Id);
+        if (emailStatus.toLowerCase() === "emailsent") break;
+      }
+      if (emailStatus && emailStatus.toLowerCase() !== "emailsent") {
+        sendWarning = `QBO did not confirm email sent (EmailStatus: ${emailStatus})`;
+      }
       sentToEmail = sendTo;
     } catch (sendErr: any) {
       try {
@@ -510,6 +527,15 @@ export async function POST(req: NextRequest) {
         await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send${sendQuery}`, {
           method: "POST",
         });
+        let emailStatus = "";
+        for (let i = 0; i < 3; i += 1) {
+          await sleep(i === 0 ? 0 : 700);
+          emailStatus = await getInvoiceEmailStatus(invoice.Id);
+          if (emailStatus.toLowerCase() === "emailsent") break;
+        }
+        if (emailStatus && emailStatus.toLowerCase() !== "emailsent") {
+          sendWarning = `QBO did not confirm email sent (EmailStatus: ${emailStatus})`;
+        }
         sentToEmail = sendTo;
       } catch (retryErr: any) {
         sendWarning = retryErr?.message || sendErr?.message || "Invoice email send failed";

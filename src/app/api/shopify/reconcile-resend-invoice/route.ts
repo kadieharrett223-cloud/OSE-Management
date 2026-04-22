@@ -3,11 +3,18 @@ import { getSession } from "@/lib/auth";
 import { authorizedQboFetch } from "@/lib/qbo";
 
 const FORCED_INVOICE_SEND_TO_EMAIL = "kadie@olympic-equipment.com";
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function requireAdmin() {
   const session: any = await getSession();
   const role = (session?.user?.role ?? "").toString().toLowerCase();
   return role === "admin";
+}
+
+async function getInvoiceEmailStatus(invoiceId: string): Promise<string> {
+  const invoiceQuery = `SELECT Id, EmailStatus FROM Invoice WHERE Id = '${invoiceId.replace(/'/g, "''")}' MAXRESULTS 1`;
+  const invoiceRes = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(invoiceQuery)}&minorversion=65`);
+  return String(invoiceRes?.QueryResponse?.Invoice?.[0]?.EmailStatus || "").trim();
 }
 
 export async function POST(req: NextRequest) {
@@ -31,10 +38,20 @@ export async function POST(req: NextRequest) {
         method: "POST",
       });
 
+      let emailStatus = "";
+      for (let i = 0; i < 3; i += 1) {
+        await sleep(i === 0 ? 0 : 700);
+        emailStatus = await getInvoiceEmailStatus(invoiceId);
+        if (emailStatus.toLowerCase() === "emailsent") break;
+      }
+
       return NextResponse.json({
         ok: true,
         qboInvoiceId: invoiceId,
         sentToEmail: sendTo,
+        sendWarning: emailStatus && emailStatus.toLowerCase() !== "emailsent"
+          ? `QBO did not confirm email sent (EmailStatus: ${emailStatus})`
+          : null,
       });
     } catch {
       const invoiceQuery = `SELECT Id, SyncToken FROM Invoice WHERE Id = '${invoiceId.replace(/'/g, "''")}' MAXRESULTS 1`;
@@ -59,10 +76,20 @@ export async function POST(req: NextRequest) {
         method: "POST",
       });
 
+      let emailStatus = "";
+      for (let i = 0; i < 3; i += 1) {
+        await sleep(i === 0 ? 0 : 700);
+        emailStatus = await getInvoiceEmailStatus(invoiceId);
+        if (emailStatus.toLowerCase() === "emailsent") break;
+      }
+
       return NextResponse.json({
         ok: true,
         qboInvoiceId: invoiceId,
         sentToEmail: sendTo,
+        sendWarning: emailStatus && emailStatus.toLowerCase() !== "emailsent"
+          ? `QBO did not confirm email sent (EmailStatus: ${emailStatus})`
+          : null,
       });
     }
   } catch (err: any) {
