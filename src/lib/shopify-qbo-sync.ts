@@ -5,6 +5,7 @@ import { getShopifyTokens } from "@/lib/shopify";
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 const SHOPIFY_API_VERSION = "2024-01";
+const FORCED_INVOICE_SEND_TO_EMAIL = "kadie@olympc-equipment.com";
 
 type JsonMap = Record<string, string>;
 
@@ -88,6 +89,8 @@ type SyncOrderResult = {
   invoiceId?: string;
   invoiceNumber?: string;
   paymentId?: string;
+  sentToEmail?: string;
+  sendWarning?: string;
   status: "synced" | "skipped" | "failed";
   reason?: string;
 };
@@ -243,6 +246,44 @@ async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
   const taxCodes = Array.isArray(res?.QueryResponse?.TaxCode) ? res.QueryResponse.TaxCode : [];
   const outOfState = taxCodes.find((code: any) => normalizeToken(code?.Name) === "out of state");
   return outOfState?.Id ? String(outOfState.Id) : null;
+}
+
+async function sendInvoiceToForcedEmail(invoiceId: string, syncToken?: string | null): Promise<{ sentToEmail: string | null; sendWarning: string | null }> {
+  const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
+  const sendQuery = `?sendTo=${encodeURIComponent(sendTo)}&minorversion=65`;
+
+  try {
+    await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    return { sentToEmail: sendTo, sendWarning: null };
+  } catch (sendErr: any) {
+    try {
+      if (syncToken) {
+        await authorizedQboFetch<any>("/invoice?minorversion=65", {
+          method: "POST",
+          body: JSON.stringify({
+            Id: invoiceId,
+            SyncToken: syncToken,
+            sparse: true,
+            BillEmail: { Address: sendTo },
+          }),
+        });
+      }
+
+      await authorizedQboFetch<any>(`/invoice/${invoiceId}/send?minorversion=65`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      return { sentToEmail: sendTo, sendWarning: null };
+    } catch (retryErr: any) {
+      return {
+        sentToEmail: null,
+        sendWarning: retryErr?.message || sendErr?.message || "Invoice email send failed",
+      };
+    }
+  }
 }
 
 async function fetchShopifyOrdersSince(since: string): Promise<ShopifyOrder[]> {
@@ -681,6 +722,8 @@ export async function syncShopifyOrdersToQbo(params?: {
           throw new Error("QBO did not return a created invoice Id");
         }
 
+        const { sentToEmail, sendWarning } = await sendInvoiceToForcedEmail(invoice.Id, invoice.SyncToken);
+
         await supabase
           .from("shopify_qbo_mappings")
           .upsert(
@@ -725,6 +768,8 @@ export async function syncShopifyOrdersToQbo(params?: {
           invoiceId: invoice.Id,
           invoiceNumber: invoice.DocNumber,
           paymentId,
+          sentToEmail: sentToEmail || undefined,
+          sendWarning: sendWarning || undefined,
         });
       } catch (err: any) {
         result.failed += 1;

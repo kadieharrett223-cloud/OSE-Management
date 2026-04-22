@@ -6,6 +6,7 @@ import { getShopifyTokens } from "@/lib/shopify";
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 const SHOPIFY_API_VERSION = "2024-01";
+const FORCED_INVOICE_SEND_TO_EMAIL = "kadie@olympc-equipment.com";
 
 function isMissingLineItemMappingColumn(error: any) {
   const text = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
@@ -256,8 +257,6 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     const shopifyOrderId = String(body?.shopify_order_id || "").trim();
-    const sendInvoice = Boolean(body?.send_invoice);
-    const sendToEmailInput = String(body?.send_to_email || "").trim().toLowerCase();
     if (!shopifyOrderId) {
       return NextResponse.json({ error: "shopify_order_id is required" }, { status: 400 });
     }
@@ -489,39 +488,33 @@ export async function POST(req: NextRequest) {
 
     let sentToEmail: string | null = null;
     let sendWarning: string | null = null;
-    if (sendInvoice) {
-      const sendTo = sendToEmailInput || customerEmail(order) || String(settingsData?.auto_send_to_email || "").trim().toLowerCase();
-      if (sendTo) {
-        const sendQuery = `?sendTo=${encodeURIComponent(sendTo)}&minorversion=65`;
-        try {
-          await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send${sendQuery}`, {
-            method: "POST",
-            body: JSON.stringify({}),
-          });
-          sentToEmail = sendTo;
-        } catch (sendErr: any) {
-          try {
-            await authorizedQboFetch<any>("/invoice?minorversion=65", {
-              method: "POST",
-              body: JSON.stringify({
-                Id: invoice.Id,
-                SyncToken: invoice.SyncToken,
-                sparse: true,
-                BillEmail: { Address: sendTo },
-              }),
-            });
+    const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
+    const sendQuery = `?sendTo=${encodeURIComponent(sendTo)}&minorversion=65`;
+    try {
+      await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send${sendQuery}`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      sentToEmail = sendTo;
+    } catch (sendErr: any) {
+      try {
+        await authorizedQboFetch<any>("/invoice?minorversion=65", {
+          method: "POST",
+          body: JSON.stringify({
+            Id: invoice.Id,
+            SyncToken: invoice.SyncToken,
+            sparse: true,
+            BillEmail: { Address: sendTo },
+          }),
+        });
 
-            await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send?minorversion=65`, {
-              method: "POST",
-              body: JSON.stringify({}),
-            });
-            sentToEmail = sendTo;
-          } catch (retryErr: any) {
-            sendWarning = retryErr?.message || sendErr?.message || "Invoice email send failed";
-          }
-        }
-      } else {
-        sendWarning = "No recipient email available to send invoice";
+        await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send?minorversion=65`, {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        sentToEmail = sendTo;
+      } catch (retryErr: any) {
+        sendWarning = retryErr?.message || sendErr?.message || "Invoice email send failed";
       }
     }
 
