@@ -29,7 +29,6 @@ export async function POST(req: NextRequest) {
     try {
       await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
         method: "POST",
-        body: JSON.stringify({}),
       });
 
       return NextResponse.json({
@@ -58,7 +57,6 @@ export async function POST(req: NextRequest) {
 
       await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
         method: "POST",
-        body: JSON.stringify({}),
       });
 
       return NextResponse.json({

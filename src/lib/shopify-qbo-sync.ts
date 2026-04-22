@@ -255,7 +255,6 @@ async function sendInvoiceToForcedEmail(invoiceId: string, syncToken?: string | 
   try {
     await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
       method: "POST",
-      body: JSON.stringify({}),
     });
     return { sentToEmail: sendTo, sendWarning: null };
   } catch (sendErr: any) {
@@ -274,7 +273,6 @@ async function sendInvoiceToForcedEmail(invoiceId: string, syncToken?: string | 
 
       await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
         method: "POST",
-        body: JSON.stringify({}),
       });
       return { sentToEmail: sendTo, sendWarning: null };
     } catch (retryErr: any) {

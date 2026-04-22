@@ -493,7 +493,6 @@ export async function POST(req: NextRequest) {
     try {
       await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send${sendQuery}`, {
         method: "POST",
-        body: JSON.stringify({}),
       });
       sentToEmail = sendTo;
     } catch (sendErr: any) {
@@ -510,7 +509,6 @@ export async function POST(req: NextRequest) {
 
         await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send${sendQuery}`, {
           method: "POST",
-          body: JSON.stringify({}),
         });
         sentToEmail = sendTo;
       } catch (retryErr: any) {
