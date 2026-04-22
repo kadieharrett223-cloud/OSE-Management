@@ -526,11 +526,11 @@ export async function POST(req: NextRequest) {
       await transporter.sendMail({
         from: smtpFrom,
         to: sendTo,
-        subject: `Invoice ${invoice.DocNumber}`,
+        subject: `Invoice ${invoice.DocNumber || invoice.Id}`,
         text: `Please find attached the invoice.`,
         attachments: [
           {
-            filename: `Invoice-${invoice.Id}.pdf`,
+            filename: `Invoice-${invoice.DocNumber || invoice.Id}.pdf`,
             content: pdfBuffer,
             contentType: "application/pdf",
           },

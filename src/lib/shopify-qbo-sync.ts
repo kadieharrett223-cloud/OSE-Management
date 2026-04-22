@@ -248,7 +248,7 @@ async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
   return outOfState?.Id ? String(outOfState.Id) : null;
 }
 
-async function sendInvoiceToForcedEmail(invoiceId: string, syncToken?: string | null): Promise<{ sentToEmail: string | null; sendWarning: string | null }> {
+async function sendInvoiceToForcedEmail(invoiceId: string, docNumber?: string | null): Promise<{ sentToEmail: string | null; sendWarning: string | null }> {
   try {
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
       return { sentToEmail: null, sendWarning: "SMTP configuration missing" };
@@ -275,15 +275,16 @@ async function sendInvoiceToForcedEmail(invoiceId: string, syncToken?: string | 
     });
 
     const smtpFrom = process.env.SMTP_FROM || process.env.SMTP_USER;
+    const invoiceLabel = String(docNumber || invoiceId).trim() || invoiceId;
 
     await transporter.sendMail({
       from: smtpFrom,
       to: sendTo,
-      subject: `Invoice ${invoiceId}`,
+      subject: `Invoice ${invoiceLabel}`,
       text: `Please find attached the invoice.`,
       attachments: [
         {
-          filename: `Invoice-${invoiceId}.pdf`,
+          filename: `Invoice-${invoiceLabel}.pdf`,
           content: pdfBuffer,
           contentType: "application/pdf",
         },
@@ -735,7 +736,7 @@ export async function syncShopifyOrdersToQbo(params?: {
           throw new Error("QBO did not return a created invoice Id");
         }
 
-        const { sentToEmail, sendWarning } = await sendInvoiceToForcedEmail(invoice.Id, invoice.SyncToken);
+        const { sentToEmail, sendWarning } = await sendInvoiceToForcedEmail(invoice.Id, invoice.DocNumber);
 
         await supabase
           .from("shopify_qbo_mappings")

@@ -45,6 +45,10 @@ export async function POST(req: NextRequest) {
 
     const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
 
+    const invoiceQuery = `SELECT Id, DocNumber FROM Invoice WHERE Id = '${invoiceId.replace(/'/g, "''")}' MAXRESULTS 1`;
+    const invoiceRes = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(invoiceQuery)}&minorversion=65`);
+    const docNumber = String(invoiceRes?.QueryResponse?.Invoice?.[0]?.DocNumber || invoiceId).trim() || invoiceId;
+
     // Fetch invoice PDF from QBO
     const pdfRes = await authorizedQboFetchRaw(`/invoice/${invoiceId}/pdf`, {
       headers: { Accept: "application/pdf" },
@@ -59,11 +63,11 @@ export async function POST(req: NextRequest) {
     await transporter.sendMail({
       from: smtpFrom,
       to: sendTo,
-      subject: `Invoice ${invoiceId}`,
+      subject: `Invoice ${docNumber}`,
       text: `Please find attached the invoice.`,
       attachments: [
         {
-          filename: `Invoice-${invoiceId}.pdf`,
+          filename: `Invoice-${docNumber}.pdf`,
           content: pdfBuffer,
           contentType: "application/pdf",
         },
