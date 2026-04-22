@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
-import { authorizedQboFetch } from "@/lib/qbo";
+import { authorizedQboFetch, authorizedQboFetchRaw } from "@/lib/qbo";
 import { getShopifyTokens } from "@/lib/shopify";
+import nodemailer from "nodemailer";
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 const SHOPIFY_API_VERSION = "2024-01";
@@ -152,12 +153,23 @@ async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
   return outOfState?.Id ? String(outOfState.Id) : null;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+function getTransporter() {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASSWORD;
+  const smtpPort = parseInt(process.env.SMTP_PORT || "587");
+  const smtpSecure = process.env.SMTP_SECURE === "true";
 
-async function getInvoiceEmailStatus(invoiceId: string): Promise<string> {
-  const query = `SELECT Id, EmailStatus FROM Invoice WHERE Id = '${invoiceId.replace(/'/g, "''")}' MAXRESULTS 1`;
-  const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`);
-  return String(res?.QueryResponse?.Invoice?.[0]?.EmailStatus || "").trim();
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    throw new Error("SMTP configuration missing (SMTP_HOST, SMTP_USER, SMTP_PASSWORD)");
+  }
+
+  return nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure,
+    auth: { user: smtpUser, pass: smtpPass },
+  });
 }
 
 function customerPhone(order: ShopifyOrder) {
@@ -496,50 +508,38 @@ export async function POST(req: NextRequest) {
 
     let sentToEmail: string | null = null;
     let sendWarning: string | null = null;
-    const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
-    const sendQuery = `?sendTo=${encodeURIComponent(sendTo)}&minorversion=65`;
+    
     try {
-      await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send${sendQuery}`, {
-        method: "POST",
+      const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
+      
+      // Fetch the invoice PDF from QBO
+      const pdfRes = await authorizedQboFetchRaw(`/invoice/${invoice.Id}/pdf`, {
+        headers: { Accept: "application/pdf" },
       });
-      let emailStatus = "";
-      for (let i = 0; i < 3; i += 1) {
-        await sleep(i === 0 ? 0 : 700);
-        emailStatus = await getInvoiceEmailStatus(invoice.Id);
-        if (emailStatus.toLowerCase() === "emailsent") break;
-      }
-      if (emailStatus && emailStatus.toLowerCase() !== "emailsent") {
-        sendWarning = `QBO did not confirm email sent (EmailStatus: ${emailStatus})`;
-      }
+
+      const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
+
+      // Send via SMTP
+      const transporter = getTransporter();
+      const smtpFrom = process.env.SMTP_FROM || process.env.SMTP_USER;
+
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: sendTo,
+        subject: `Invoice ${invoice.DocNumber}`,
+        text: `Please find attached the invoice.`,
+        attachments: [
+          {
+            filename: `Invoice-${invoice.Id}.pdf`,
+            content: pdfBuffer,
+            contentType: "application/pdf",
+          },
+        ],
+      });
+
       sentToEmail = sendTo;
     } catch (sendErr: any) {
-      try {
-        await authorizedQboFetch<any>("/invoice?minorversion=65", {
-          method: "POST",
-          body: JSON.stringify({
-            Id: invoice.Id,
-            SyncToken: invoice.SyncToken,
-            sparse: true,
-            BillEmail: { Address: sendTo },
-          }),
-        });
-
-        await authorizedQboFetch<any>(`/invoice/${invoice.Id}/send${sendQuery}`, {
-          method: "POST",
-        });
-        let emailStatus = "";
-        for (let i = 0; i < 3; i += 1) {
-          await sleep(i === 0 ? 0 : 700);
-          emailStatus = await getInvoiceEmailStatus(invoice.Id);
-          if (emailStatus.toLowerCase() === "emailsent") break;
-        }
-        if (emailStatus && emailStatus.toLowerCase() !== "emailsent") {
-          sendWarning = `QBO did not confirm email sent (EmailStatus: ${emailStatus})`;
-        }
-        sentToEmail = sendTo;
-      } catch (retryErr: any) {
-        sendWarning = retryErr?.message || sendErr?.message || "Invoice email send failed";
-      }
+      sendWarning = sendErr?.message || "Invoice email send failed";
     }
 
     await supabase

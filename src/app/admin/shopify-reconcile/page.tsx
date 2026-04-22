@@ -557,7 +557,7 @@ export default function ShopifyReconcilePage() {
         throw new Error(data?.error || "Failed to create QBO invoice");
       }
       if (data?.sendWarning) {
-        throw new Error(`Invoice created, but email send is not confirmed: ${data.sendWarning}`);
+        throw new Error(`Invoice created, but email send failed: ${data.sendWarning}`);
       }
 
       await Promise.all([load(), loadMappings()]);
@@ -583,9 +583,9 @@ export default function ShopifyReconcilePage() {
         throw new Error(data?.error || "Failed to resend QBO invoice");
       }
       if (data?.sendWarning) {
-        throw new Error(`Resend not confirmed by QBO: ${data.sendWarning}`);
+        throw new Error(`Resend failed: ${data.sendWarning}`);
       }
-      setActionSuccess(`Invoice ${qboInvoiceId} sent to kadie@olympic-equipment.com — QBO confirmed EmailStatus: EmailSent`);
+      setActionSuccess(`Invoice ${qboInvoiceId} sent to kadie@olympic-equipment.com`);
     } catch (err: any) {
       setActionError(err?.message || "Failed to resend invoice");
     } finally {

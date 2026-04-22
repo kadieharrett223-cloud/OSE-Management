@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import { getServerSupabaseClient } from "@/lib/supabase";
-import { authorizedQboFetch } from "@/lib/qbo";
+import { authorizedQboFetch, authorizedQboFetchRaw } from "@/lib/qbo";
 import { getShopifyTokens } from "@/lib/shopify";
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
@@ -249,38 +249,53 @@ async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
 }
 
 async function sendInvoiceToForcedEmail(invoiceId: string, syncToken?: string | null): Promise<{ sentToEmail: string | null; sendWarning: string | null }> {
-  const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
-  const sendQuery = `?sendTo=${encodeURIComponent(sendTo)}&minorversion=65`;
-
   try {
-    await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
-      method: "POST",
-    });
-    return { sentToEmail: sendTo, sendWarning: null };
-  } catch (sendErr: any) {
-    try {
-      if (syncToken) {
-        await authorizedQboFetch<any>("/invoice?minorversion=65", {
-          method: "POST",
-          body: JSON.stringify({
-            Id: invoiceId,
-            SyncToken: syncToken,
-            sparse: true,
-            BillEmail: { Address: sendTo },
-          }),
-        });
-      }
-
-      await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
-        method: "POST",
-      });
-      return { sentToEmail: sendTo, sendWarning: null };
-    } catch (retryErr: any) {
-      return {
-        sentToEmail: null,
-        sendWarning: retryErr?.message || sendErr?.message || "Invoice email send failed",
-      };
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+      return { sentToEmail: null, sendWarning: "SMTP configuration missing" };
     }
+
+    const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
+
+    // Fetch the invoice PDF from QBO
+    const pdfRes = await authorizedQboFetchRaw(`/invoice/${invoiceId}/pdf`, {
+      headers: { Accept: "application/pdf" },
+    });
+
+    const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
+
+    // Send via SMTP
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || "587", 10),
+      secure: process.env.SMTP_SECURE === "true",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD,
+      },
+    });
+
+    const smtpFrom = process.env.SMTP_FROM || process.env.SMTP_USER;
+
+    await transporter.sendMail({
+      from: smtpFrom,
+      to: sendTo,
+      subject: `Invoice ${invoiceId}`,
+      text: `Please find attached the invoice.`,
+      attachments: [
+        {
+          filename: `Invoice-${invoiceId}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+
+    return { sentToEmail: sendTo, sendWarning: null };
+  } catch (err: any) {
+    return {
+      sentToEmail: null,
+      sendWarning: err?.message || "Invoice email send failed",
+    };
   }
 }
 

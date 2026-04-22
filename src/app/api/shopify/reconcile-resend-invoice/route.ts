@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { authorizedQboFetch } from "@/lib/qbo";
+import { authorizedQboFetch, authorizedQboFetchRaw } from "@/lib/qbo";
+import nodemailer from "nodemailer";
 
 const FORCED_INVOICE_SEND_TO_EMAIL = "kadie@olympic-equipment.com";
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function requireAdmin() {
   const session: any = await getSession();
@@ -11,10 +11,23 @@ async function requireAdmin() {
   return role === "admin";
 }
 
-async function getInvoiceEmailStatus(invoiceId: string): Promise<string> {
-  const invoiceQuery = `SELECT Id, EmailStatus FROM Invoice WHERE Id = '${invoiceId.replace(/'/g, "''")}' MAXRESULTS 1`;
-  const invoiceRes = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(invoiceQuery)}&minorversion=65`);
-  return String(invoiceRes?.QueryResponse?.Invoice?.[0]?.EmailStatus || "").trim();
+function getTransporter() {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASSWORD;
+  const smtpPort = parseInt(process.env.SMTP_PORT || "587");
+  const smtpSecure = process.env.SMTP_SECURE === "true";
+
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    throw new Error("SMTP configuration missing (SMTP_HOST, SMTP_USER, SMTP_PASSWORD)");
+  }
+
+  return nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure,
+    auth: { user: smtpUser, pass: smtpPass },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -31,67 +44,37 @@ export async function POST(req: NextRequest) {
     }
 
     const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
-    const sendQuery = `?sendTo=${encodeURIComponent(sendTo)}&minorversion=65`;
 
-    try {
-      await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
-        method: "POST",
-      });
+    // Fetch invoice PDF from QBO
+    const pdfRes = await authorizedQboFetchRaw(`/invoice/${invoiceId}/pdf`, {
+      headers: { Accept: "application/pdf" },
+    });
 
-      let emailStatus = "";
-      for (let i = 0; i < 3; i += 1) {
-        await sleep(i === 0 ? 0 : 700);
-        emailStatus = await getInvoiceEmailStatus(invoiceId);
-        if (emailStatus.toLowerCase() === "emailsent") break;
-      }
+    const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
 
-      return NextResponse.json({
-        ok: true,
-        qboInvoiceId: invoiceId,
-        sentToEmail: sendTo,
-        sendWarning: emailStatus && emailStatus.toLowerCase() !== "emailsent"
-          ? `QBO did not confirm email sent (EmailStatus: ${emailStatus})`
-          : null,
-      });
-    } catch {
-      const invoiceQuery = `SELECT Id, SyncToken FROM Invoice WHERE Id = '${invoiceId.replace(/'/g, "''")}' MAXRESULTS 1`;
-      const invoiceRes = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(invoiceQuery)}&minorversion=65`);
-      const invoice = invoiceRes?.QueryResponse?.Invoice?.[0];
+    // Send via SMTP
+    const transporter = getTransporter();
+    const smtpFrom = process.env.SMTP_FROM || process.env.SMTP_USER;
 
-      if (!invoice?.Id || invoice?.SyncToken === undefined || invoice?.SyncToken === null) {
-        throw new Error("Unable to load invoice SyncToken for resend fallback");
-      }
+    await transporter.sendMail({
+      from: smtpFrom,
+      to: sendTo,
+      subject: `Invoice ${invoiceId}`,
+      text: `Please find attached the invoice.`,
+      attachments: [
+        {
+          filename: `Invoice-${invoiceId}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
 
-      await authorizedQboFetch<any>("/invoice?minorversion=65", {
-        method: "POST",
-        body: JSON.stringify({
-          Id: invoice.Id,
-          SyncToken: invoice.SyncToken,
-          sparse: true,
-          BillEmail: { Address: sendTo },
-        }),
-      });
-
-      await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
-        method: "POST",
-      });
-
-      let emailStatus = "";
-      for (let i = 0; i < 3; i += 1) {
-        await sleep(i === 0 ? 0 : 700);
-        emailStatus = await getInvoiceEmailStatus(invoiceId);
-        if (emailStatus.toLowerCase() === "emailsent") break;
-      }
-
-      return NextResponse.json({
-        ok: true,
-        qboInvoiceId: invoiceId,
-        sentToEmail: sendTo,
-        sendWarning: emailStatus && emailStatus.toLowerCase() !== "emailsent"
-          ? `QBO did not confirm email sent (EmailStatus: ${emailStatus})`
-          : null,
-      });
-    }
+    return NextResponse.json({
+      ok: true,
+      qboInvoiceId: invoiceId,
+      sentToEmail: sendTo,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || "Failed to resend QBO invoice" }, { status: 500 });
   }
