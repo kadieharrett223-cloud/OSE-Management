@@ -250,20 +250,12 @@ async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
 
 async function sendInvoiceToForcedEmail(invoiceId: string, syncToken?: string | null): Promise<{ sentToEmail: string | null; sendWarning: string | null }> {
   const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
-  const sendPayload = {
-    DeliveryInfo: {
-      DeliveryType: "Email",
-      DeliveryAddress: {
-        Address: sendTo,
-      },
-    },
-  };
   const sendQuery = `?sendTo=${encodeURIComponent(sendTo)}&minorversion=65`;
 
   try {
     await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
       method: "POST",
-      body: JSON.stringify(sendPayload),
+      body: JSON.stringify({}),
     });
     return { sentToEmail: sendTo, sendWarning: null };
   } catch (sendErr: any) {
@@ -280,9 +272,9 @@ async function sendInvoiceToForcedEmail(invoiceId: string, syncToken?: string | 
         });
       }
 
-      await authorizedQboFetch<any>(`/invoice/${invoiceId}/send?minorversion=65`, {
+      await authorizedQboFetch<any>(`/invoice/${invoiceId}/send${sendQuery}`, {
         method: "POST",
-        body: JSON.stringify(sendPayload),
+        body: JSON.stringify({}),
       });
       return { sentToEmail: sendTo, sendWarning: null };
     } catch (retryErr: any) {
