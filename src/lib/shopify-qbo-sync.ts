@@ -622,9 +622,6 @@ export async function syncShopifyOrdersToQbo(params?: {
     const requiresOutOfStateTaxCode = filteredOrders.some((order) => !isDeliveredToWashington(order));
     const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
     const customFieldDefIds = await resolveTransactionCustomFieldDefIds();
-    if (!customFieldDefIds.salesRep) {
-      throw new Error("QuickBooks custom field 'Sales Rep' is required for website order sync. Please create/enable it in QBO.");
-    }
     if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
       throw new Error("QuickBooks tax code 'Out of State' was not found. Create it in QBO before syncing non-WA invoices.");
     }
@@ -723,6 +720,7 @@ export async function syncShopifyOrdersToQbo(params?: {
             value: [
               `Shopify Order: ${orderName}`,
               `Shopify Order ID: ${orderId}`,
+              `Rep: ${SALES_REP_VALUE}`,
               order.note ? `Note: ${order.note}` : null,
             ]
               .filter(Boolean)
@@ -741,7 +739,9 @@ export async function syncShopifyOrdersToQbo(params?: {
           };
         }
         const customFields = [
-          { DefinitionId: customFieldDefIds.salesRep, Name: "Sales Rep", Type: "StringType", StringValue: SALES_REP_VALUE },
+          customFieldDefIds.salesRep
+            ? { DefinitionId: customFieldDefIds.salesRep, Name: "Sales Rep", Type: "StringType", StringValue: SALES_REP_VALUE }
+            : null,
           customFieldDefIds.email && customerEmail(order)
             ? { DefinitionId: customFieldDefIds.email, Name: "email", Type: "StringType", StringValue: customerEmail(order) }
             : null,

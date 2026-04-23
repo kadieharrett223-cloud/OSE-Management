@@ -482,9 +482,6 @@ export async function POST(req: NextRequest) {
     const requiresOutOfStateTaxCode = !isDeliveredToWashington(order);
     const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
     const customFieldDefIds = await resolveTransactionCustomFieldDefIds();
-    if (!customFieldDefIds.salesRep) {
-      throw new Error("QuickBooks custom field 'Sales Rep' is required for website order sync. Please create/enable it in QBO.");
-    }
     if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
       throw new Error("QuickBooks tax code 'Out of State' was not found. Create it in QBO before creating non-WA invoices.");
     }
@@ -496,7 +493,7 @@ export async function POST(req: NextRequest) {
       PONumber: String(order.name || `#${order.order_number}`).replace(/^#/, ""),
       PrivateNote: `Manually created from Shopify Reconcile (${order.id})`,
       CustomerMemo: {
-        value: [`Shopify Order: ${order.name}`, `Shopify Order ID: ${order.id}`, order.note ? `Note: ${order.note}` : null]
+        value: [`Shopify Order: ${order.name}`, `Shopify Order ID: ${order.id}`, `Rep: ${SALES_REP_VALUE}`, order.note ? `Note: ${order.note}` : null]
           .filter(Boolean)
           .join(" | "),
       },
@@ -513,7 +510,9 @@ export async function POST(req: NextRequest) {
       };
     }
     const customFields = [
-      { DefinitionId: customFieldDefIds.salesRep, Name: "Sales Rep", Type: "StringType", StringValue: SALES_REP_VALUE },
+      customFieldDefIds.salesRep
+        ? { DefinitionId: customFieldDefIds.salesRep, Name: "Sales Rep", Type: "StringType", StringValue: SALES_REP_VALUE }
+        : null,
       customFieldDefIds.email && customerEmail(order)
         ? { DefinitionId: customFieldDefIds.email, Name: "email", Type: "StringType", StringValue: customerEmail(order) }
         : null,
