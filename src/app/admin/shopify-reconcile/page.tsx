@@ -923,7 +923,7 @@ export default function ShopifyReconcilePage() {
                                   onClick={() => setLinkTarget(row)}
                                   className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
                                 >
-                                  {row.qbo ? "Linked" : "Link"}
+                                  {row.matchType === "manual" ? "Linked" : "Link Invoice"}
                                 </button>
                                 {row.qbo && (
                                   <button
@@ -946,7 +946,7 @@ export default function ShopifyReconcilePage() {
                                 >
                                   {row.matchType === "cancelled" ? "Undo" : "Cancel"}
                                 </button>
-                                {!row.qbo && row.matchType !== "cancelled" && (
+                                {row.matchType !== "cancelled" && row.matchType !== "manual" && (
                                   <button
                                     type="button"
                                     onClick={() => handleCreateNewInvoice(row.shopify)}
@@ -977,7 +977,7 @@ export default function ShopifyReconcilePage() {
           shopifyOrder={linkTarget.shopify}
           qboInvoices={qboInvoices}
           currentQboId={
-            manualMapById.get(String(linkTarget.shopify.id))?.qbo_invoice_id ?? linkTarget.qbo?.id ?? null
+            manualMapById.get(String(linkTarget.shopify.id))?.qbo_invoice_id ?? null
           }
           onSave={(inv, note) => handleSaveLink(linkTarget.shopify, inv, note)}
           onUnlink={() => handleUnlink(linkTarget.shopify.id)}
