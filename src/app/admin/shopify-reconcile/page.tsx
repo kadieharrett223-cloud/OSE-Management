@@ -145,6 +145,7 @@ function buildMatchedRows(
         return { shopify: order, qbo: inv, matchType: "manual" };
         }
       }
+      return { shopify: order, qbo: null, matchType: "manual" };
     }
 
     const nameMatches = (qboByName.get(normCustomer) || []).filter(
@@ -905,12 +906,16 @@ export default function ShopifyReconcilePage() {
                                 className={`px-4 py-2 text-center text-sm font-medium ${
                                   row.matchType === "cancelled"
                                     ? "text-slate-500"
+                                    : row.matchType === "manual"
+                                    ? "text-blue-700"
                                     : row.matchType === "customer"
                                     ? "text-emerald-700"
                                     : "text-red-500"
                                 }`}>
                                 {row.matchType === "cancelled"
                                   ? "Marked as cancelled"
+                                  : row.matchType === "manual"
+                                  ? "- Manually linked invoice (not in current QBO date filter yet) -"
                                   : row.matchType === "customer"
                                   ? "- Matching customer found in QuickBooks (no invoice linked yet) -"
                                   : "- Invoice not found in QuickBooks -"}
