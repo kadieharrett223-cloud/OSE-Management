@@ -160,6 +160,16 @@ function buildQboAddress(
 ) {
   if (!addr) return undefined;
 
+  const city = String(addr.city || "").trim();
+  const state = String(addr.province_code || addr.province || "").trim();
+  const postal = String(addr.zip || "").trim();
+  const country = String(addr.country || addr.country_code || "").trim();
+
+  const locationLine = [city, [state, postal].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ")
+    .trim();
+
   const lines = [
     [addr.name, addr.company].filter(Boolean).join(" - "),
     addr.address1 || "",
@@ -167,17 +177,42 @@ function buildQboAddress(
   ].filter(Boolean) as string[];
 
   if (options?.includeContact) {
-    if (options.phone) {
-      lines.push(`Phone: ${options.phone}`);
+    if (locationLine) {
+      lines.push(locationLine);
     }
-    lines.push(options.email ? `Email: ${options.email}` : "Email: *no customer email*");
+
+    if (country) {
+      lines.push(country);
+    }
+
+    const contactLine = [
+      options.phone ? `Phone: ${options.phone}` : null,
+      options.email ? `Email: ${options.email}` : "Email: *no customer email*",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    if (contactLine) {
+      if (lines.length < 5) {
+        lines.push(contactLine);
+      } else {
+        lines[4] = [lines[4], contactLine].filter(Boolean).join(" | ");
+      }
+    }
+
+    const out: Record<string, string> = {};
+    lines.slice(0, 5).forEach((line, idx) => {
+      out[`Line${idx + 1}`] = line;
+    });
+
+    return Object.keys(out).length > 0 ? out : undefined;
   }
 
   const out: Record<string, string> = {
-    City: String(addr.city || "").trim(),
-    CountrySubDivisionCode: String(addr.province_code || addr.province || "").trim(),
-    PostalCode: String(addr.zip || "").trim(),
-    Country: String(addr.country || addr.country_code || "").trim(),
+    City: city,
+    CountrySubDivisionCode: state,
+    PostalCode: postal,
+    Country: country,
   };
 
   lines.slice(0, 5).forEach((line, idx) => {
