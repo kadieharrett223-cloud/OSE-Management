@@ -8,6 +8,7 @@ import nodemailer from "nodemailer";
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 const SHOPIFY_API_VERSION = "2024-01";
 const FORCED_INVOICE_SEND_TO_EMAIL = "kadie@olympic-equipment.com";
+const SALES_REP_VALUE = "KLH";
 
 function isMissingLineItemMappingColumn(error: any) {
   const text = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
@@ -481,6 +482,9 @@ export async function POST(req: NextRequest) {
     const requiresOutOfStateTaxCode = !isDeliveredToWashington(order);
     const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
     const customFieldDefIds = await resolveTransactionCustomFieldDefIds();
+    if (!customFieldDefIds.salesRep) {
+      throw new Error("QuickBooks custom field 'Sales Rep' is required for website order sync. Please create/enable it in QBO.");
+    }
     if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
       throw new Error("QuickBooks tax code 'Out of State' was not found. Create it in QBO before creating non-WA invoices.");
     }
@@ -509,9 +513,7 @@ export async function POST(req: NextRequest) {
       };
     }
     const customFields = [
-      customFieldDefIds.salesRep
-        ? { DefinitionId: customFieldDefIds.salesRep, Name: "Sales Rep", Type: "StringType", StringValue: "KLH" }
-        : null,
+      { DefinitionId: customFieldDefIds.salesRep, Name: "Sales Rep", Type: "StringType", StringValue: SALES_REP_VALUE },
       customFieldDefIds.email && customerEmail(order)
         ? { DefinitionId: customFieldDefIds.email, Name: "email", Type: "StringType", StringValue: customerEmail(order) }
         : null,
