@@ -612,42 +612,6 @@ export async function POST(req: NextRequest) {
       throw new Error("QuickBooks did not return created invoice id");
     }
 
-    let sentToEmail: string | null = null;
-    let sendWarning: string | null = null;
-    
-    try {
-      const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
-      
-      // Fetch the invoice PDF from QBO
-      const pdfRes = await authorizedQboFetchRaw(`/invoice/${invoice.Id}/pdf`, {
-        headers: { Accept: "application/pdf" },
-      });
-
-      const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
-
-      // Send via SMTP
-      const transporter = getTransporter();
-      const smtpFrom = process.env.SMTP_FROM || process.env.SMTP_USER;
-
-      await transporter.sendMail({
-        from: smtpFrom,
-        to: sendTo,
-        subject: `Invoice ${invoice.DocNumber || invoice.Id}`,
-        text: `Please find attached the invoice.`,
-        attachments: [
-          {
-            filename: `Invoice-${invoice.DocNumber || invoice.Id}.pdf`,
-            content: pdfBuffer,
-            contentType: "application/pdf",
-          },
-        ],
-      });
-
-      sentToEmail = sendTo;
-    } catch (sendErr: any) {
-      sendWarning = sendErr?.message || "Invoice email send failed";
-    }
-
     await supabase
       .from("shopify_qbo_mappings")
       .upsert(
@@ -685,6 +649,39 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify(paymentPayload),
       });
       paymentId = paymentRes?.Payment?.Id ? String(paymentRes.Payment.Id) : null;
+    }
+
+    let sentToEmail: string | null = null;
+    let sendWarning: string | null = null;
+
+    try {
+      const sendTo = FORCED_INVOICE_SEND_TO_EMAIL;
+
+      const pdfRes = await authorizedQboFetchRaw(`/invoice/${invoice.Id}/pdf`, {
+        headers: { Accept: "application/pdf" },
+      });
+
+      const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
+      const transporter = getTransporter();
+      const smtpFrom = process.env.SMTP_FROM || process.env.SMTP_USER;
+
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: sendTo,
+        subject: `Invoice ${invoice.DocNumber || invoice.Id}`,
+        text: `Please find attached the invoice.`,
+        attachments: [
+          {
+            filename: `Invoice-${invoice.DocNumber || invoice.Id}.pdf`,
+            content: pdfBuffer,
+            contentType: "application/pdf",
+          },
+        ],
+      });
+
+      sentToEmail = sendTo;
+    } catch (sendErr: any) {
+      sendWarning = sendErr?.message || "Invoice email send failed";
     }
 
     return NextResponse.json({

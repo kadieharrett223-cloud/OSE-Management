@@ -842,8 +842,6 @@ export async function syncShopifyOrdersToQbo(params?: {
           throw new Error("QBO did not return a created invoice Id");
         }
 
-        const { sentToEmail, sendWarning } = await sendInvoiceToForcedEmail(invoice.Id, invoice.DocNumber);
-
         await supabase
           .from("shopify_qbo_mappings")
           .upsert(
@@ -879,6 +877,8 @@ export async function syncShopifyOrdersToQbo(params?: {
           });
           paymentId = paymentRes?.Payment?.Id ? String(paymentRes.Payment.Id) : undefined;
         }
+
+        const { sentToEmail, sendWarning } = await sendInvoiceToForcedEmail(invoice.Id, invoice.DocNumber);
 
         result.synced += 1;
         result.results.push({
