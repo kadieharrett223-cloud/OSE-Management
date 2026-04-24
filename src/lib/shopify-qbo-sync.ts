@@ -45,6 +45,7 @@ type ShopifyOrder = {
   created_at: string;
   financial_status: string;
   total_price: string;
+  total_tax?: string;
   note: string | null;
   customer?: {
     first_name?: string | null;
@@ -348,6 +349,18 @@ async function resolveOutOfStateTaxCodeId(): Promise<string | null> {
   return outOfState?.Id ? String(outOfState.Id) : null;
 }
 
+async function resolveMiscAdjustmentItemId(defaultItemId: string | null): Promise<string | null> {
+  const query = "SELECT Id, Name FROM Item WHERE Active = true MAXRESULTS 1000";
+  const res = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(query)}&minorversion=65`).catch(() => null);
+  const items = Array.isArray(res?.QueryResponse?.Item) ? res.QueryResponse.Item : [];
+  const targetNames = ["misc", "miscellaneous", "misc charge", "tax adjustment", "sales tax adjustment", "adjustment"];
+  for (const targetName of targetNames) {
+    const found = items.find((i: any) => normalizeToken(i?.Name) === targetName);
+    if (found?.Id) return String(found.Id);
+  }
+  return defaultItemId;
+}
+
 async function sendInvoiceToForcedEmail(invoiceId: string, docNumber?: string | null): Promise<{ sentToEmail: string | null; sendWarning: string | null }> {
   try {
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
@@ -410,7 +423,7 @@ async function fetchShopifyOrdersSince(since: string): Promise<ShopifyOrder[]> {
     limit: "250",
     status: "any",
     created_at_min: since,
-    fields: "id,name,order_number,created_at,financial_status,total_price,note,email,phone,customer,billing_address,shipping_address,line_items,shipping_lines",
+    fields: "id,name,order_number,created_at,financial_status,total_price,total_tax,note,email,phone,customer,billing_address,shipping_address,line_items,shipping_lines",
   });
 
   let nextUrl: string | null = `https://${tokens.shop}/admin/api/${SHOPIFY_API_VERSION}/orders.json?${params.toString()}`;
@@ -842,6 +855,48 @@ export async function syncShopifyOrdersToQbo(params?: {
           throw new Error("QBO did not return a created invoice Id");
         }
 
+        // WA sales tax adjustment: make QBO invoice total match Shopify total exactly
+        let taxAdjustmentWarning: string | null = null;
+        if (isDeliveredToWashington(order)) {
+          const shopifyTax = parseFloat(Number(order.total_tax || 0).toFixed(2));
+          const qboTax = parseFloat(Number(invoice.TxnTaxDetail?.TotalTax || 0).toFixed(2));
+          const qboTotal = parseFloat(Number(invoice.TotalAmt || 0).toFixed(2));
+          const shopifyTotal = parseFloat(Number(order.total_price).toFixed(2));
+          const diff = parseFloat((shopifyTotal - qboTotal).toFixed(2));
+          if (Math.abs(diff) >= 0.01) {
+            const taxMissing = qboTax < 0.01 && shopifyTax > 0.01;
+            if (taxMissing) {
+              taxAdjustmentWarning = "Sales Tax Review: no WA tax rate found in QBO for this location";
+            }
+            const miscItemId = await resolveMiscAdjustmentItemId(settings.qbo_default_item_id);
+            if (miscItemId) {
+              const adjustmentLine: any = {
+                DetailType: "SalesItemLineDetail",
+                Amount: diff,
+                Description: `Sales Tax Adjustment (Shopify tax: $${shopifyTax.toFixed(2)}, QBO tax: $${qboTax.toFixed(2)})`,
+                SalesItemLineDetail: {
+                  ItemRef: { value: miscItemId },
+                  Qty: 1,
+                  UnitPrice: diff,
+                },
+              };
+              const updatePayload = {
+                ...invoice,
+                Line: [...(invoice.Line || []).filter((l: any) => l.DetailType !== "SubTotalLineDetail"), adjustmentLine],
+              };
+              const updateRes = await authorizedQboFetch<any>("/invoice?minorversion=65&operation=update", {
+                method: "POST",
+                body: JSON.stringify(updatePayload),
+              }).catch(() => null);
+              if (updateRes?.Invoice?.Id) {
+                invoice = updateRes.Invoice;
+              }
+            } else if (!taxAdjustmentWarning) {
+              taxAdjustmentWarning = `Sales Tax Adjustment of $${diff.toFixed(2)} needed but no misc/adjustment item found in QBO`;
+            }
+          }
+        }
+
         await supabase
           .from("shopify_qbo_mappings")
           .upsert(
@@ -889,7 +944,7 @@ export async function syncShopifyOrdersToQbo(params?: {
           invoiceNumber: invoice.DocNumber,
           paymentId,
           sentToEmail: sentToEmail || undefined,
-          sendWarning: sendWarning || undefined,
+          sendWarning: sendWarning || taxAdjustmentWarning || undefined,
         });
       } catch (err: any) {
         result.failed += 1;
