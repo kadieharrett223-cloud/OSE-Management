@@ -141,10 +141,17 @@ function getNextPageUrl(linkHeader: string | null): string | null {
 }
 
 function customerName(order: ShopifyOrder) {
-  const first = order.customer?.first_name || "";
-  const last = order.customer?.last_name || "";
+  const first = capitalizePersonName(order.customer?.first_name || "");
+  const last = capitalizePersonName(order.customer?.last_name || "");
   const full = [first, last].filter(Boolean).join(" ").trim();
   return full || order.customer?.email || order.email || "Shopify Customer";
+}
+
+function capitalizePersonName(value: string): string {
+  const input = String(value || "").trim();
+  if (!input) return "";
+  const lower = input.toLowerCase();
+  return lower.replace(/(^|[\s\-'])([a-z])/g, (_, sep: string, char: string) => `${sep}${char.toUpperCase()}`);
 }
 
 function customerEmail(order: ShopifyOrder) {
@@ -186,7 +193,7 @@ function buildQboAddress(
     .trim();
 
   const lines = [
-    [addr.name, addr.company].filter(Boolean).join(" - "),
+    [capitalizePersonName(String(addr.name || "")), addr.company].filter(Boolean).join(" - "),
     addr.address1 || "",
     addr.address2 || "",
   ].filter(Boolean) as string[];
@@ -278,6 +285,49 @@ async function resolveTransactionCustomFieldDefIds(): Promise<{
     email: findId("email"),
     phone: findId("phone"),
   };
+}
+
+function initialsFromName(value: string): string {
+  return String(value || "")
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
+}
+
+async function resolveSalesRepRefByName(repName: string): Promise<{ value: string; name: string }> {
+  const target = normalizeToken(repName);
+
+  const salesRepQuery = "SELECT * FROM SalesRep MAXRESULTS 1000";
+  const salesRepRes = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(salesRepQuery)}&minorversion=65`).catch(() => null);
+  const salesReps = Array.isArray(salesRepRes?.QueryResponse?.SalesRep) ? salesRepRes.QueryResponse.SalesRep : [];
+
+  for (const salesRep of salesReps) {
+    const refName = String(salesRep?.SalesRepEntityRef?.name || salesRep?.Name || "").trim();
+    const refValue = String(salesRep?.SalesRepEntityRef?.value || salesRep?.Id || "").trim();
+    if (!refName || !refValue) continue;
+    if (normalizeToken(refName) === target || initialsFromName(refName) === repName.toUpperCase()) {
+      return { value: refValue, name: refName };
+    }
+  }
+
+  const employeeQuery = "SELECT Id, DisplayName, GivenName, MiddleName, FamilyName FROM Employee MAXRESULTS 1000";
+  const employeeRes = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(employeeQuery)}&minorversion=65`).catch(() => null);
+  const employees = Array.isArray(employeeRes?.QueryResponse?.Employee) ? employeeRes.QueryResponse.Employee : [];
+
+  for (const emp of employees) {
+    const displayName = String(emp?.DisplayName || "").trim();
+    const fullName = [emp?.GivenName, emp?.MiddleName, emp?.FamilyName].filter(Boolean).join(" ").trim();
+    const candidate = displayName || fullName;
+    const empId = String(emp?.Id || "").trim();
+    if (!candidate || !empId) continue;
+    if (normalizeToken(candidate) === target || initialsFromName(candidate) === repName.toUpperCase()) {
+      return { value: empId, name: candidate };
+    }
+  }
+
+  throw new Error(`QuickBooks Sales Rep '${repName}' not found. Add a Sales Rep/Employee with this name or initials.`);
 }
 
 async function resolveShopifyPaymentMethodId(settings: ShopifySyncSettings): Promise<string | null> {
@@ -636,6 +686,7 @@ export async function syncShopifyOrdersToQbo(params?: {
     const requiresOutOfStateTaxCode = filteredOrders.some((order) => !isDeliveredToWashington(order));
     const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
     const customFieldDefIds = await resolveTransactionCustomFieldDefIds();
+    const salesRepRef = await resolveSalesRepRefByName(SALES_REP_VALUE);
     if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
       throw new Error("QuickBooks tax code 'Out of State' was not found. Create it in QBO before syncing non-WA invoices.");
     }
@@ -730,11 +781,11 @@ export async function syncShopifyOrdersToQbo(params?: {
           TxnDate: syncDate,
           PONumber: String(orderName).replace(/^#/, ""),
           PrivateNote: `Shopify Order ${orderName} (${orderId})`,
+          SalesRepRef: salesRepRef,
           CustomerMemo: {
             value: [
               `Shopify Order: ${orderName}`,
               `Shopify Order ID: ${orderId}`,
-              `Rep: ${SALES_REP_VALUE}`,
               order.note ? `Note: ${order.note}` : null,
             ]
               .filter(Boolean)
