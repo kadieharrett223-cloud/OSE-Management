@@ -58,6 +58,9 @@ const money = (v: number | string) =>
 
 const toYmd = (date: Date) => date.toISOString().slice(0, 10);
 
+const AUTO_MATCH_MAX_DAYS_BEFORE_ORDER = 1;
+const AUTO_MATCH_MAX_DAYS_AFTER_ORDER = 21;
+
 const normalizePersonName = (s: string) =>
   s
     .toLowerCase()
@@ -153,11 +156,12 @@ function buildMatchedRows(
     );
     if (nameMatches.length > 0) {
       const orderDate = new Date(order.created_at).getTime();
-      const MAX_DAYS = 90;
-      const MAX_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
-      const nearby = nameMatches.filter(
-        (inv) => Math.abs(new Date(inv.txnDate).getTime() - orderDate) <= MAX_MS
-      );
+      const minDate = orderDate - AUTO_MATCH_MAX_DAYS_BEFORE_ORDER * 24 * 60 * 60 * 1000;
+      const maxDate = orderDate + AUTO_MATCH_MAX_DAYS_AFTER_ORDER * 24 * 60 * 60 * 1000;
+      const nearby = nameMatches.filter((inv) => {
+        const invoiceDate = new Date(inv.txnDate).getTime();
+        return Number.isFinite(invoiceDate) && invoiceDate >= minDate && invoiceDate <= maxDate;
+      });
       const candidates = nearby.length > 0 ? nearby : [];
       if (candidates.length > 0) {
         const best = candidates.sort(
