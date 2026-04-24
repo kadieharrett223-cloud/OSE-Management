@@ -151,8 +151,22 @@ function customerEmail(order: ShopifyOrder) {
   return String(order.customer?.email || order.email || "").trim().toLowerCase();
 }
 
+function formatPhoneNumber(value: string): string {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("1")) {
+    const local = digits.slice(1);
+    return `${local.slice(0, 3)}-${local.slice(3, 6)}-${local.slice(6)}`;
+  }
+  return String(value || "").trim();
+}
+
 function customerPhone(order: ShopifyOrder) {
-  return String(order.phone || order.customer?.phone || order.shipping_address?.phone || order.billing_address?.phone || "").trim();
+  return formatPhoneNumber(
+    String(order.phone || order.customer?.phone || order.shipping_address?.phone || order.billing_address?.phone || "").trim()
+  );
 }
 
 function buildQboAddress(
