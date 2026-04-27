@@ -308,8 +308,8 @@ async function resolveSalesRepRefByName(repName: string): Promise<{ value: strin
     const refName = String(salesRep?.SalesRepEntityRef?.name || salesRep?.Name || "").trim();
     const refValue = String(salesRep?.SalesRepEntityRef?.value || salesRep?.Id || "").trim();
     if (!refName || !refValue) continue;
-    if (normalizeToken(refName) === target || initialsFromName(refName) === repName.toUpperCase()) {
-      return { value: refValue, name: refName };
+    if (normalizeToken(refName) === target) {
+      return { value: refValue, name: repName };
     }
   }
 
@@ -323,12 +323,12 @@ async function resolveSalesRepRefByName(repName: string): Promise<{ value: strin
     const candidate = displayName || fullName;
     const empId = String(emp?.Id || "").trim();
     if (!candidate || !empId) continue;
-    if (normalizeToken(candidate) === target || initialsFromName(candidate) === repName.toUpperCase()) {
-      return { value: empId, name: candidate };
+    if (normalizeToken(candidate) === target) {
+      return { value: empId, name: repName };
     }
   }
 
-  throw new Error(`QuickBooks Sales Rep '${repName}' not found. Add a Sales Rep/Employee with this name or initials.`);
+  throw new Error(`QuickBooks Sales Rep '${repName}' not found. Add a Sales Rep/Employee named exactly '${repName}' in QuickBooks.`);
 }
 
 async function resolveShopifyPaymentMethodId(settings: ShopifySyncSettings): Promise<string | null> {
