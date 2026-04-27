@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getShopifyTokens } from "@/lib/shopify";
 
 const SHOPIFY_API_VERSION = "2024-01";
+const MIN_ABANDONED_CART_DATE = "2026-04-24T00:00:00Z";
 
 type ShopifyCheckout = {
   id: number;
@@ -71,8 +72,11 @@ export async function GET(req: NextRequest) {
     const daysRaw = Number(sp.get("days") || "7");
     const days = Math.min(Math.max(Number.isFinite(daysRaw) ? Math.floor(daysRaw) : 7, 1), 365);
 
-    const sinceDate = new Date();
-    sinceDate.setDate(sinceDate.getDate() - days);
+    const dynamicSinceDate = new Date();
+    dynamicSinceDate.setDate(dynamicSinceDate.getDate() - days);
+
+    const minimumDate = new Date(MIN_ABANDONED_CART_DATE);
+    const sinceDate = dynamicSinceDate < minimumDate ? minimumDate : dynamicSinceDate;
 
     const params = new URLSearchParams({
       limit: "250",
@@ -125,7 +129,13 @@ export async function GET(req: NextRequest) {
       }))
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 
-    return NextResponse.json({ ok: true, days, count: carts.length, carts });
+    return NextResponse.json({
+      ok: true,
+      days,
+      minStartDate: MIN_ABANDONED_CART_DATE,
+      count: carts.length,
+      carts,
+    });
   } catch (err: any) {
     console.error("[shopify/abandoned-carts] Error:", err);
     return NextResponse.json({ error: err?.message || "Failed to fetch abandoned carts" }, { status: 500 });

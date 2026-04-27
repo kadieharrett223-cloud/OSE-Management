@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
+const DOWNLOADED_CARTS_KEY = "abandoned-cart-downloaded-tokens";
+const MIN_START_DATE_LABEL = "2026-04-24";
+
 type AbandonedCart = {
   id: number;
   token: string;
@@ -38,6 +41,33 @@ export default function ShopifyAbandonedCartsPage() {
   const [error, setError] = useState<string | null>(null);
   const [carts, setCarts] = useState<AbandonedCart[]>([]);
   const [downloadingToken, setDownloadingToken] = useState<string | null>(null);
+  const [downloadedTokens, setDownloadedTokens] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DOWNLOADED_CARTS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setDownloadedTokens(parsed.map((v) => String(v)).filter(Boolean));
+      }
+    } catch {
+      // Ignore localStorage parsing issues
+    }
+  }, []);
+
+  const markDownloaded = useCallback((token: string) => {
+    setDownloadedTokens((prev) => {
+      if (prev.includes(token)) return prev;
+      const next = [...prev, token];
+      try {
+        localStorage.setItem(DOWNLOADED_CARTS_KEY, JSON.stringify(next));
+      } catch {
+        // Ignore localStorage write issues
+      }
+      return next;
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,6 +111,7 @@ export default function ShopifyAbandonedCartsPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      markDownloaded(token);
     } catch (err: any) {
       setError(err?.message || "Failed to download cart");
     } finally {
@@ -104,7 +135,7 @@ export default function ShopifyAbandonedCartsPage() {
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">Admin</p>
               <h1 className="text-2xl font-semibold text-slate-900">Shopify Abandoned Carts</h1>
               <p className="mt-1 text-sm text-slate-500">
-                Import abandoned carts from Shopify by selected day range, then export each cart one by one as PDF.
+                Import abandoned carts from Shopify (only carts from {MIN_START_DATE_LABEL} and later), then export each cart one by one as PDF.
               </p>
             </header>
 
@@ -151,7 +182,7 @@ export default function ShopifyAbandonedCartsPage() {
               </div>
               <div className="bg-white border border-slate-200 rounded-lg p-4">
                 <p className="text-xs font-medium text-slate-500">Range</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">{days} day(s)</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">From {MIN_START_DATE_LABEL}</p>
               </div>
             </div>
 
@@ -186,12 +217,24 @@ export default function ShopifyAbandonedCartsPage() {
                         </td>
                       </tr>
                     ) : (
-                      carts.map((cart) => (
-                        <tr key={cart.token} className="hover:bg-slate-50 transition-colors">
+                      carts.map((cart) => {
+                        const isDownloaded = downloadedTokens.includes(cart.token);
+                        return (
+                        <tr
+                          key={cart.token}
+                          className={`${isDownloaded ? "bg-slate-100 opacity-60" : "hover:bg-slate-50"} transition-colors`}
+                        >
                           <td className="px-4 py-2 text-slate-700 whitespace-nowrap">{cart.created_at?.slice(0, 10)}</td>
                           <td className="px-4 py-2 text-slate-800">
                             <div className="font-medium">{cart.customerName || "Unknown"}</div>
                             <div className="text-xs text-slate-500">{cart.customerEmail || "No email"}</div>
+                            {isDownloaded && (
+                              <div className="mt-1">
+                                <span className="inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                  Downloaded
+                                </span>
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-2 text-slate-700">
                             {[cart.city, cart.state, cart.country].filter(Boolean).join(", ") || "-"}
@@ -220,11 +263,15 @@ export default function ShopifyAbandonedCartsPage() {
                               disabled={downloadingToken === cart.token}
                               className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                             >
-                              {downloadingToken === cart.token ? "Downloading…" : "Download PDF"}
+                              {downloadingToken === cart.token
+                                ? "Downloading…"
+                                : isDownloaded
+                                ? "Download Again"
+                                : "Download PDF"}
                             </button>
                           </td>
                         </tr>
-                      ))
+                      )})
                     )}
                   </tbody>
                 </table>
