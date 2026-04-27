@@ -15,6 +15,7 @@ export default function SettingsPage() {
   const [shopifyShop, setShopifyShop] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [disconnectingShopify, setDisconnectingShopify] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [shopInput, setShopInput] = useState('');
@@ -154,6 +155,28 @@ export default function SettingsPage() {
       window.location.href = data.authUrl;
     } catch (err: any) {
       setError(err.message || 'Failed to connect Shopify');
+    }
+  };
+
+  const handleDisconnectShopify = async () => {
+    if (!confirm("Disconnect Shopify? You'll need to reconnect to sync Shopify data.")) return;
+    try {
+      setError(null);
+      setSuccess(null);
+      setDisconnectingShopify(true);
+      const res = await fetch('/api/shopify/disconnect', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to disconnect Shopify');
+      }
+
+      setShopifyConnected(false);
+      setShopifyShop(null);
+      setSuccess('Shopify disconnected successfully');
+    } catch (err: any) {
+      setError(err.message || 'Failed to disconnect Shopify');
+    } finally {
+      setDisconnectingShopify(false);
     }
   };
 
@@ -465,13 +488,22 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     {shopifyConnected ? (
-                      <button
-                        onClick={handleSyncPrices}
-                        disabled={syncing}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {syncing ? 'Syncing...' : 'Push Mapped to Shopify'}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSyncPrices}
+                          disabled={syncing}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {syncing ? 'Syncing...' : 'Push Mapped to Shopify'}
+                        </button>
+                        <button
+                          onClick={handleDisconnectShopify}
+                          disabled={disconnectingShopify}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {disconnectingShopify ? 'Disconnecting...' : 'Disconnect'}
+                        </button>
+                      </div>
                     ) : (
                       <div className="flex gap-2">
                         <input

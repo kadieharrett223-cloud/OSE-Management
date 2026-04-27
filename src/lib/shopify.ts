@@ -51,6 +51,21 @@ export async function saveShopifyTokens(tokens: ShopifyTokens): Promise<void> {
 }
 
 /**
+ * Remove stored Shopify tokens (disconnect)
+ */
+export async function clearShopifyTokens(): Promise<void> {
+  const { error } = await supabase
+    .from("shopify_tokens")
+    .delete()
+    .not("shop", "is", null);
+
+  if (error) {
+    console.error("Failed to clear Shopify tokens:", error);
+    throw new Error("Failed to disconnect Shopify");
+  }
+}
+
+/**
  * Build Shopify OAuth authorization URL
  */
 export function buildShopifyAuthUrl(shop: string): string {
