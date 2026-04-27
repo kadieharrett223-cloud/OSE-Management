@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
+function isMissingPaymentSchedulesTableError(error: any): boolean {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    message.includes("purchase_order_payment_schedules") &&
+    (message.includes("schema cache") || message.includes("does not exist"))
+  );
+}
+
 function mapSchedule(row: any) {
   return {
     id: row.id,
@@ -58,6 +66,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     return NextResponse.json({ ok: true, schedule: mapSchedule(data) });
   } catch (error: any) {
+    if (isMissingPaymentSchedulesTableError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            "Payment schedule table is missing in Supabase. Run the latest migrations (including 069_ensure_purchase_order_payment_schedules_exists.sql).",
+        },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
       { error: error?.message || "Failed to update payment schedule" },
       { status: 500 }
@@ -86,6 +103,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {
+    if (isMissingPaymentSchedulesTableError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            "Payment schedule table is missing in Supabase. Run the latest migrations (including 069_ensure_purchase_order_payment_schedules_exists.sql).",
+        },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
       { error: error?.message || "Failed to delete payment schedule" },
       { status: 500 }
