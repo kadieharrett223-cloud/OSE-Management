@@ -30,6 +30,7 @@ const navGroups: { title: string; items: { label: string; hint: string; href: st
     title: "Admin",
     items: [
       { label: "Shopify Reconcile", hint: "Match orders to QBO invoices", href: "/admin/shopify-reconcile" },
+      { label: "Abandoned Carts", hint: "Import and export carts", href: "/admin/shopify-abandoned-carts" },
       { label: "Settings", hint: "QBO & Shopify config", href: "/settings" },
     ],
   },
