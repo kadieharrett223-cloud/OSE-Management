@@ -76,7 +76,7 @@ export default function ShopifyAbandonedCartsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `abandoned-cart-${token}.csv`;
+      a.download = `abandoned-cart-${token}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -104,7 +104,7 @@ export default function ShopifyAbandonedCartsPage() {
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">Admin</p>
               <h1 className="text-2xl font-semibold text-slate-900">Shopify Abandoned Carts</h1>
               <p className="mt-1 text-sm text-slate-500">
-                Import abandoned carts from Shopify by selected day range, then export each cart one by one as CSV.
+                Import abandoned carts from Shopify by selected day range, then export each cart one by one as PDF.
               </p>
             </header>
 
@@ -220,7 +220,7 @@ export default function ShopifyAbandonedCartsPage() {
                               disabled={downloadingToken === cart.token}
                               className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                             >
-                              {downloadingToken === cart.token ? "Downloading…" : "Download CSV"}
+                              {downloadingToken === cart.token ? "Downloading…" : "Download PDF"}
                             </button>
                           </td>
                         </tr>

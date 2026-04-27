@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getShopifyTokens } from "@/lib/shopify";
+import PDFDocument from "pdfkit";
+
+export const runtime = "nodejs";
 
 const SHOPIFY_API_VERSION = "2024-01";
 
@@ -37,12 +40,7 @@ type CheckoutDetail = {
   line_items?: CheckoutLineItem[];
 };
 
-function csv(value: unknown): string {
-  const text = String(value ?? "");
-  return `"${text.replace(/"/g, '""')}"`;
-}
-
-function buildCsv(checkout: CheckoutDetail): string {
+function buildPdf(checkout: CheckoutDetail): Promise<Buffer> {
   const shippingName = [checkout.shipping_address?.first_name, checkout.shipping_address?.last_name].filter(Boolean).join(" ").trim();
   const shippingAddress = [
     checkout.shipping_address?.address1,
@@ -55,39 +53,59 @@ function buildCsv(checkout: CheckoutDetail): string {
     .filter(Boolean)
     .join(", ");
 
-  const lines: string[] = [];
-  lines.push("Field,Value");
-  lines.push(`Checkout ID,${csv(checkout.id)}`);
-  lines.push(`Checkout Token,${csv(checkout.token)}`);
-  lines.push(`Created At,${csv(checkout.created_at)}`);
-  lines.push(`Updated At,${csv(checkout.updated_at)}`);
-  lines.push(`Customer Name,${csv(shippingName)}`);
-  lines.push(`Customer Email,${csv(checkout.email || "")}`);
-  lines.push(`Shipping Address,${csv(shippingAddress)}`);
-  lines.push(`Subtotal,${csv(checkout.subtotal_price || "0")}`);
-  lines.push(`Sales Tax,${csv(checkout.total_tax || "0")}`);
-  lines.push(`Total,${csv(checkout.total_price || "0")}`);
-  lines.push(`Currency,${csv(checkout.currency || "USD")}`);
-  lines.push(`Recovery URL,${csv(checkout.abandoned_checkout_url || "")}`);
-  lines.push("");
-  lines.push("Line Item,SKU,Qty,Unit Price,Line Total");
+  const doc = new PDFDocument({ margin: 40, size: "LETTER" });
+  const chunks: Buffer[] = [];
 
-  for (const lineItem of checkout.line_items || []) {
-    const qty = Number(lineItem.quantity || 0) || 0;
-    const unitPrice = Number(lineItem.price || 0) || 0;
-    const lineTotal = (qty * unitPrice).toFixed(2);
-    lines.push(
-      [
-        csv(lineItem.title || ""),
-        csv(lineItem.sku || ""),
-        csv(qty),
-        csv(unitPrice.toFixed(2)),
-        csv(lineTotal),
-      ].join(",")
-    );
-  }
+  return new Promise<Buffer>((resolve, reject) => {
+    doc.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
 
-  return lines.join("\n");
+    doc.fontSize(16).text("Shopify Abandoned Cart", { underline: true });
+    doc.moveDown(0.7);
+    doc.fontSize(10);
+
+    const rows: Array<[string, string]> = [
+      ["Checkout ID", String(checkout.id || "")],
+      ["Checkout Token", checkout.token || ""],
+      ["Created At", checkout.created_at || ""],
+      ["Updated At", checkout.updated_at || ""],
+      ["Customer Name", shippingName || ""],
+      ["Customer Email", checkout.email || ""],
+      ["Shipping Address", shippingAddress || ""],
+      ["Subtotal", checkout.subtotal_price || "0"],
+      ["Sales Tax", checkout.total_tax || "0"],
+      ["Total", checkout.total_price || "0"],
+      ["Currency", checkout.currency || "USD"],
+      ["Recovery URL", checkout.abandoned_checkout_url || ""],
+    ];
+
+    for (const [label, value] of rows) {
+      doc.font("Helvetica-Bold").text(`${label}: `, { continued: true });
+      doc.font("Helvetica").text(value || "-");
+    }
+
+    doc.moveDown(0.8);
+    doc.font("Helvetica-Bold").fontSize(12).text("Line Items");
+    doc.moveDown(0.3);
+    doc.fontSize(10).font("Helvetica");
+
+    if (!checkout.line_items || checkout.line_items.length === 0) {
+      doc.text("No line items.");
+    } else {
+      for (const [index, lineItem] of checkout.line_items.entries()) {
+        const qty = Number(lineItem.quantity || 0) || 0;
+        const unitPrice = Number(lineItem.price || 0) || 0;
+        const lineTotal = (qty * unitPrice).toFixed(2);
+        doc.font("Helvetica-Bold").text(`${index + 1}. ${lineItem.title || "Item"}`);
+        doc.font("Helvetica").text(`SKU: ${lineItem.sku || "-"}`);
+        doc.text(`Qty: ${qty}    Unit Price: ${unitPrice.toFixed(2)}    Line Total: ${lineTotal}`);
+        doc.moveDown(0.35);
+      }
+    }
+
+    doc.end();
+  });
 }
 
 export async function GET(req: NextRequest) {
@@ -131,14 +149,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Checkout not found" }, { status: 404 });
     }
 
-    const csvContent = buildCsv(checkout);
+    const pdfContent = await buildPdf(checkout);
     const safeToken = checkout.token.replace(/[^a-zA-Z0-9_-]/g, "");
 
-    return new NextResponse(csvContent, {
+    return new NextResponse(new Uint8Array(pdfContent), {
       status: 200,
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename=abandoned-cart-${safeToken || "checkout"}.csv`,
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename=abandoned-cart-${safeToken || "checkout"}.pdf`,
       },
     });
   } catch (err: any) {
