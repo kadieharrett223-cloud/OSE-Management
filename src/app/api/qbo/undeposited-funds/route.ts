@@ -19,8 +19,10 @@ export async function GET(req: NextRequest) {
   try {
     const userId = await getUserId();
 
-    // Run both queries in parallel: account balance + undeposited payments
-    const accountQuery = "SELECT * FROM Account WHERE Name = 'Undeposited Funds'";
+    // Query all active Undeposited Funds-type accounts and sum balances.
+    // Some companies can end up with multiple matching accounts.
+    const accountQuery =
+      "SELECT * FROM Account WHERE AccountSubType = 'UndepositedFunds' AND Active = true MAXRESULTS 100";
     // Payments deposited to "Undeposited Funds" are not yet batched to a bank account
     const paymentQuery =
       "SELECT * FROM Payment WHERE DepositToAccountRef = 'Undeposited Funds' ORDERBY TxnDate DESC MAXRESULTS 50";
@@ -43,10 +45,17 @@ export async function GET(req: NextRequest) {
       accountData.status === "fulfilled"
         ? accountData.value?.QueryResponse?.Account || []
         : [];
-    const undepositedAccount = accounts[0];
-    const undeposited = undepositedAccount
-      ? Number(undepositedAccount.CurrentBalance || 0)
-      : 0;
+    const undepositedAccounts = (Array.isArray(accounts) ? accounts : []).filter((a: any) => {
+      const subtype = String(a?.AccountSubType || "").trim();
+      const active = a?.Active !== false;
+      return subtype === "UndepositedFunds" && active;
+    });
+
+    const undeposited = undepositedAccounts.reduce(
+      (sum: number, account: any) => sum + (Number(account?.CurrentBalance || 0) || 0),
+      0
+    );
+    const undepositedAccount = undepositedAccounts[0] || null;
 
     // Individual payments sitting in Undeposited Funds
     const rawPayments: any[] =
@@ -85,6 +94,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       account: undepositedAccount,
+      accountCount: undepositedAccounts.length,
       undeposited,
       payments,
       paymentCount: payments.length,
