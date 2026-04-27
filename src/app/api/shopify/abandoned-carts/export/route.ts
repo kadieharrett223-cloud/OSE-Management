@@ -40,6 +40,12 @@ type CheckoutDetail = {
   line_items?: CheckoutLineItem[];
 };
 
+function isCheckoutScopeApprovalError(status: number, text: string): boolean {
+  if (status !== 403) return false;
+  const normalized = String(text || "").toLowerCase();
+  return normalized.includes("read_checkouts") || normalized.includes("merchant approval");
+}
+
 function buildPdf(checkout: CheckoutDetail): Promise<Buffer> {
   const shippingName = [checkout.shipping_address?.first_name, checkout.shipping_address?.last_name].filter(Boolean).join(" ").trim();
   const shippingAddress = [
@@ -140,6 +146,15 @@ export async function GET(req: NextRequest) {
 
     if (!response.ok) {
       const text = await response.text();
+      if (isCheckoutScopeApprovalError(response.status, text)) {
+        return NextResponse.json(
+          {
+            error:
+              "Shopify checkout access is not approved for this app. Approve read_checkouts in Shopify and reconnect the store in Settings.",
+          },
+          { status: 403 }
+        );
+      }
       throw new Error(`Shopify API error ${response.status}: ${text}`);
     }
 

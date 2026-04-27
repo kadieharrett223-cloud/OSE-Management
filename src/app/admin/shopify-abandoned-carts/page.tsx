@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 
 const DOWNLOADED_CARTS_KEY = "abandoned-cart-downloaded-tokens";
@@ -124,6 +125,11 @@ export default function ShopifyAbandonedCartsPage() {
     [carts]
   );
 
+  const needsCheckoutScopeApproval =
+    (error || "").toLowerCase().includes("read_checkouts") ||
+    (error || "").toLowerCase().includes("merchant approval") ||
+    (error || "").toLowerCase().includes("checkout access is not approved");
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
@@ -165,9 +171,26 @@ export default function ShopifyAbandonedCartsPage() {
               </button>
             </div>
 
-            {error && (
+            {error && !needsCheckoutScopeApproval && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 <strong>Error:</strong> {error}
+              </div>
+            )}
+
+            {error && needsCheckoutScopeApproval && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <div>
+                  <strong>Shopify approval needed:</strong> this app still needs merchant approval for checkout access (`read_checkouts`).
+                </div>
+                <div className="mt-1">Open Settings, reconnect Shopify, and approve the requested scope.</div>
+                <div className="mt-2">
+                  <Link
+                    href="/settings"
+                    className="inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                  >
+                    Go to Settings
+                  </Link>
+                </div>
               </div>
             )}
 
