@@ -150,7 +150,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "Shopify checkout access is not approved for this app. Approve read_checkouts in Shopify and reconnect the store in Settings.",
+              "Shopify checkout access is not approved for this app. Normal Shopify sign-in will work, but abandoned carts cannot be exported unless Shopify approves read_checkouts for this app.",
           },
           { status: 403 }
         );

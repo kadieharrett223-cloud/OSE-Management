@@ -180,9 +180,9 @@ export default function ShopifyAbandonedCartsPage() {
             {error && needsCheckoutScopeApproval && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 <div>
-                  <strong>Shopify approval needed:</strong> this app still needs merchant approval for checkout access (`read_checkouts`).
+                  <strong>Shopify approval needed:</strong> Shopify sign-in can work normally, but this abandoned carts feature needs special checkout access (`read_checkouts`) that is not approved for this app.
                 </div>
-                <div className="mt-1">Open Settings, reconnect Shopify, and approve the requested scope.</div>
+                <div className="mt-1">You can reconnect Shopify again now, but abandoned carts will stay unavailable until Shopify approves checkout access for this app.</div>
                 <div className="mt-2">
                   <Link
                     href="/settings"

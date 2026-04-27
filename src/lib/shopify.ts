@@ -56,7 +56,7 @@ export async function saveShopifyTokens(tokens: ShopifyTokens): Promise<void> {
 export function buildShopifyAuthUrl(shop: string): string {
   const clientId = process.env.SHOPIFY_API_KEY!;
   const redirectUri = process.env.SHOPIFY_REDIRECT_URI || 'https://ose-management.vercel.app/api/shopify/callback';
-  const scopes = "read_products,write_products,read_orders,read_checkouts,read_shopify_payments_payouts";
+  const scopes = "read_products,write_products,read_orders,read_shopify_payments_payouts";
   const nonce = Math.random().toString(36).substring(7);
 
   console.log('[Shopify] Building auth URL:', { shop, clientId: clientId?.substring(0, 8), redirectUri });
