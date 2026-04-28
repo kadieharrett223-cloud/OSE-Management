@@ -20,6 +20,33 @@ export interface PendingCharge {
   disburseDate?: string;
 }
 
+function normalizeAmount(raw: any): number {
+  const value = Number(raw || 0);
+  if (!Number.isFinite(value)) return 0;
+  if (!Number.isInteger(value)) return value;
+  if (Math.abs(value) >= 100000) return value / 100;
+  return value;
+}
+
+function toDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (typeof value === "number") {
+    const ms = value > 1_000_000_000_000 ? value : value * 1000;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(String(value));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function isSameLocalDay(date: Date, target: Date): boolean {
+  return (
+    date.getFullYear() === target.getFullYear() &&
+    date.getMonth() === target.getMonth() &&
+    date.getDate() === target.getDate()
+  );
+}
+
 export async function GET(req: NextRequest) {
   try {
     const userId = await getUserId();
@@ -28,15 +55,8 @@ export async function GET(req: NextRequest) {
     const todayOnly = searchParams.get("today") === "true";
 
     // The QBO Payments API requires Company-Id header in addition to Bearer token.
-    // GET /charges with status filter returns pending/funded charges.
-    // We pull the last 30 days and filter client-side for PENDING to be safe.
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 30);
-    const startIso = cutoff.toISOString().slice(0, 10);
-
-    const url = todayOnly
-      ? `${QBO_PAYMENTS_BASE}/charges?created_after=${startIso}`
-      : `${QBO_PAYMENTS_BASE}/charges?status=PENDING&created_after=${startIso}`;
+    // Pull latest charges and do robust filtering server-side; upstream filters vary by account/API version.
+    const url = `${QBO_PAYMENTS_BASE}/charges`;
 
     let res = await fetch(url, {
       headers: {
@@ -47,19 +67,6 @@ export async function GET(req: NextRequest) {
         "Request-Id": `pending-charges-${Date.now()}`,
       },
     });
-
-    // If the status-filtered endpoint isn't supported, fall back to plain /charges listing
-    if (res.status === 400 || res.status === 404) {
-      const fallbackUrl = `${QBO_PAYMENTS_BASE}/charges`;
-      res = await fetch(fallbackUrl, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Company-Id": realmId,
-          Accept: "application/json",
-          "Request-Id": `pending-charges-fallback-${Date.now()}`,
-        },
-      });
-    }
 
     if (!res.ok) {
       const body = await res.text();
@@ -81,19 +88,26 @@ export async function GET(req: NextRequest) {
 
     const data = await res.json();
 
-    // Intuit returns the charges array either directly or under a key
+    // Intuit returns arrays under different keys depending on endpoint version/account
     const raw: any[] = Array.isArray(data)
       ? data
-      : data?.charges ?? data?.Charges ?? data?.data ?? [];
+      : data?.charges ?? data?.Charges ?? data?.data ?? data?.items ?? data?.results ?? [];
 
-    const todayYmd = new Date().toISOString().slice(0, 10);
+    const localToday = new Date();
 
     const charges: PendingCharge[] = raw
       .map((c: any) => ({
         id: c.id || c.Id || "",
-        created: c.created || c.Created || c.TxnDate || "",
+        created:
+          c.created ||
+          c.Created ||
+          c.createdAt ||
+          c.createTime ||
+          c.context?.created ||
+          c.TxnDate ||
+          "",
         status: (c.status || c.Status || "").toUpperCase(),
-        amount: Number(c.amount || c.Amount || 0) / 100, // Payments API returns cents
+        amount: normalizeAmount(c.amount ?? c.Amount ?? c.total ?? c.Total ?? c.context?.amount ?? 0),
         currency: c.currency || c.Currency || "USD",
         card: c.card
           ? {
@@ -106,8 +120,8 @@ export async function GET(req: NextRequest) {
       }))
       .filter((c) => {
         if (todayOnly) {
-          const createdYmd = c.created ? c.created.slice(0, 10) : "";
-          if (createdYmd !== todayYmd) return false;
+          const createdDate = toDate(c.created);
+          if (!createdDate || !isSameLocalDay(createdDate, localToday)) return false;
           const status = (c.status || "").toUpperCase();
           return !["DECLINED", "FAILED", "VOIDED", "CANCELLED", "CANCELED"].includes(status);
         }
