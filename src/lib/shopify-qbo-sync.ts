@@ -6,7 +6,6 @@ import { getShopifyTokens } from "@/lib/shopify";
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 const SHOPIFY_API_VERSION = "2024-01";
 const FORCED_INVOICE_SEND_TO_EMAIL = "kadie@olympic-equipment.com";
-const SALES_REP_VALUE = "KLH";
 
 type JsonMap = Record<string, string>;
 
@@ -269,7 +268,6 @@ function isDeliveredToWashington(order: ShopifyOrder) {
 }
 
 async function resolveTransactionCustomFieldDefIds(): Promise<{
-  salesRep: string | null;
   email: string | null;
   phone: string | null;
 }> {
@@ -282,53 +280,9 @@ async function resolveTransactionCustomFieldDefIds(): Promise<{
   };
 
   return {
-    salesRep: findId("sales rep", "salesrep", "rep"),
     email: findId("email"),
     phone: findId("phone"),
   };
-}
-
-function initialsFromName(value: string): string {
-  return String(value || "")
-    .split(/\s+/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("");
-}
-
-async function resolveSalesRepRefByName(repName: string): Promise<{ value: string; name: string }> {
-  const target = normalizeToken(repName);
-
-  const salesRepQuery = "SELECT * FROM SalesRep MAXRESULTS 1000";
-  const salesRepRes = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(salesRepQuery)}&minorversion=65`).catch(() => null);
-  const salesReps = Array.isArray(salesRepRes?.QueryResponse?.SalesRep) ? salesRepRes.QueryResponse.SalesRep : [];
-
-  for (const salesRep of salesReps) {
-    const refName = String(salesRep?.SalesRepEntityRef?.name || salesRep?.Name || "").trim();
-    const refValue = String(salesRep?.SalesRepEntityRef?.value || salesRep?.Id || "").trim();
-    if (!refName || !refValue) continue;
-    if (normalizeToken(refName) === target) {
-      return { value: refValue, name: repName };
-    }
-  }
-
-  const employeeQuery = "SELECT Id, DisplayName, GivenName, MiddleName, FamilyName FROM Employee MAXRESULTS 1000";
-  const employeeRes = await authorizedQboFetch<any>(`/query?query=${encodeURIComponent(employeeQuery)}&minorversion=65`).catch(() => null);
-  const employees = Array.isArray(employeeRes?.QueryResponse?.Employee) ? employeeRes.QueryResponse.Employee : [];
-
-  for (const emp of employees) {
-    const displayName = String(emp?.DisplayName || "").trim();
-    const fullName = [emp?.GivenName, emp?.MiddleName, emp?.FamilyName].filter(Boolean).join(" ").trim();
-    const candidate = displayName || fullName;
-    const empId = String(emp?.Id || "").trim();
-    if (!candidate || !empId) continue;
-    if (normalizeToken(candidate) === target) {
-      return { value: empId, name: repName };
-    }
-  }
-
-  throw new Error(`QuickBooks Sales Rep '${repName}' not found. Add a Sales Rep/Employee named exactly '${repName}' in QuickBooks.`);
 }
 
 async function resolveShopifyPaymentMethodId(settings: ShopifySyncSettings): Promise<string | null> {
@@ -699,7 +653,6 @@ export async function syncShopifyOrdersToQbo(params?: {
     const requiresOutOfStateTaxCode = filteredOrders.some((order) => !isDeliveredToWashington(order));
     const outOfStateTaxCodeId = requiresOutOfStateTaxCode ? await resolveOutOfStateTaxCodeId() : null;
     const customFieldDefIds = await resolveTransactionCustomFieldDefIds();
-    const salesRepRef = await resolveSalesRepRefByName(SALES_REP_VALUE);
     if (requiresOutOfStateTaxCode && !outOfStateTaxCodeId) {
       throw new Error("QuickBooks tax code 'Out of State' was not found. Create it in QBO before syncing non-WA invoices.");
     }
@@ -794,7 +747,6 @@ export async function syncShopifyOrdersToQbo(params?: {
           TxnDate: syncDate,
           PONumber: String(orderName).replace(/^#/, ""),
           PrivateNote: `Shopify Order ${orderName} (${orderId})`,
-          SalesRepRef: salesRepRef,
           CustomerMemo: {
             value: [
               `Shopify Order: ${orderName}`,
@@ -817,9 +769,6 @@ export async function syncShopifyOrdersToQbo(params?: {
           };
         }
         const customFields = [
-          customFieldDefIds.salesRep
-            ? { DefinitionId: customFieldDefIds.salesRep, Name: "Sales Rep", Type: "StringType", StringValue: SALES_REP_VALUE }
-            : null,
           customFieldDefIds.email && customerEmail(order)
             ? { DefinitionId: customFieldDefIds.email, Name: "email", Type: "StringType", StringValue: customerEmail(order) }
             : null,
