@@ -5,7 +5,7 @@ import { getShopifyTokens } from "@/lib/shopify";
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 const SHOPIFY_API_VERSION = "2024-01";
-const FORCED_INVOICE_SEND_TO_EMAIL = "kadie@olympic-equipment.com";
+const FORCED_INVOICE_SEND_TO_EMAIL = "mindy@olympic-equipment.com";
 
 type JsonMap = Record<string, string>;
 
@@ -594,7 +594,7 @@ export async function syncShopifyOrdersToQbo(params?: {
   const manualBackfill = Boolean(params?.force && !params?.since);
   const autoSince = settings.last_order_sync_at || new Date().toISOString();
   const since = params?.since || (manualBackfill ? "1970-01-01T00:00:00.000Z" : autoSince);
-  const statusFilter = (settings.order_sync_financial_statuses || ["paid"]).map((s) => normalizeStatus(s));
+  const statusFilter = ["all"];
 
   const { data: logRow } = await supabase
     .from("shopify_order_sync_logs")
@@ -620,7 +620,7 @@ export async function syncShopifyOrdersToQbo(params?: {
 
   try {
     const orders = await fetchShopifyOrdersSince(since);
-    const filteredOrders = orders.filter((order) => statusFilter.includes(normalizeStatus(order.financial_status)));
+    const filteredOrders = orders;
 
     const { data: priceItems, error: priceError } = await supabase
       .from("price_list_items")
@@ -662,6 +662,17 @@ export async function syncShopifyOrdersToQbo(params?: {
       const orderName = order.name || `#${order.order_number}`;
 
       try {
+        if (isDeliveredToWashington(order)) {
+          result.skipped += 1;
+          result.results.push({
+            shopifyOrderId: orderId,
+            orderName,
+            status: "skipped",
+            reason: "Washington order (excluded from auto-sync)",
+          });
+          continue;
+        }
+
         const existing = existingByOrderId.get(orderId);
         // Only skip if cancelled AND already linked to an invoice — a cancelled-only flag
         // without an invoice means the user accidentally hit Cancel; let the sync proceed.
