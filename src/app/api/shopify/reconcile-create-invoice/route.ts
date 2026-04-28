@@ -673,7 +673,7 @@ export async function POST(req: NextRequest) {
         from: smtpFrom,
         to: sendTo,
         subject: `Invoice ${invoice.DocNumber || invoice.Id}`,
-        text: `Please find attached the invoice.`,
+        text: `website order invoice`,
         attachments: [
           {
             filename: `Invoice-${invoice.DocNumber || invoice.Id}.pdf`,

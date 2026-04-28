@@ -348,7 +348,7 @@ async function sendInvoiceToForcedEmail(invoiceId: string, docNumber?: string | 
       from: smtpFrom,
       to: sendTo,
       subject: `Invoice ${invoiceLabel}`,
-      text: `Please find attached the invoice.`,
+      text: `website order invoice`,
       attachments: [
         {
           filename: `Invoice-${invoiceLabel}.pdf`,
