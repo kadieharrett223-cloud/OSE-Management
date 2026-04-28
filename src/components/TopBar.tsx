@@ -8,8 +8,8 @@ export function TopBar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [paymentsTodayTotal, setPaymentsTodayTotal] = useState(0);
   const [loadingPaymentsToday, setLoadingPaymentsToday] = useState(true);
-  const [undepositedFunds, setUndepositedFunds] = useState(0);
-  const [loadingUndepositedFunds, setLoadingUndepositedFunds] = useState(true);
+  const [incomingDepositsTotal, setIncomingDepositsTotal] = useState(0);
+  const [loadingIncomingDeposits, setLoadingIncomingDeposits] = useState(true);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
@@ -103,27 +103,27 @@ export function TopBar() {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchUndepositedFunds = async () => {
+    const fetchIncomingDeposits = async () => {
       try {
         const res = await fetch(`/api/qbo/undeposited-funds?_=${Date.now()}`);
 
         if (!res.ok) {
-          throw new Error("Failed to fetch undeposited funds");
+          throw new Error("Failed to fetch incoming deposits");
         }
 
         const data = await res.json();
-        const totalUndeposited = Number(data?.undeposited || 0);
-        if (isMounted) setUndepositedFunds(totalUndeposited);
+        const totalIncoming = Number(data?.undeposited || 0);
+        if (isMounted) setIncomingDepositsTotal(totalIncoming);
       } catch (error) {
         // Keep previous value on error
       } finally {
-        if (isMounted) setLoadingUndepositedFunds(false);
+        if (isMounted) setLoadingIncomingDeposits(false);
       }
     };
 
-    setLoadingUndepositedFunds(true);
-    fetchUndepositedFunds();
-    const interval = setInterval(fetchUndepositedFunds, 30000);
+    setLoadingIncomingDeposits(true);
+    fetchIncomingDeposits();
+    const interval = setInterval(fetchIncomingDeposits, 30000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -162,9 +162,9 @@ export function TopBar() {
             </span>
           </div>
           <div className="flex items-center gap-2 border-l border-slate-500 pl-3 text-slate-100">
-            <span className="font-semibold text-slate-300">Undeposited:</span>
+            <span className="font-semibold text-slate-300">Incoming Deposits:</span>
             <span className="text-xs font-bold text-amber-300 sm:text-sm">
-              {loadingUndepositedFunds ? "…" : formatCurrency(undepositedFunds)}
+              {loadingIncomingDeposits ? "…" : formatCurrency(incomingDepositsTotal)}
             </span>
           </div>
         </div>

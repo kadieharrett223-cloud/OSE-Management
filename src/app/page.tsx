@@ -77,7 +77,7 @@ interface CustomerPayment {
   txnDate: string;
 }
 
-interface UndepositedPayment {
+interface IncomingDeposit {
   id: string;
   txnDate: string;
   customerName: string;
@@ -287,11 +287,11 @@ export default function Dashboard() {
   const [lastMonthTrend, setLastMonthTrend] = useState<number[]>([]);
   const [expenseTrend, setExpenseTrend] = useState<number[]>([]);
 
-  // Undeposited funds state
-  const [undepositedFunds, setUndepositedFunds] = useState<number>(0);
-  const [undepositedPayments, setUndepositedPayments] = useState<UndepositedPayment[]>([]);
-  const [loadingUndepositedFunds, setLoadingUndepositedFunds] = useState(true);
-  const [showUndepositedModal, setShowUndepositedModal] = useState(false);
+  // Incoming deposits state
+  const [incomingDepositsTotal, setIncomingDepositsTotal] = useState<number>(0);
+  const [incomingDeposits, setIncomingDeposits] = useState<IncomingDeposit[]>([]);
+  const [loadingIncomingDeposits, setLoadingIncomingDeposits] = useState(true);
+  const [showIncomingDepositsModal, setShowIncomingDepositsModal] = useState(false);
 
   const [showDepositsModal, setShowDepositsModal] = useState(false);
 
@@ -1058,22 +1058,22 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Fetch undeposited funds (QBO balance + itemized payments)
+  // Fetch QuickBooks payments pending bank deposit — these are the actual incoming funds
   useEffect(() => {
     let isMounted = true;
-    const fetchUndepositedFunds = async () => {
-      setLoadingUndepositedFunds(true);
+    const fetchIncomingDeposits = async () => {
+      setLoadingIncomingDeposits(true);
       try {
         const res = await fetch(`/api/qbo/undeposited-funds?_=${Date.now()}`);
-        if (!res.ok) throw new Error("Failed to fetch undeposited funds");
+        if (!res.ok) throw new Error("Failed to fetch incoming deposits");
         const data = await res.json();
         if (isMounted) {
-          setUndepositedFunds(Number(data.undeposited || 0));
-          setUndepositedPayments(
+          setIncomingDepositsTotal(Number(data.undeposited || 0));
+          setIncomingDeposits(
             (data.payments || []).map((p: any) => ({
               id: p.id,
               txnDate: p.txnDate,
-              customerName: p.customerName,
+              customerName: p.customerName || "Unknown",
               totalAmt: Number(p.totalAmt || 0),
               appliedAmt: Number(p.appliedAmt || 0),
               memo: p.memo || "",
@@ -1082,17 +1082,17 @@ export default function Dashboard() {
           );
         }
       } catch (err) {
-        console.error("Failed to fetch undeposited funds:", err);
+        console.error("Failed to fetch incoming deposits:", err);
         if (isMounted) {
-          setUndepositedFunds(0);
-          setUndepositedPayments([]);
+          setIncomingDepositsTotal(0);
+          setIncomingDeposits([]);
         }
       } finally {
-        if (isMounted) setLoadingUndepositedFunds(false);
+        if (isMounted) setLoadingIncomingDeposits(false);
       }
     };
-    fetchUndepositedFunds();
-    const interval = setInterval(fetchUndepositedFunds, 120000);
+    fetchIncomingDeposits();
+    const interval = setInterval(fetchIncomingDeposits, 120000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -1215,26 +1215,26 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Undeposited Funds + Shopify Scheduled Deposits */}
+            {/* Incoming Deposits + Shopify Scheduled Deposits */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* QBO Undeposited Funds */}
+              {/* QBO Incoming Deposits */}
               <div className="bg-white border border-slate-200 rounded-lg">
                 <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Undeposited Funds</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">Incoming Deposits</h2>
                     <p className="mt-0.5 text-sm text-slate-600">
-                      Payments in QBO awaiting bank deposit
+                      Payments received in QBO pending bank deposit
                     </p>
-                    {!loadingUndepositedFunds && (
+                    {!loadingIncomingDeposits && (
                       <p className="mt-1 text-lg font-bold text-amber-600">
-                        ${money(undepositedFunds)}
+                        ${money(incomingDepositsTotal)}
                       </p>
                     )}
                   </div>
-                  {undepositedPayments.length > 0 && (
+                  {incomingDeposits.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setShowUndepositedModal(true)}
+                      onClick={() => setShowIncomingDepositsModal(true)}
                       className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                     >
                       View all â†’
@@ -1251,16 +1251,14 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {loadingUndepositedFunds ? (
+                      {loadingIncomingDeposits ? (
                         <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
-                      ) : undepositedPayments.length === 0 ? (
+                      ) : incomingDeposits.length === 0 ? (
                         <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">
-                          {undepositedFunds > 0
-                            ? `$${money(undepositedFunds)} in Undeposited Funds â€” no itemized payments found`
-                            : "No undeposited funds"}
+                          No payments pending deposit to bank
                         </td></tr>
                       ) : (
-                        undepositedPayments.slice(0, 5).map((p) => (
+                        incomingDeposits.slice(0, 5).map((p) => (
                           <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-5 py-3 text-sm font-medium text-slate-900">{p.customerName}</td>
                             <td className="px-5 py-3 text-sm text-slate-600">{p.txnDate}</td>
@@ -1940,18 +1938,18 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Undeposited Funds Modal */}
-            {showUndepositedModal && (
+            {/* Incoming Deposits Modal */}
+            {showIncomingDepositsModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
                 <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg">
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900">All Undeposited Payments</h2>
-                      <p className="mt-0.5 text-sm text-slate-600">Total: ${money(undepositedFunds)}</p>
+                      <h2 className="text-lg font-semibold text-slate-900">Incoming Deposits</h2>
+                      <p className="mt-0.5 text-sm text-slate-600">Total pending to bank: ${money(incomingDepositsTotal)}</p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setShowUndepositedModal(false)}
+                      onClick={() => setShowIncomingDepositsModal(false)}
                       className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       Close
@@ -1961,24 +1959,22 @@ export default function Dashboard() {
                     <table className="w-full">
                       <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Deposit To</th>
                           <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Invoices</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Memo</th>
                           <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
-                          <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Account</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {undepositedPayments.length === 0 ? (
-                          <tr><td colSpan={5} className="px-5 py-6 text-center text-slate-500">No itemized undeposited payments found</td></tr>
+                        {incomingDeposits.length === 0 ? (
+                          <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">No QuickBooks deposits scheduled for tomorrow or the next day</td></tr>
                         ) : (
-                          undepositedPayments.map((p) => (
+                          incomingDeposits.map((p) => (
                             <tr key={p.id} className="hover:bg-slate-50">
-                              <td className="px-5 py-3 font-medium text-slate-900">{p.customerName}</td>
+                              <td className="px-5 py-3 font-medium text-slate-900">{p.depositToAccount}</td>
                               <td className="px-5 py-3 text-sm text-slate-600">{p.txnDate}</td>
-                              <td className="px-5 py-3 text-sm text-slate-500 font-mono">{p.invoiceNums.join(", ") || "â€”"}</td>
-                              <td className="px-5 py-3 text-right font-semibold text-amber-700">${money(p.appliedAmt || p.totalAmt)}</td>
-                              <td className="px-5 py-3 text-right text-sm text-slate-500">Undeposited Funds</td>
+                              <td className="px-5 py-3 text-sm text-slate-500">{p.memo || "â€”"}</td>
+                              <td className="px-5 py-3 text-right font-semibold text-amber-700">${money(p.totalAmt)}</td>
                             </tr>
                           ))
                         )}
