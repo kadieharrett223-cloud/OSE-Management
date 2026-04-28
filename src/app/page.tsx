@@ -1059,17 +1059,17 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Fetch QBO Payments pending charges (Merchant Center "Pending" transactions)
+  // Fetch customer payments made today in QuickBooks Payments
   useEffect(() => {
     let isMounted = true;
     const fetchIncomingDeposits = async () => {
       setLoadingIncomingDeposits(true);
       try {
-        const res = await fetch(`/api/qbo/pending-charges?_=${Date.now()}`);
+        const res = await fetch(`/api/qbo/pending-charges?today=true&_=${Date.now()}`);
         if (!res.ok) throw new Error("Failed to fetch pending charges");
         const data = await res.json();
         if (isMounted) {
-          setIncomingDepositsTotal(Number(data.totalPending || 0));
+          setIncomingDepositsTotal(Number(data.totalAmount || 0));
           setIncomingDeposits(
             (data.charges || []).map((c: any) => ({
               id: c.id,
@@ -1217,15 +1217,15 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Incoming Deposits + Shopify Scheduled Deposits */}
+            {/* Customer Payments Today + Shopify Scheduled Deposits */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* QBO Incoming Deposits */}
+              {/* QBO Payments Customer Payments Today */}
               <div className="bg-white border border-slate-200 rounded-lg">
                 <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Incoming Deposits</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
                     <p className="mt-0.5 text-sm text-slate-600">
-                      QuickBooks Payments transactions pending settlement
+                      Charges run through QuickBooks Payments today
                     </p>
                     {!loadingIncomingDeposits && (
                       <p className="mt-1 text-lg font-bold text-amber-600">
@@ -1258,7 +1258,7 @@ export default function Dashboard() {
                         <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
                       ) : incomingDeposits.length === 0 ? (
                         <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">
-                          No pending charges found in QBO Payments
+                          No QuickBooks Payments customer charges found today
                         </td></tr>
                       ) : (
                         incomingDeposits.slice(0, 5).map((p) => (
@@ -1942,14 +1942,14 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Incoming Deposits Modal */}
+            {/* Customer Payments Today Modal */}
             {showIncomingDepositsModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
                 <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg">
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900">Incoming Deposits</h2>
-                      <p className="mt-0.5 text-sm text-slate-600">Total pending: ${money(incomingDepositsTotal)}</p>
+                      <h2 className="text-lg font-semibold text-slate-900">All Customer Payments Today</h2>
+                      <p className="mt-0.5 text-sm text-slate-600">Total processed today: ${money(incomingDepositsTotal)}</p>
                     </div>
                     <button
                       type="button"
@@ -1972,7 +1972,7 @@ export default function Dashboard() {
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {incomingDeposits.length === 0 ? (
-                          <tr><td colSpan={5} className="px-5 py-6 text-center text-slate-500">No pending charges found in QBO Payments</td></tr>
+                          <tr><td colSpan={5} className="px-5 py-6 text-center text-slate-500">No QuickBooks Payments customer charges found today</td></tr>
                         ) : (
                           incomingDeposits.map((p) => (
                             <tr key={p.id} className="hover:bg-slate-50">

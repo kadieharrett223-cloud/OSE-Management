@@ -105,14 +105,14 @@ export function TopBar() {
 
     const fetchIncomingDeposits = async () => {
       try {
-        const res = await fetch(`/api/qbo/pending-charges?_=${Date.now()}`);
+        const res = await fetch(`/api/qbo/pending-charges?today=true&_=${Date.now()}`);
 
         if (!res.ok) {
           throw new Error("Failed to fetch pending charges");
         }
 
         const data = await res.json();
-        const totalIncoming = Number(data?.totalPending || 0);
+        const totalIncoming = Number(data?.totalAmount || 0);
         if (isMounted) setIncomingDepositsTotal(totalIncoming);
       } catch (error) {
         // Keep previous value on error
@@ -162,7 +162,7 @@ export function TopBar() {
             </span>
           </div>
           <div className="flex items-center gap-2 border-l border-slate-500 pl-3 text-slate-100">
-            <span className="font-semibold text-slate-300">Incoming Deposits:</span>
+            <span className="font-semibold text-slate-300">QBO Payments Today:</span>
             <span className="text-xs font-bold text-amber-300 sm:text-sm">
               {loadingIncomingDeposits ? "…" : formatCurrency(incomingDepositsTotal)}
             </span>

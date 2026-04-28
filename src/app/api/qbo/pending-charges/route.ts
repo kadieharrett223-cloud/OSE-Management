@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
   try {
     const userId = await getUserId();
     const { accessToken, realmId } = await ensureAccessToken(userId || undefined);
+    const searchParams = req.nextUrl.searchParams;
+    const todayOnly = searchParams.get("today") === "true";
 
     // The QBO Payments API requires Company-Id header in addition to Bearer token.
     // GET /charges with status filter returns pending/funded charges.
@@ -32,7 +34,9 @@ export async function GET(req: NextRequest) {
     cutoff.setDate(cutoff.getDate() - 30);
     const startIso = cutoff.toISOString().slice(0, 10);
 
-    const url = `${QBO_PAYMENTS_BASE}/charges?status=PENDING&created_after=${startIso}`;
+    const url = todayOnly
+      ? `${QBO_PAYMENTS_BASE}/charges?created_after=${startIso}`
+      : `${QBO_PAYMENTS_BASE}/charges?status=PENDING&created_after=${startIso}`;
 
     let res = await fetch(url, {
       headers: {
@@ -68,6 +72,7 @@ export async function GET(req: NextRequest) {
           detail: body,
           charges: [],
           totalPending: 0,
+          totalAmount: 0,
           count: 0,
         },
         { status: 200 } // 200 so the client receives the structured error
@@ -80,6 +85,8 @@ export async function GET(req: NextRequest) {
     const raw: any[] = Array.isArray(data)
       ? data
       : data?.charges ?? data?.Charges ?? data?.data ?? [];
+
+    const todayYmd = new Date().toISOString().slice(0, 10);
 
     const charges: PendingCharge[] = raw
       .map((c: any) => ({
@@ -97,8 +104,16 @@ export async function GET(req: NextRequest) {
           : null,
         disburseDate: c.disburseDate || c.DisburseDate || undefined,
       }))
-      // Keep only PENDING (not yet funded/settled)
-      .filter((c) => !c.status || c.status === "PENDING" || c.status === "AUTHORIZED");
+      .filter((c) => {
+        if (todayOnly) {
+          const createdYmd = c.created ? c.created.slice(0, 10) : "";
+          if (createdYmd !== todayYmd) return false;
+          const status = (c.status || "").toUpperCase();
+          return !["DECLINED", "FAILED", "VOIDED", "CANCELLED", "CANCELED"].includes(status);
+        }
+
+        return !c.status || c.status === "PENDING" || c.status === "AUTHORIZED";
+      });
 
     const totalPending = charges.reduce((sum, c) => sum + c.amount, 0);
 
@@ -106,14 +121,15 @@ export async function GET(req: NextRequest) {
       ok: true,
       charges,
       totalPending,
+      totalAmount: totalPending,
       count: charges.length,
     });
   } catch (error: any) {
     if (error instanceof QboApiError) {
-      return NextResponse.json({ ok: false, error: error.message, charges: [], totalPending: 0, count: 0 }, { status: 200 });
+      return NextResponse.json({ ok: false, error: error.message, charges: [], totalPending: 0, totalAmount: 0, count: 0 }, { status: 200 });
     }
     return NextResponse.json(
-      { ok: false, error: error.message || "Failed to fetch pending charges", charges: [], totalPending: 0, count: 0 },
+      { ok: false, error: error.message || "Failed to fetch pending charges", charges: [], totalPending: 0, totalAmount: 0, count: 0 },
       { status: 200 }
     );
   }
