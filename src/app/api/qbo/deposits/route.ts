@@ -17,6 +17,8 @@ export interface QboDeposit {
   depositToAccount: string;
   totalAmt: number;
   memo: string;
+  reconcileStatus: string;
+  paymentCount: number;
   lines: DepositLine[];
 }
 
@@ -26,11 +28,14 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
-    const limit = parseInt(searchParams.get("limit") || "30", 10);
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
+    // uncleared=true → only deposits not yet reconciled to the bank (processing)
+    const uncleared = searchParams.get("uncleared") === "true";
 
     let query = "SELECT * FROM Deposit";
     const conditions: string[] = [];
 
+    if (uncleared) conditions.push("ReconcileStatus = 'NotReconciled'");
     if (startDate) conditions.push(`TxnDate >= '${startDate}'`);
     if (endDate) conditions.push(`TxnDate <= '${endDate}'`);
 
@@ -63,12 +68,15 @@ export async function GET(req: NextRequest) {
           };
         });
 
+      const paymentLines = lines.filter((l) => l.entityName);
       return {
         id: dep.Id,
         txnDate: dep.TxnDate,
         depositToAccount: dep.DepositToAccountRef?.name || "Unknown",
         totalAmt: Number(dep.TotalAmt) || 0,
         memo: dep.PrivateNote || dep.Memo || "",
+        reconcileStatus: dep.ReconcileStatus || "Unknown",
+        paymentCount: paymentLines.length,
         lines,
       };
     });

@@ -80,11 +80,11 @@ interface CustomerPayment {
 interface IncomingDeposit {
   id: string;
   txnDate: string;
-  customerName: string;
+  depositToAccount: string;
   totalAmt: number;
-  appliedAmt: number;
+  paymentCount: number;
   memo: string;
-  invoiceNums: string[];
+  reconcileStatus: string;
 }
 
 interface ShopifyPayout {
@@ -1058,26 +1058,26 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Fetch QuickBooks payments pending bank deposit — these are the actual incoming funds
+  // Fetch QBO Deposit transactions that are not yet reconciled — real processing payments
   useEffect(() => {
     let isMounted = true;
     const fetchIncomingDeposits = async () => {
       setLoadingIncomingDeposits(true);
       try {
-        const res = await fetch(`/api/qbo/undeposited-funds?_=${Date.now()}`);
+        const res = await fetch(`/api/qbo/deposits?uncleared=true&limit=50&_=${Date.now()}`);
         if (!res.ok) throw new Error("Failed to fetch incoming deposits");
         const data = await res.json();
         if (isMounted) {
-          setIncomingDepositsTotal(Number(data.undeposited || 0));
+          setIncomingDepositsTotal(Number(data.totalDeposited || 0));
           setIncomingDeposits(
-            (data.payments || []).map((p: any) => ({
+            (data.deposits || []).map((p: any) => ({
               id: p.id,
               txnDate: p.txnDate,
-              customerName: p.customerName || "Unknown",
+              depositToAccount: p.depositToAccount || "Unknown",
               totalAmt: Number(p.totalAmt || 0),
-              appliedAmt: Number(p.appliedAmt || 0),
+              paymentCount: Number(p.paymentCount || 0),
               memo: p.memo || "",
-              invoiceNums: p.invoiceNums || [],
+              reconcileStatus: p.reconcileStatus || "",
             }))
           );
         }
@@ -1223,7 +1223,7 @@ export default function Dashboard() {
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900">Incoming Deposits</h2>
                     <p className="mt-0.5 text-sm text-slate-600">
-                      Payments received in QBO pending bank deposit
+                      QBO deposits recorded but not yet cleared at the bank
                     </p>
                     {!loadingIncomingDeposits && (
                       <p className="mt-1 text-lg font-bold text-amber-600">
@@ -1245,25 +1245,27 @@ export default function Dashboard() {
                   <table className="w-full">
                     <thead className="bg-slate-50 border-b border-slate-100">
                       <tr>
-                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Bank Account</th>
                         <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
+                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Payments</th>
                         <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {loadingIncomingDeposits ? (
-                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
+                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
                       ) : incomingDeposits.length === 0 ? (
-                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">
-                          No payments pending deposit to bank
+                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">
+                          No processing deposits found in QuickBooks
                         </td></tr>
                       ) : (
                         incomingDeposits.slice(0, 5).map((p) => (
                           <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{p.customerName}</td>
+                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{p.depositToAccount}</td>
                             <td className="px-5 py-3 text-sm text-slate-600">{p.txnDate}</td>
+                            <td className="px-5 py-3 text-right text-sm text-slate-500">{p.paymentCount > 0 ? p.paymentCount : "—"}</td>
                             <td className="px-5 py-3 text-right text-sm font-semibold text-amber-700">
-                              ${money(p.appliedAmt || p.totalAmt)}
+                              ${money(p.totalAmt)}
                             </td>
                           </tr>
                         ))
@@ -1945,7 +1947,7 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
                       <h2 className="text-lg font-semibold text-slate-900">Incoming Deposits</h2>
-                      <p className="mt-0.5 text-sm text-slate-600">Total pending to bank: ${money(incomingDepositsTotal)}</p>
+                      <p className="mt-0.5 text-sm text-slate-600">Total processing: ${money(incomingDepositsTotal)}</p>
                     </div>
                     <button
                       type="button"
@@ -1959,21 +1961,23 @@ export default function Dashboard() {
                     <table className="w-full">
                       <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
-                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Deposit To</th>
+                          <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Bank Account</th>
                           <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
                           <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Memo</th>
+                          <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Payments</th>
                           <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {incomingDeposits.length === 0 ? (
-                          <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">No QuickBooks deposits scheduled for tomorrow or the next day</td></tr>
+                          <tr><td colSpan={5} className="px-5 py-6 text-center text-slate-500">No processing deposits found in QuickBooks</td></tr>
                         ) : (
                           incomingDeposits.map((p) => (
                             <tr key={p.id} className="hover:bg-slate-50">
                               <td className="px-5 py-3 font-medium text-slate-900">{p.depositToAccount}</td>
                               <td className="px-5 py-3 text-sm text-slate-600">{p.txnDate}</td>
                               <td className="px-5 py-3 text-sm text-slate-500">{p.memo || "â€”"}</td>
+                              <td className="px-5 py-3 text-right text-sm text-slate-500">{p.paymentCount > 0 ? p.paymentCount : "—"}</td>
                               <td className="px-5 py-3 text-right font-semibold text-amber-700">${money(p.totalAmt)}</td>
                             </tr>
                           ))
