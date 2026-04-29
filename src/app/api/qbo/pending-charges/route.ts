@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureAccessToken, QboApiError } from "@/lib/qbo";
+import { authorizedQboFetch, ensureAccessToken, QboApiError } from "@/lib/qbo";
 import { getUserId } from "@/lib/auth";
 
 // QuickBooks Payments API base – separate from the accounting API
@@ -18,6 +18,38 @@ export interface PendingCharge {
   } | null;
   token?: string;
   disburseDate?: string;
+}
+
+async function fetchQboIntuitPaymentSalesReceipts(userId?: string, todayYmd?: string): Promise<PendingCharge[]> {
+  if (!todayYmd) return [];
+
+  const query = `SELECT * FROM SalesReceipt WHERE TxnDate = '${todayYmd}' MAXRESULTS 1000`;
+  const data = await authorizedQboFetch<any>(
+    `/query?query=${encodeURIComponent(query)}&minorversion=65`,
+    {},
+    userId || undefined
+  );
+
+  const rawReceipts: any[] = data?.QueryResponse?.SalesReceipt || [];
+
+  return rawReceipts
+    .filter((sr: any) => {
+      const txnSource = String(sr?.TxnSource || "").toUpperCase();
+      return txnSource === "INTUITPAYMENT" || !!sr?.CreditCardPayment;
+    })
+    .map((sr: any) => ({
+      id: String(sr.Id || ""),
+      created: sr.MetaData?.CreateTime || `${todayYmd}T00:00:00`,
+      status: "PROCESSED",
+      amount: Number(sr.TotalAmt || 0),
+      currency: sr.CurrencyRef?.value || "USD",
+      card: {
+        name: sr.CustomerRef?.name || sr.BillEmail?.Address || "",
+        last4: "",
+        cardType: "CARD",
+      },
+      disburseDate: undefined,
+    }));
 }
 
 function normalizeAmount(raw: any): number {
@@ -129,14 +161,24 @@ export async function GET(req: NextRequest) {
         return !c.status || c.status === "PENDING" || c.status === "AUTHORIZED";
       });
 
-    const totalPending = charges.reduce((sum, c) => sum + c.amount, 0);
+    let finalCharges = charges;
+
+    if (todayOnly && finalCharges.length === 0) {
+      try {
+        finalCharges = await fetchQboIntuitPaymentSalesReceipts(userId || undefined, localToday.toISOString().slice(0, 10));
+      } catch (fallbackError) {
+        console.error("QBO IntuitPayment fallback failed", fallbackError);
+      }
+    }
+
+    const totalPending = finalCharges.reduce((sum, c) => sum + c.amount, 0);
 
     return NextResponse.json({
       ok: true,
-      charges,
+      charges: finalCharges,
       totalPending,
       totalAmount: totalPending,
-      count: charges.length,
+      count: finalCharges.length,
     });
   } catch (error: any) {
     if (error instanceof QboApiError) {
