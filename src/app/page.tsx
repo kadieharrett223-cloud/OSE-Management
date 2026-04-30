@@ -328,53 +328,74 @@ export default function Dashboard() {
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  // Fetch QuickBooks invoice data for current month (calendar month)
+  // Single consolidated dashboard fetch — replaces all individual QBO useEffects
   useEffect(() => {
     let isMounted = true;
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = (today.getMonth() + 1).toString().padStart(2, "0");
-    const startDate = `${year}-${month}-01`;
-    const endDate = today.toISOString().slice(0, 10);
-    
-    // Fetch total sales
-    fetch(`/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=paid`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Failed to fetch invoices');
-        return await res.json();
-      })
-      .then((data) => {
-        if (!isMounted) return;
-        if (data.ok) {
-          setQboSales(data.totalPaid || 0);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch QBO invoices:', err);
-      })
-      .finally(() => undefined);
 
-    // Fetch sales by rep (for totals)
-    fetch(`/api/qbo/invoice/sales-by-rep?startDate=${startDate}&endDate=${endDate}&status=paid`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Failed to fetch sales by rep');
-        return await res.json();
-      })
-      .then((data) => {
-        if (!isMounted) return;
-        if (data.ok && data.reps) {
-          setRepSalesData(data.reps);
+    const fetchSummary = async () => {
+      try {
+        setLoadingMonthlyTotal(true);
+        setLoadingLastMonthTotal(true);
+        setLoadingProfit(true);
+        setLoadingPartialPaidInvoices(true);
+        setLoadingRecentInvoices(true);
+        setLoadingRecentPurchases(true);
+        setLoadingCustomerPayments(true);
+        setLoadingVendorPayments(true);
+
+        const res = await fetch(`/api/dashboard/summary?_=${Date.now()}`);
+        if (!res.ok) throw new Error("Dashboard summary fetch failed");
+        const data = await res.json();
+        if (!isMounted || !data.ok) return;
+
+        setSalesTodayTotal(data.salesToday ?? 0);
+        setSalesWeekTotal(data.salesWeek ?? 0);
+        setMonthlyTotal(data.salesMonth ?? 0);
+        setLastMonthTotal(data.salesLastMonth ?? 0);
+        setCurrentMonthTrend(data.currentMonthTrend ?? []);
+        setLastMonthTrend(data.lastMonthTrend ?? []);
+        setExpenseTrend(data.expenseTrend ?? []);
+        setPaidExpensesTotal(data.paidExpensesTotal ?? 0);
+        setTopExpenses(data.topExpenses ?? []);
+        setVendorPaymentsTotal(data.vendorPaymentsTotal ?? 0);
+        setVendorPaymentsToday(data.vendorPaymentsToday ?? []);
+        setOutstandingCount(data.outstandingCount ?? 0);
+        setOutstandingTotal(data.outstandingTotal ?? 0);
+        setPartialPaidInvoices(data.partialPaid ?? []);
+        setPartialPaidCount((data.partialPaid ?? []).length);
+        setPartialPaidRemaining((data.partialPaid ?? []).reduce((s: number, i: any) => s + i.balance, 0));
+        setRecentInvoices(data.recentInvoices ?? []);
+        setPaymentsTotal(data.paymentsTotal ?? 0);
+        setCustomerPaymentsToday(data.customerPaymentsToday ?? []);
+        setRecentPurchases(data.recentPurchases ?? []);
+        setQboSyncStatus("ok");
+      } catch (err) {
+        console.error("Dashboard summary error:", err);
+        if (isMounted) setQboSyncStatus("error");
+      } finally {
+        if (isMounted) {
+          setLoadingMonthlyTotal(false);
+          setLoadingLastMonthTotal(false);
+          setLoadingProfit(false);
+          setLoadingPartialPaidInvoices(false);
+          setLoadingRecentInvoices(false);
+          setLoadingRecentPurchases(false);
+          setLoadingCustomerPayments(false);
+          setLoadingVendorPayments(false);
         }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch rep sales:', err);
-      });
+      }
+    };
+
+    fetchSummary();
+    const interval = setInterval(fetchSummary, 30000);
 
     return () => {
       isMounted = false;
+      clearInterval(interval);
     };
   }, []);
 
+  // Derived display values (depend on state set by summary fetch)
   const fallbackSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
   const totalSales = loadingMonthlyTotal ? fallbackSales : monthlyTotal;
   const totalCommission = repSalesData.length > 0
@@ -384,317 +405,6 @@ export default function Dashboard() {
   const topExpenseSeries = topExpenses.map((expense) => expense.total);
   const maxTopExpense = Math.max(...topExpenseSeries, 1);
   const profitVsExpenseMax = Math.max(Math.abs(profitThisMonth), totalExpenses, 1);
-
-  // Fetch unpaid invoices for current month
-  useEffect(() => {
-    const fetchUnpaidInvoices = async () => {
-      try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = (now.getMonth() + 1).toString().padStart(2, '0');
-        const startDate = `${year}-${month}-01`;
-        const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
-        const endDate = `${year}-${month}-${lastDay}`;
-
-        const response = await fetch(
-          `/api/qbo/invoice/query?startDate=${startDate}&endDate=${endDate}&status=unpaid`
-        );
-        
-        if (!response.ok) throw new Error("Failed to fetch unpaid invoices");
-        
-        const data = await response.json();
-        const invoices = data.invoices || [];
-        const totalOutstanding = invoices.reduce((sum: number, inv: any) => sum + (Number(inv.Balance) || 0), 0);
-
-        console.log(`[dashboard] Unpaid invoices fetched: ${invoices.length} invoices`);
-        setOutstandingCount(invoices.length);
-        setOutstandingTotal(totalOutstanding);
-      } catch (error) {
-        console.error("Error fetching unpaid invoices:", error);
-        setOutstandingCount(0);
-        setOutstandingTotal(0);
-      }
-    };
-
-    fetchUnpaidInvoices();
-  }, []);
-
-  // Fetch sales (payments received) for current and previous month
-  useEffect(() => {
-    const fetchMonthlySales = async () => {
-      setLoadingMonthlyTotal(true);
-      setLoadingLastMonthTotal(true);
-      try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = (now.getMonth() + 1).toString().padStart(2, '0');
-        const startDate = `${year}-${month}-01`;
-        const endDate = toYmdLocal(now);
-        const todayDate = endDate;
-
-        const weekStart = new Date(now);
-        const day = weekStart.getDay(); // Sunday=0
-        const daysSinceMonday = (day + 6) % 7;
-        weekStart.setDate(weekStart.getDate() - daysSinceMonday);
-        const weekStartDate = toYmdLocal(weekStart);
-
-        const lastMonthStart = new Date(year, now.getMonth() - 1, 1);
-        const lastMonthEnd = new Date(year, now.getMonth(), 0);
-        const lastMonthStartDate = `${lastMonthStart.getFullYear()}-${String(lastMonthStart.getMonth() + 1).padStart(2, "0")}-01`;
-        const lastMonthEndDate = `${lastMonthEnd.getFullYear()}-${String(lastMonthEnd.getMonth() + 1).padStart(2, "0")}-${String(lastMonthEnd.getDate()).padStart(2, "0")}`;
-
-        const [todayPaymentResponse, weekPaymentResponse, monthPaymentResponse, lastMonthPaymentResponse] = await Promise.all([
-          fetch(`/api/qbo/payment/query?startDate=${todayDate}&endDate=${todayDate}&_=${Date.now()}`),
-          fetch(`/api/qbo/payment/query?startDate=${weekStartDate}&endDate=${endDate}&_=${Date.now()}`),
-          fetch(`/api/qbo/payment/query?startDate=${startDate}&endDate=${endDate}&_=${Date.now()}`),
-          fetch(`/api/qbo/payment/query?startDate=${lastMonthStartDate}&endDate=${lastMonthEndDate}&_=${Date.now()}`),
-        ]);
-
-        if (!todayPaymentResponse.ok || !weekPaymentResponse.ok || !monthPaymentResponse.ok || !lastMonthPaymentResponse.ok) {
-          throw new Error("Failed to fetch payment data");
-        }
-
-        const [todayPaymentData, weekPaymentData, monthPaymentData, lastMonthPaymentData] = await Promise.all([
-          todayPaymentResponse.json(),
-          weekPaymentResponse.json(),
-          monthPaymentResponse.json(),
-          lastMonthPaymentResponse.json(),
-        ]);
-
-        const todayTotalApplied = Number(todayPaymentData.totalApplied || 0);
-        const weekTotalApplied = Number(weekPaymentData.totalApplied || 0);
-        const monthTotalApplied = Number(monthPaymentData.totalApplied || 0);
-        const lastMonthTotalApplied = Number(lastMonthPaymentData.totalApplied || 0);
-
-        console.log(
-          `[dashboard] Payments received: today ${todayTotalApplied}, week ${weekTotalApplied}, month ${monthTotalApplied}, last month ${lastMonthTotalApplied}`
-        );
-        setSalesTodayTotal(todayTotalApplied);
-        setSalesWeekTotal(weekTotalApplied);
-        setMonthlyTotal(monthTotalApplied);
-        setLastMonthTotal(lastMonthTotalApplied);
-      } catch (error) {
-        console.error("Error fetching monthly sales:", error);
-        console.error("Full error details:", {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        setSalesTodayTotal(0);
-        setSalesWeekTotal(0);
-        setMonthlyTotal(0);
-        setLastMonthTotal(0);
-      } finally {
-        setLoadingMonthlyTotal(false);
-        setLoadingLastMonthTotal(false);
-      }
-    };
-
-    fetchMonthlySales();
-    const interval = setInterval(fetchMonthlySales, 60000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Fetch paid expenses for profit (month-to-date)
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchProfit = async () => {
-      setLoadingProfit(true);
-      try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const monthIndex = now.getMonth();
-        const month = String(monthIndex + 1).padStart(2, "0");
-        const startDate = `${year}-${month}-01`;
-        const endDate = now.toISOString().slice(0, 10);
-        const billsRes = await fetch(`/api/qbo/bill-payment/query?startDate=${startDate}&endDate=${endDate}`);
-
-        if (!billsRes.ok) {
-          throw new Error("Failed to fetch profit inputs");
-        }
-
-        const billsData = await billsRes.json();
-        const paidBills = Number(billsData.totalAmount || 0);
-        const billPayments = billsData.payments || [];
-        const daysElapsed = now.getDate();
-        const expenseDaily = Array.from({ length: daysElapsed }, () => 0);
-
-        billPayments.forEach((payment: any) => {
-          if (!payment.TxnDate) return;
-          const paymentDate = new Date(payment.TxnDate);
-          if (paymentDate.getFullYear() !== year || paymentDate.getMonth() !== monthIndex) return;
-          const dayIndex = Math.max(0, Math.min(daysElapsed - 1, paymentDate.getDate() - 1));
-          const total = Number(payment.TotalAmt) || 0;
-          expenseDaily[dayIndex] += total;
-        });
-
-        const expenseSeries: number[] = [];
-        let runningExpense = 0;
-        for (let i = 0; i < expenseDaily.length; i += 1) {
-          runningExpense += expenseDaily[i];
-          expenseSeries.push(runningExpense);
-        }
-
-        const vendorTotals = new Map<string, number>();
-        billPayments.forEach((payment: any) => {
-          const vendorName =
-            payment.VendorRef?.name ||
-            payment.PayeeRef?.name ||
-            "Unknown Vendor";
-          const total = Number(payment.TotalAmt) || 0;
-          vendorTotals.set(vendorName, (vendorTotals.get(vendorName) || 0) + total);
-        });
-
-        const topVendors = Array.from(vendorTotals.entries())
-          .map(([name, total]) => ({ name, total }))
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 5);
-
-        if (isMounted) {
-          setPaidExpensesTotal(paidBills);
-          setTopExpenses(topVendors);
-          setExpenseTrend(expenseSeries);
-        }
-      } catch (error) {
-        console.error("Failed to fetch profit data:", error);
-        if (isMounted) {
-          setPaidExpensesTotal(0);
-          setTopExpenses([]);
-          setExpenseTrend([]);
-        }
-      } finally {
-        if (isMounted) setLoadingProfit(false);
-      }
-    };
-
-    fetchProfit();
-    const interval = setInterval(fetchProfit, 60000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  // Fetch partially paid invoices for current month
-  useEffect(() => {
-    const fetchPartialPaidInvoices = async () => {
-      setLoadingPartialPaidInvoices(true);
-      try {
-        const response = await fetch(
-          `/api/qbo/invoice/query?status=unpaid&allPages=true`
-        );
-
-        if (!response.ok) throw new Error("Failed to fetch invoices");
-
-        const data = await response.json();
-        const invoices = data.invoices || [];
-
-        const partialInvoices: PartialPaidInvoice[] = invoices
-          .map((inv: any) => {
-            const total = Number(inv.TotalAmt) || 0;
-            const balance = Number(inv.Balance) || 0;
-            const paid = Math.max(total - balance, 0);
-
-            if (!(paid > 0 && balance > 0)) {
-              return null;
-            }
-
-            return {
-              id: String(inv.Id || ""),
-              docNumber: String(inv.DocNumber || "N/A"),
-              customerName: String(inv.CustomerRef?.name || inv.CustomerRef?.value || "Unknown"),
-              txnDate: String(inv.TxnDate || ""),
-              totalAmt: total,
-              paidAmt: paid,
-              balance,
-            } as PartialPaidInvoice;
-          })
-          .filter((inv: PartialPaidInvoice | null): inv is PartialPaidInvoice => Boolean(inv))
-          .sort((a: PartialPaidInvoice, b: PartialPaidInvoice) => b.balance - a.balance);
-
-        let remaining = 0;
-        partialInvoices.forEach((inv: PartialPaidInvoice) => {
-          remaining += inv.balance;
-        });
-
-        setPartialPaidInvoices(partialInvoices);
-        setPartialPaidCount(partialInvoices.length);
-        setPartialPaidRemaining(remaining);
-      } catch (error) {
-        console.error("Error fetching partial paid invoices:", error);
-        setPartialPaidInvoices([]);
-        setPartialPaidCount(0);
-        setPartialPaidRemaining(0);
-      } finally {
-        setLoadingPartialPaidInvoices(false);
-      }
-    };
-
-    fetchPartialPaidInvoices();
-  }, []);
-
-  // QuickBooks connectivity status check
-  useEffect(() => {
-    let isMounted = true;
-
-    const checkQboStatus = async () => {
-      try {
-        const today = new Date().toISOString().slice(0, 10);
-        const res = await fetch(`/api/qbo/invoice/query?startDate=${today}&endDate=${today}`);
-        if (!res.ok) throw new Error("QBO status check failed");
-        if (isMounted) setQboSyncStatus("ok");
-      } catch (error) {
-        console.error("Failed QBO status check:", error);
-        if (isMounted) setQboSyncStatus("error");
-      }
-    };
-
-    checkQboStatus();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Unpaid invoices
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchUnpaidInvoices = async () => {
-      setLoadingRecentInvoices(true);
-      try {
-        const res = await fetch(`/api/qbo/invoice/query?status=unpaid`);
-        if (!res.ok) throw new Error("Failed to fetch unpaid invoices");
-        const data = await res.json();
-        const invoices = (data.invoices || []).map((inv: any) => {
-          const total = Number(inv.TotalAmt) || 0;
-          const balance = Number(inv.Balance) || 0;
-          return {
-            id: inv.Id,
-            docNumber: inv.DocNumber,
-            customerName: inv.CustomerRef?.name || "Unknown",
-            totalAmt: Number(inv.TotalAmt) || 0,
-            balance,
-            txnDate: inv.TxnDate,
-            status: balance <= 0 ? "Paid" : "Open",
-          } as RecentInvoice;
-        });
-
-        if (isMounted) setRecentInvoices(invoices);
-      } catch (error) {
-        console.error("Failed to fetch unpaid invoices:", error);
-        if (isMounted) setRecentInvoices([]);
-      } finally {
-        if (isMounted) setLoadingRecentInvoices(false);
-      }
-    };
-
-    fetchUnpaidInvoices();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const handlePrintOpenInvoices = () => {
     if (loadingRecentInvoices) return;
@@ -723,312 +433,6 @@ export default function Dashboard() {
       setPrintingPartialPaid(false);
     }, 150);
   };
-
-  // Recent purchases (latest purchase orders)
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchRecentPurchases = async () => {
-      setLoadingRecentPurchases(true);
-      try {
-        const res = await fetch(`/api/purchase-orders`);
-        if (!res.ok) throw new Error("Failed to fetch recent purchases");
-        const data = await res.json();
-        const purchases = (data.data || []).slice(0, 5).map((po: any) => ({
-          id: po.id,
-          poNumber: po.po_number,
-          vendorName: po.vendor_name || "Unknown",
-          totalAmount: Number(po.total_amount) || 0,
-          status: po.status || "UNKNOWN",
-          orderDate: po.order_date,
-        })) as RecentPurchase[];
-
-        if (isMounted) setRecentPurchases(purchases);
-      } catch (error) {
-        console.error("Failed to fetch recent purchases:", error);
-        if (isMounted) setRecentPurchases([]);
-      } finally {
-        if (isMounted) setLoadingRecentPurchases(false);
-      }
-    };
-
-    fetchRecentPurchases();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Monthly performance comparison (last month vs this month)
-  useEffect(() => {
-    let isMounted = true;
-
-    const buildCumulativeSeries = (payments: any[], days: number, startDate: Date) => {
-      const dailyTotals = Array.from({ length: days }, () => 0);
-
-      payments.forEach((payment: any) => {
-        const date = new Date(payment.TxnDate);
-        const dayIndex = Math.max(0, Math.min(days - 1, date.getDate() - 1));
-        const total = Number(payment.TotalAmt) || 0;
-        const unapplied = Number(payment.UnappliedAmt) || 0;
-        const applied = Math.max(total - unapplied, 0);
-        dailyTotals[dayIndex] += applied;
-      });
-
-      const cumulative: number[] = [];
-      let running = 0;
-      for (let i = 0; i < days; i += 1) {
-        running += dailyTotals[i];
-        cumulative.push(running);
-      }
-
-      return cumulative;
-    };
-
-    const fetchMonthlyComparison = async () => {
-      try {
-        const today = new Date();
-        const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        const currentMonthEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const daysSoFar = today.getDate();
-
-        const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-        const lastMonthDays = lastMonthEnd.getDate();
-        const compareDays = Math.min(daysSoFar, lastMonthDays);
-
-        const currentStart = currentMonthStart.toISOString().slice(0, 10);
-        const currentEnd = currentMonthEnd.toISOString().slice(0, 10);
-        const lastStart = lastMonthStart.toISOString().slice(0, 10);
-        const lastEnd = new Date(lastMonthStart.getFullYear(), lastMonthStart.getMonth(), compareDays)
-          .toISOString()
-          .slice(0, 10);
-
-        const [currentRes, lastRes] = await Promise.all([
-          fetch(`/api/qbo/payment/query?startDate=${currentStart}&endDate=${currentEnd}&_=${Date.now()}`),
-          fetch(`/api/qbo/payment/query?startDate=${lastStart}&endDate=${lastEnd}&_=${Date.now()}`),
-        ]);
-
-        if (!currentRes.ok || !lastRes.ok) {
-          console.error("Monthly comparison fetch failed:", currentRes.status, lastRes.status);
-          throw new Error("Failed to fetch monthly comparison");
-        }
-
-        const currentData = await currentRes.json();
-        const lastData = await lastRes.json();
-
-        const currentPayments = currentData.payments || [];
-        const lastPayments = lastData.payments || [];
-
-        console.log(`[dashboard] Monthly data - current: ${currentPayments.length} payments, last month: ${lastPayments.length} payments`);
-
-        const currentSeries = buildCumulativeSeries(currentPayments, daysSoFar, currentMonthStart);
-        const lastSeries = buildCumulativeSeries(lastPayments, compareDays, lastMonthStart);
-
-        if (isMounted) {
-          setCurrentMonthTrend(currentSeries);
-          setLastMonthTrend(lastSeries);
-        }
-      } catch (error) {
-        console.error("Failed to fetch monthly comparison:", error);
-        if (isMounted) {
-          setCurrentMonthTrend([]);
-          setLastMonthTrend([]);
-        }
-      }
-    };
-
-    fetchMonthlyComparison();
-    const interval = setInterval(fetchMonthlyComparison, 60000); // Refresh every minute
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  // Fetch payments made today (live tracking)
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchPaymentsToday = async () => {
-      setLoadingCustomerPayments(true);
-      try {
-        const today = getLocalDateYmd();
-        const [invoiceRes, paymentRes] = await Promise.all([
-          fetch(`/api/qbo/invoice/query?startDate=${today}&endDate=${today}&status=paid&allPages=true&_=${Date.now()}`),
-          fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`),
-        ]);
-
-        const itemizedPayments: CustomerPayment[] = [];
-        const paidByInvoiceId = new Map<string, number>();
-
-        if (invoiceRes.ok) {
-          const invoiceData = await invoiceRes.json();
-          const invoices = invoiceData?.invoices || [];
-          invoices.forEach((inv: any) => {
-            const invoiceId = String(inv?.Id || "");
-            if (!invoiceId) return;
-
-            const total = Number(inv?.TotalAmt) || 0;
-            const balance = Number(inv?.Balance) || 0;
-            const paid = Math.max(total - balance, 0);
-            if (paid <= 0) return;
-
-            paidByInvoiceId.set(invoiceId, paid);
-            itemizedPayments.push({
-              id: `inv-${invoiceId}`,
-              customerName: inv?.CustomerRef?.name || inv?.CustomerRef?.value || "Unknown",
-              appliedAmount: paid,
-              totalAmount: total,
-              txnDate: inv?.TxnDate || today,
-            });
-          });
-        }
-
-        if (paymentRes.ok) {
-          const paymentData = await paymentRes.json();
-          const payments = paymentData?.payments || [];
-
-          payments.forEach((payment: any) => {
-            const total = Number(payment?.TotalAmt) || 0;
-            const unapplied = Number(payment?.UnappliedAmt) || 0;
-            const applied = Math.max(total - unapplied, 0);
-            if (applied <= 0) return;
-
-            let linkedAmount = 0;
-            const lines = Array.isArray(payment?.Line) ? payment.Line : [];
-            lines.forEach((line: any) => {
-              const lineAmount = Number(line?.Amount) || 0;
-              const linked = Array.isArray(line?.LinkedTxn) ? line.LinkedTxn : [];
-              const invoiceLinks = linked.filter((txn: any) => txn?.TxnType === "Invoice" && txn?.TxnId);
-              if (invoiceLinks.length === 0) return;
-
-              linkedAmount += lineAmount;
-              invoiceLinks.forEach((txn: any) => {
-                const invoiceId = String(txn.TxnId || "");
-                if (!invoiceId) return;
-                if (!paidByInvoiceId.has(invoiceId) && lineAmount > 0) {
-                  paidByInvoiceId.set(invoiceId, lineAmount);
-                  itemizedPayments.push({
-                    id: `pay-link-${payment?.Id || "unknown"}-${invoiceId}`,
-                    customerName: payment?.CustomerRef?.name || payment?.CustomerRef?.value || "Unknown",
-                    appliedAmount: lineAmount,
-                    totalAmount: lineAmount,
-                    txnDate: payment?.TxnDate || today,
-                  });
-                }
-              });
-            });
-
-            const unlinkedApplied = Math.max(applied - linkedAmount, 0);
-            if (unlinkedApplied > 0) {
-              itemizedPayments.push({
-                id: `pay-${payment?.Id || Math.random().toString(36).slice(2)}`,
-                customerName: payment?.CustomerRef?.name || payment?.CustomerRef?.value || "Unknown",
-                appliedAmount: unlinkedApplied,
-                totalAmount: total,
-                txnDate: payment?.TxnDate || today,
-              });
-            }
-          });
-        }
-
-        const totalApplied = itemizedPayments.reduce((sum, row) => sum + (Number(row.appliedAmount) || 0), 0);
-        itemizedPayments.sort((a, b) => b.appliedAmount - a.appliedAmount);
-
-        if (isMounted) {
-          setPaymentsTotal(totalApplied);
-          setCustomerPaymentsToday(itemizedPayments);
-          setLoadingCustomerPayments(false);
-        }
-      } catch (error) {
-        console.error("Failed to fetch payments today:", error);
-        if (isMounted) {
-          setPaymentsTotal(0);
-          setCustomerPaymentsToday([]);
-          setLoadingCustomerPayments(false);
-        }
-      }
-    };
-
-    fetchPaymentsToday();
-    const interval = setInterval(fetchPaymentsToday, 30000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  // Fetch payments made to vendors today (live tracking)
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchVendorPaymentsToday = async () => {
-      setLoadingVendorPayments(true);
-      try {
-        const today = new Date().toLocaleDateString("en-CA");
-        const res = await fetch(`/api/qbo/bill-payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
-        if (!res.ok) throw new Error("Failed to fetch vendor payments");
-        const data = await res.json();
-        const payments = data.payments || [];
-
-        const summaryMap = new Map<string, VendorPaymentSummary>();
-        let totalPaid = 0;
-
-        payments.forEach((payment: any) => {
-          const paid = Number(payment.TotalAmt) || 0;
-          if (paid <= 0) return;
-
-          const vendorName =
-            payment.VendorRef?.name ||
-            payment.PayeeRef?.name ||
-            "Unknown Vendor";
-
-          totalPaid += paid;
-
-          const existing = summaryMap.get(vendorName);
-          if (existing) {
-            existing.totalPaid += paid;
-            existing.paymentCount += 1;
-            if (payment.TxnDate && payment.TxnDate > existing.lastTxnDate) {
-              existing.lastTxnDate = payment.TxnDate;
-            }
-          } else {
-            summaryMap.set(vendorName, {
-              vendorName,
-              totalPaid: paid,
-              paymentCount: 1,
-              lastTxnDate: payment.TxnDate || today,
-            });
-          }
-        });
-
-        const summary = Array.from(summaryMap.values()).sort((a, b) => b.totalPaid - a.totalPaid);
-
-        if (isMounted) {
-          setVendorPaymentsToday(summary);
-          setVendorPaymentsTotal(totalPaid);
-        }
-      } catch (error) {
-        console.error("Failed to fetch vendor payments today:", error);
-        if (isMounted) {
-          setVendorPaymentsToday([]);
-          setVendorPaymentsTotal(0);
-        }
-      } finally {
-        if (isMounted) setLoadingVendorPayments(false);
-      }
-    };
-
-    fetchVendorPaymentsToday();
-    const interval = setInterval(fetchVendorPaymentsToday, 30000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
 
   // Fetch customer payments made today in QuickBooks Payments
   useEffect(() => {
