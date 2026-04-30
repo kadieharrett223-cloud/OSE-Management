@@ -8,7 +8,7 @@ export type PricingInput = {
   margin: number; // Margin % as decimal (e.g., 0.2296 for 22.96%)
   listPrice?: number; // Optional manual list price
   discount?: number; // % off list price (default 20)
-  tariffExempt?: boolean; // If true, skip tariff (FOB×2), ocean, and importing calculations
+  tariffExempt?: boolean; // If true, skip tariff, ocean, and importing calculations
 };
 
 export type PricingResult = PricingInput & {
@@ -65,6 +65,8 @@ const normalizeBoolean = (value: unknown): boolean => {
 
 const floorTo = (value: number, step: number): number => Math.floor(value / step) * step;
 
+const GLOBAL_TARIFF_PERCENT = 80;
+
 export const computePricingRow = (raw: PricingInput): PricingResult => {
   const base: PricingInput = {
     itemNo: normalizeText(raw.itemNo),
@@ -80,6 +82,7 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
   };
 
   // Constants
+  const TARIFF_MULTIPLIER = 1 + GLOBAL_TARIFF_PERCENT / 100;
   const OCEAN_FREIGHT_PER_CONTAINER = 3000;
   const IMPORTING_PER_CONTAINER = 2100;
 
@@ -96,8 +99,8 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
     importingPerUnit = 0;
     costNoShipping = base.fobCost;
   } else {
-    // Normal: tariff = FOB × 2, plus ocean and importing per unit
-    tariff = base.fobCost * 2;
+    // Normal: tariff = FOB × (1 + Tariff%)
+    tariff = base.fobCost * TARIFF_MULTIPLIER;
     oceanPerUnit = OCEAN_FREIGHT_PER_CONTAINER / base.quantity;
     importingPerUnit = IMPORTING_PER_CONTAINER / base.quantity;
     costNoShipping = tariff + oceanPerUnit + importingPerUnit;
@@ -106,10 +109,10 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
   const finalCost = costNoShipping + base.shipping;
   
   // Sell price based on margin: Sell = Final / (1 - Margin)
-  const sellPrice = base.margin > 0 && base.margin < 1 ? finalCost / (1 - base.margin) : finalCost;
+  const sellPrice = base.margin < 1 ? finalCost / (1 - base.margin) : finalCost;
   const profit = sellPrice - finalCost;
   
-  // List price: always 20% higher than sell price
+  // List price: sell ÷ 0.80 (20% off list)
   const calculatedListPrice = sellPrice / 0.8; // Sell / 0.80 = List
   const appliedListPrice = base.listPrice !== undefined ? base.listPrice : calculatedListPrice;
   
@@ -185,7 +188,7 @@ export const exportRowShape = {
     "Tariff Exempt",
   ],
   computedHeaders: [
-    "Tariff (FOB × 2)",
+    `Tariff (FOB × ${1 + GLOBAL_TARIFF_PERCENT / 100})`,
     "Ocean Per Unit",
     "Importing Per Unit",
     "Cost (no shipping)",
@@ -209,7 +212,7 @@ export const toExportRow = (row: PricingResult) => ({
   "List Price (Optional)": row.listPrice ?? "",
   "Discount %": row.discount,
   "Tariff Exempt": row.tariffExempt ? "Yes" : "No",
-  "Tariff (FOB × 2)": row.tariff,
+  [`Tariff (FOB × ${1 + GLOBAL_TARIFF_PERCENT / 100})`]: row.tariff,
   "Ocean Per Unit": row.oceanPerUnit,
   "Importing Per Unit": row.importingPerUnit,
   "Cost (no shipping)": row.costNoShipping,

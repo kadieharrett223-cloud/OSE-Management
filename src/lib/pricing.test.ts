@@ -9,14 +9,14 @@ describe("pricing calculations", () => {
     fobCost: 100,
     quantity: 100, // Container capacity
     shipping: 50,
-    multiplier: 1.5,
+    margin: 0.25,
   } as const;
 
-  it("matches new pricing formula", () => {
+  it("matches pricing guide formula", () => {
     const result = computePricingRow(baseRow);
 
-    // tariff = fobCost × 2
-    expect(result.tariff).toBe(200);
+    // tariff = fobCost × (1 + 80%)
+    expect(result.tariff).toBe(180);
     
     // oceanPerUnit = 3000 / quantity
     expect(result.oceanPerUnit).toBe(30);
@@ -25,22 +25,22 @@ describe("pricing calculations", () => {
     expect(result.importingPerUnit).toBe(21);
     
     // costNoShipping = tariff + oceanPerUnit + importingPerUnit
-    expect(result.costNoShipping).toBe(251);
+    expect(result.costNoShipping).toBe(231);
     
     // finalCost = costNoShipping + shipping
-    expect(result.finalCost).toBe(301);
+    expect(result.finalCost).toBe(281);
     
-    // sellPrice = (costNoShipping × multiplier) + shipping
-    expect(result.sellPrice).toBeCloseTo(426.5);
+    // sellPrice = finalCost / (1 - margin)
+    expect(result.sellPrice).toBeCloseTo(374.6666667);
     
     // profit = sellPrice - finalCost
-    expect(result.profit).toBeCloseTo(125.5);
+    expect(result.profit).toBeCloseTo(93.6666667);
     
-    // calculated list price = sellPrice × 1.2 (20% markup for 20% discount)
-    expect(result.calculatedListPrice).toBeCloseTo(511.8);
+    // calculated list price = sellPrice ÷ 0.80
+    expect(result.calculatedListPrice).toBeCloseTo(468.3333333);
     
     // discounted price = appliedListPrice × (1 - discountPercent / 100)
-    expect(result.discountedPrice).toBeCloseTo(409.44);
+    expect(result.discountedPrice).toBeCloseTo(374.6666667);
   });
 
   it("allows manual list price override", () => {
@@ -79,13 +79,13 @@ describe("pricing calculations", () => {
       "FOB COST": "100",
       "Quantity": 100,
       "Shipping": 50,
-      "Multiplier": 1.5,
+      "Margin": 25,
     });
 
     expect(row).not.toBeNull();
     expect(row?.fobCost).toBe(100);
     expect(row?.quantity).toBe(100);
     expect(row?.shipping).toBe(50);
-    expect(row?.multiplier).toBe(1.5);
+    expect(row?.margin).toBe(0.25);
   });
 });

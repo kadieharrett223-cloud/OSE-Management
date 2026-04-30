@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const [confirmationStep, setConfirmationStep] = useState(1);
   const [activeTab, setActiveTab] = useState<'integrations' | 'defaults' | 'billing'>('integrations');
   const [globalTariffPercent, setGlobalTariffPercent] = useState<string>('100');
+  const [keepSellPricesOnTariffChange, setKeepSellPricesOnTariffChange] = useState(false);
   const [savingTariff, setSavingTariff] = useState(false);
   const [savingOrderSyncSettings, setSavingOrderSyncSettings] = useState(false);
   const [runningOrderSync, setRunningOrderSync] = useState(false);
@@ -248,7 +249,10 @@ export default function SettingsPage() {
       const res = await fetch('/api/pricing/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ global_tariff_percent: normalizedTariffPercent }),
+        body: JSON.stringify({
+          global_tariff_percent: normalizedTariffPercent,
+          keep_sell_prices: keepSellPricesOnTariffChange,
+        }),
       });
 
       const data = await res.json();
@@ -257,7 +261,11 @@ export default function SettingsPage() {
       }
 
       setGlobalTariffPercent(String(Number(normalizedTariffPercent.toFixed(4))));
-      setSuccess('Global tariff updated. Non-manual products were recalculated.');
+      if (keepSellPricesOnTariffChange) {
+        setSuccess('Global tariff updated. Non-manual products were recalculated while keeping existing sell prices.');
+      } else {
+        setSuccess('Global tariff updated. Non-manual products were recalculated.');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to save tariff setting');
     } finally {
@@ -745,6 +753,15 @@ export default function SettingsPage() {
                   {savingTariff ? 'Saving...' : 'Save Tariff'}
                 </button>
               </div>
+              <label className="mt-3 inline-flex items-center gap-2 text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={keepSellPricesOnTariffChange}
+                  onChange={(e) => setKeepSellPricesOnTariffChange(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Keep all existing sell prices the same (recalculate margin instead)
+              </label>
               <p className="mt-2 text-xs text-gray-500">
                 Enter <strong>25</strong> for 25%, or <strong>1.25</strong> for a 1.25x tariff multiplier.
               </p>

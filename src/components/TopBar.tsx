@@ -8,8 +8,6 @@ export function TopBar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [paymentsTodayTotal, setPaymentsTodayTotal] = useState(0);
   const [loadingPaymentsToday, setLoadingPaymentsToday] = useState(true);
-  const [incomingDepositsTotal, setIncomingDepositsTotal] = useState(0);
-  const [loadingIncomingDeposits, setLoadingIncomingDeposits] = useState(true);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
@@ -100,36 +98,6 @@ export function TopBar() {
     };
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchIncomingDeposits = async () => {
-      try {
-        const res = await fetch(`/api/qbo/pending-charges?today=true&_=${Date.now()}`);
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch pending charges");
-        }
-
-        const data = await res.json();
-        const totalIncoming = Number(data?.totalAmount || 0);
-        if (isMounted) setIncomingDepositsTotal(totalIncoming);
-      } catch (error) {
-        // Keep previous value on error
-      } finally {
-        if (isMounted) setLoadingIncomingDeposits(false);
-      }
-    };
-
-    setLoadingIncomingDeposits(true);
-    fetchIncomingDeposits();
-    const interval = setInterval(fetchIncomingDeposits, 30000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
   return (
     <div className="sticky top-0 z-40 w-full border-b border-slate-600 bg-slate-700 pt-[env(safe-area-inset-top)] text-white print:hidden">
       <div className="mx-auto flex w-full flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
@@ -159,12 +127,6 @@ export function TopBar() {
             <span className="font-semibold text-slate-300">Payments Received:</span>
             <span className="text-xs font-bold text-emerald-300 sm:text-sm">
               {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 border-l border-slate-500 pl-3 text-slate-100">
-            <span className="font-semibold text-slate-300">QBO Payments Today:</span>
-            <span className="text-xs font-bold text-amber-300 sm:text-sm">
-              {loadingIncomingDeposits ? "…" : formatCurrency(incomingDepositsTotal)}
             </span>
           </div>
         </div>
