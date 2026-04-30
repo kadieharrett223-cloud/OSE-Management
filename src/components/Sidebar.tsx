@@ -14,8 +14,7 @@ const navGroups: { title: string; items: { label: string; hint: string; href: st
   {
     title: "Finance",
     items: [
-      { label: "Expenses", hint: "Bills & payroll", href: "/expenses" },
-      { label: "Payroll", hint: "Payroll costs & team", href: "/payroll" },
+      { label: "Expenses", hint: "Bills & payments", href: "/expenses" },
     ],
   },
   {

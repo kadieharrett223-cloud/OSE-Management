@@ -10,12 +10,20 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getServerSupabaseClient();
-    const { error } = await supabase
-      .from("qbo_tokens")
-      .delete()
-      .eq("user_id", session.user.id);
 
-    if (error) throw error;
+    if (session.user.id === "shared-access") {
+      const { error } = await supabase
+        .from("qbo_tokens")
+        .delete()
+        .eq("id", "primary");
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from("qbo_tokens")
+        .delete()
+        .eq("user_id", session.user.id);
+      if (error) throw error;
+    }
 
     return NextResponse.json({
       ok: true,

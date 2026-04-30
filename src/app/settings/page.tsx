@@ -224,7 +224,8 @@ export default function SettingsPage() {
   };
 
   const handleLogout = async () => {
-    await signOut({ redirect: true, callbackUrl: '/' });
+    await fetch('/api/access/logout', { method: 'POST' }).catch(() => undefined);
+    await signOut({ redirect: true, callbackUrl: '/auth/signin' });
   };
 
   const handleSaveTariff = async () => {

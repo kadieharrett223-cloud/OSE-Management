@@ -259,7 +259,6 @@ export default function Dashboard() {
   const [lastMonthTotal, setLastMonthTotal] = useState<number>(0);
   const [loadingLastMonthTotal, setLoadingLastMonthTotal] = useState(true);
   const [paidExpensesTotal, setPaidExpensesTotal] = useState<number>(0);
-  const [payrollExpenseTotal, setPayrollExpenseTotal] = useState<number>(0);
   const [loadingProfit, setLoadingProfit] = useState(true);
   const [topExpenses, setTopExpenses] = useState<Array<{ name: string; total: number }>>([]);
   const [partialPaidCount, setPartialPaidCount] = useState<number>(0);
@@ -311,7 +310,7 @@ export default function Dashboard() {
   });
 
   // Compute derived values first (needed for animated count-ups)
-  const totalExpenses = paidExpensesTotal + payrollExpenseTotal;
+  const totalExpenses = paidExpensesTotal;
   const profitThisMonth = monthlyTotal - totalExpenses;
 
   // Animated values using count-up hook
@@ -320,7 +319,6 @@ export default function Dashboard() {
   const animatedSalesWeekTotal = useCountUp(salesWeekTotal);
   const animatedProfitThisMonth = useCountUp(profitThisMonth);
   const animatedTotalExpenses = useCountUp(totalExpenses);
-  const animatedPayrollTotal = useCountUp(payrollExpenseTotal);
 
   const getLocalDateYmd = () => {
     const now = new Date();
@@ -497,7 +495,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch paid expenses + payroll for profit (month-to-date)
+  // Fetch paid expenses for profit (month-to-date)
   useEffect(() => {
     let isMounted = true;
 
@@ -510,42 +508,17 @@ export default function Dashboard() {
         const month = String(monthIndex + 1).padStart(2, "0");
         const startDate = `${year}-${month}-01`;
         const endDate = now.toISOString().slice(0, 10);
-        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-        const daysElapsed = now.getDate();
+        const billsRes = await fetch(`/api/qbo/bill-payment/query?startDate=${startDate}&endDate=${endDate}`);
 
-        const [billsRes, payrollRes] = await Promise.all([
-          fetch(`/api/qbo/bill-payment/query?startDate=${startDate}&endDate=${endDate}`),
-          fetch(`/api/qbo/payroll/overview?startDate=${startDate}&endDate=${endDate}`),
-        ]);
-
-        if (!billsRes.ok || !payrollRes.ok) {
+        if (!billsRes.ok) {
           throw new Error("Failed to fetch profit inputs");
         }
 
-        const [billsData, payrollData] = await Promise.all([billsRes.json(), payrollRes.json()]);
+        const billsData = await billsRes.json();
         const paidBills = Number(billsData.totalAmount || 0);
         const billPayments = billsData.payments || [];
-        const team = payrollData.team || [];
-
-        const payrollTotal = team.reduce((sum: number, member: any) => {
-          const rate = Number(member.rate) || 0;
-          if (member.type === "Salary") {
-            const monthlySalary = rate / 12;
-            return sum + monthlySalary * (daysElapsed / daysInMonth);
-          }
-          const hours = Number(member.currentHours ?? member.hours ?? 0);
-          if (hours > 0) {
-            return sum + hours * rate;
-          }
-          const perPayroll = Number(member.perPayrollCost) || 0;
-          return sum + perPayroll * (daysElapsed / 14);
-        }, 0);
-
+        const daysElapsed = now.getDate();
         const expenseDaily = Array.from({ length: daysElapsed }, () => 0);
-        const payrollDaily = daysElapsed > 0 ? payrollTotal / daysElapsed : 0;
-        for (let i = 0; i < daysElapsed; i += 1) {
-          expenseDaily[i] = payrollDaily;
-        }
 
         billPayments.forEach((payment: any) => {
           if (!payment.TxnDate) return;
@@ -580,7 +553,6 @@ export default function Dashboard() {
 
         if (isMounted) {
           setPaidExpensesTotal(paidBills);
-          setPayrollExpenseTotal(payrollTotal);
           setTopExpenses(topVendors);
           setExpenseTrend(expenseSeries);
         }
@@ -588,7 +560,6 @@ export default function Dashboard() {
         console.error("Failed to fetch profit data:", error);
         if (isMounted) {
           setPaidExpensesTotal(0);
-          setPayrollExpenseTotal(0);
           setTopExpenses([]);
           setExpenseTrend([]);
         }
@@ -1461,11 +1432,7 @@ export default function Dashboard() {
                             </div>
                           </div>
                           
-                          <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
-                            <div>
-                              <div className="text-xs font-medium text-slate-500">Payroll</div>
-                              <div className="mt-1 text-base font-semibold text-slate-900">${money(Math.round(animatedPayrollTotal))}</div>
-                            </div>
+                          <div className="mt-4 grid grid-cols-1 gap-4 border-t border-slate-200 pt-4">
                             <div>
                               <div className="text-xs font-medium text-slate-500">Bills</div>
                               <div className="mt-1 text-base font-semibold text-slate-900">${money(paidExpensesTotal)}</div>

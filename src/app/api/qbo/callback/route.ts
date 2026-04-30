@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
   try {
     // Get current user from session for multi-tenant token storage
     const session: any = await getSession();
-    const userId = session?.user?.id;
+    const isSharedAccess = session?.user?.id === "shared-access";
+    const userId = isSharedAccess ? undefined : session?.user?.id;
 
     // Exchange code for tokens
     const tokenResponse = await exchangeCodeForToken(code, realmId);

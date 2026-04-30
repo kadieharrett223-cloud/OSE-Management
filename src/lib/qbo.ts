@@ -155,17 +155,38 @@ async function writeTokenFile(row: QboTokenRow): Promise<void> {
 export async function getTokenRow(userId?: string): Promise<QboTokenRow | null> {
   try {
     const supabase = getServerSupabaseClient();
-    let query = supabase
-      .from("qbo_tokens")
-      .select("*");
-    
+    let data: any = null;
+    let error: any = null;
+
     if (userId) {
-      query = query.eq("user_id", userId);
+      const userRow = await supabase
+        .from("qbo_tokens")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      data = userRow.data;
+      error = userRow.error;
+
+      if (!error && !data) {
+        const primaryRow = await supabase
+          .from("qbo_tokens")
+          .select("*")
+          .eq("id", "primary")
+          .maybeSingle();
+        data = primaryRow.data;
+        error = primaryRow.error;
+      }
     } else {
-      query = query.eq("id", "primary");
+      const primaryRow = await supabase
+        .from("qbo_tokens")
+        .select("*")
+        .eq("id", "primary")
+        .maybeSingle();
+      data = primaryRow.data;
+      error = primaryRow.error;
     }
-    
-    const { data, error } = await query.maybeSingle();
+
     if (error) throw error;
     return data as QboTokenRow | null;
   } catch (err) {

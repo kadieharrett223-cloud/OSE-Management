@@ -56,7 +56,6 @@ const money = (value: number | undefined) => {
 export default function CommissionsPage() {
   const pathname = usePathname();
   const tabs = [
-    { label: "Payroll", href: "/payroll" },
     { label: "Commissions", href: "/commissions" },
   ];
 

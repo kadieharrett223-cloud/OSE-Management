@@ -23,7 +23,6 @@ export function TopBar() {
   const pages = [
     { label: "Dashboard", href: "/" },
     { label: "Expenses", href: "/expenses" },
-    { label: "Payroll", href: "/payroll" },
     { label: "Commissions", href: "/commissions" },
     { label: "Price List", href: "/admin/price-list" },
     { label: "Purchasing", href: "/admin/purchasing" },
