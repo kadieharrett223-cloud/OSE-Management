@@ -594,27 +594,27 @@ export default function Dashboard() {
 
             {/* Customer Payments Today + Shopify Scheduled Deposits */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* QBO Payments Customer Payments Today */}
+              {/* Customer Payments Today -- QBO payments received today */}
               <div className="bg-white border border-slate-200 rounded-lg">
                 <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
                     <p className="mt-0.5 text-sm text-slate-600">
-                      Charges run through QuickBooks Payments today
+                      Payments received in QuickBooks today
                     </p>
-                    {!loadingIncomingDeposits && (
-                      <p className="mt-1 text-lg font-bold text-amber-600">
-                        ${money(incomingDepositsTotal)}
+                    {!loadingCustomerPayments && (
+                      <p className="mt-1 text-lg font-bold text-emerald-700">
+                        ${money(paymentsTotal)}
                       </p>
                     )}
                   </div>
-                  {incomingDeposits.length > 0 && (
+                  {customerPaymentsToday.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setShowIncomingDepositsModal(true)}
+                      onClick={() => setShowCustomerPaymentsModal(true)}
                       className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                     >
-                      View all â†’
+                      View all
                     </button>
                   )}
                 </div>
@@ -624,25 +624,23 @@ export default function Dashboard() {
                       <tr>
                         <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
                         <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
-                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Card</th>
                         <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {loadingIncomingDeposits ? (
-                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
-                      ) : incomingDeposits.length === 0 ? (
-                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">
-                          No QuickBooks Payments customer charges found today
+                      {loadingCustomerPayments ? (
+                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
+                      ) : customerPaymentsToday.length === 0 ? (
+                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">
+                          No payments recorded in QuickBooks today
                         </td></tr>
                       ) : (
-                        incomingDeposits.slice(0, 5).map((p) => (
+                        customerPaymentsToday.slice(0, 8).map((p) => (
                           <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{p.cardName || "—"}</td>
-                            <td className="px-5 py-3 text-sm text-slate-600">{p.created?.slice(0, 10) || "—"}</td>
-                            <td className="px-5 py-3 text-right text-sm text-slate-500">{p.cardType} {p.cardLast4 ? `····${p.cardLast4}` : ""}</td>
-                            <td className="px-5 py-3 text-right text-sm font-semibold text-amber-700">
-                              ${money(p.amount)}
+                            <td className="px-5 py-3 text-sm font-medium text-slate-900">{p.customerName}</td>
+                            <td className="px-5 py-3 text-sm text-slate-600">{p.txnDate}</td>
+                            <td className="px-5 py-3 text-right text-sm font-semibold text-emerald-700">
+                              ${money(p.appliedAmount)}
                             </td>
                           </tr>
                         ))
@@ -651,7 +649,6 @@ export default function Dashboard() {
                   </table>
                 </div>
               </div>
-
               {/* Shopify Scheduled Deposits */}
               <div className="bg-white border border-slate-200 rounded-lg">
                 <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
