@@ -63,6 +63,9 @@ type MockPOLine = {
   quantity: number;
 };
 
+type BulkAdjustField = "fob_cost" | "zone5_shipping" | "list_price";
+type BulkAdjustOperation = "add" | "subtract";
+
 const money = (v: number | null) => {
   if (v === null || v === undefined) return "—";
   return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -237,6 +240,11 @@ export default function AdminPriceListPage() {
   const [mockPoBLines, setMockPoBLines] = useState<MockPOLine[]>([]);
   const [mockPoACostMode, setMockPoACostMode] = useState<"fob" | "delivered">("fob");
   const [mockPoBCostMode, setMockPoBCostMode] = useState<"fob" | "delivered">("fob");
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [bulkAdjustField, setBulkAdjustField] = useState<BulkAdjustField>("zone5_shipping");
+  const [bulkAdjustOperation, setBulkAdjustOperation] = useState<BulkAdjustOperation>("add");
+  const [bulkAdjustAmount, setBulkAdjustAmount] = useState<string>("");
+  const [isApplyingBulkAdjust, setIsApplyingBulkAdjust] = useState(false);
   const [newProduct, setNewProduct] = useState<Partial<PriceListItem>>({
     version_tag: "v1",
     item_no: "",
@@ -1038,6 +1046,75 @@ export default function AdminPriceListPage() {
     .sort((a, b) => (a.category.display_order ?? 0) - (b.category.display_order ?? 0))
     .map(({ category, items }) => ({ category, items }));
 
+  const visibleItemIds = itemsByCategory.flatMap(({ items: categoryItems }) => categoryItems.map((item) => item.id));
+  const selectedVisibleCount = visibleItemIds.filter((id) => selectedItemIds.has(id)).length;
+
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      const allVisibleSelected = visibleItemIds.length > 0 && visibleItemIds.every((id) => next.has(id));
+
+      if (allVisibleSelected) {
+        visibleItemIds.forEach((id) => next.delete(id));
+      } else {
+        visibleItemIds.forEach((id) => next.add(id));
+      }
+
+      return next;
+    });
+  };
+
+  const handleApplyBulkAdjust = async () => {
+    const amount = Number(bulkAdjustAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setStatus("Enter a valid amount greater than 0 for bulk adjust.");
+      return;
+    }
+
+    if (selectedItemIds.size === 0) {
+      setStatus("Select at least one item for bulk adjust.");
+      return;
+    }
+
+    setIsApplyingBulkAdjust(true);
+    setStatus(null);
+    try {
+      const res = await fetch("/api/price-list/bulk-adjust", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemIds: Array.from(selectedItemIds),
+          field: bulkAdjustField,
+          operation: bulkAdjustOperation,
+          amount,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Bulk adjust failed");
+      }
+
+      setStatus(`✓ Bulk update complete. Updated ${Number(data.updatedCount || 0)} item(s).`);
+      setSelectedItemIds(new Set());
+      setBulkAdjustAmount("");
+      await loadData();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Bulk adjust failed.");
+    } finally {
+      setIsApplyingBulkAdjust(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="flex min-h-screen">
@@ -1310,6 +1387,61 @@ export default function AdminPriceListPage() {
               </div>
             </header>
 
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bulk Price Adjust</p>
+                  <p className="text-xs text-slate-500">Select items below, then add/subtract a fixed amount.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleSelectAllVisible}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  {visibleItemIds.length > 0 && selectedVisibleCount === visibleItemIds.length ? "Unselect visible" : "Select visible"}
+                </button>
+                <span className="text-xs text-slate-600">{selectedItemIds.size} selected</span>
+
+                <select
+                  value={bulkAdjustField}
+                  onChange={(e) => setBulkAdjustField(e.target.value as BulkAdjustField)}
+                  className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
+                >
+                  <option value="zone5_shipping">Shipping</option>
+                  <option value="fob_cost">FOB Cost</option>
+                  <option value="list_price">List Price</option>
+                </select>
+
+                <select
+                  value={bulkAdjustOperation}
+                  onChange={(e) => setBulkAdjustOperation(e.target.value as BulkAdjustOperation)}
+                  className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
+                >
+                  <option value="add">Add</option>
+                  <option value="subtract">Subtract</option>
+                </select>
+
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={bulkAdjustAmount}
+                  onChange={(e) => setBulkAdjustAmount(e.target.value)}
+                  placeholder="Amount"
+                  className="w-28 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
+                />
+
+                <button
+                  type="button"
+                  onClick={handleApplyBulkAdjust}
+                  disabled={isApplyingBulkAdjust || selectedItemIds.size === 0}
+                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isApplyingBulkAdjust ? "Applying..." : "Apply Bulk Adjust"}
+                </button>
+              </div>
+            </div>
+
             {/* Status */}
             {status && (
               <div className={`rounded-lg px-4 py-3 text-sm ${status.includes("✓") ? "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200" : "bg-red-50 text-red-900 ring-1 ring-red-200"}`}>
@@ -1343,6 +1475,7 @@ export default function AdminPriceListPage() {
                       <table className="w-full divide-y divide-slate-100 text-xs border-collapse">
                         <thead className="bg-slate-50">
                           <tr>
+                            <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap">Select</th>
                             <th className="pl-2 pr-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
                             <th className="px-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap text-xs">Description</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
@@ -1369,6 +1502,14 @@ export default function AdminPriceListPage() {
                             return (
                             <React.Fragment key={item.id}>
                             <tr className={isEditing ? "bg-blue-50/70 border-l-4 border-l-blue-500" : "hover:bg-slate-50"}>
+                              <td className="px-1 py-1 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedItemIds.has(item.id)}
+                                  onChange={() => toggleItemSelection(item.id)}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                              </td>
                               {/* Item No (INPUT) */}
                               <td className="pl-2 pr-0.5 py-1 sticky left-0 bg-inherit z-10">
                                 {isEditing ? (
@@ -1637,7 +1778,7 @@ export default function AdminPriceListPage() {
                           );})}
                           {categoryItems.length === 0 && (
                             <tr>
-                              <td colSpan={17} className="px-6 py-4 text-center text-xs text-slate-600">
+                              <td colSpan={18} className="px-6 py-4 text-center text-xs text-slate-600">
                                 No items in this category
                               </td>
                             </tr>
@@ -1712,6 +1853,17 @@ export default function AdminPriceListPage() {
                         
                         return (
                           <div key={item.id} className={`p-3 ${isEditing ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}`}>
+                            <div className="mb-2 flex items-center justify-between">
+                              <label className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedItemIds.has(item.id)}
+                                  onChange={() => toggleItemSelection(item.id)}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                Select item
+                              </label>
+                            </div>
                             {/* Item No only (no description on mobile) */}
                             <div className="mb-2">
                               {isEditing ? (
