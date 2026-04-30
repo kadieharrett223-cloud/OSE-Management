@@ -333,6 +333,36 @@ export async function authorizedQboFetch<T>(path: string, init: RequestInit = {}
   });
 }
 
+/**
+ * Like authorizedQboFetch but bypasses the rate-limit queue — safe to call in
+ * parallel when you need multiple results at once (e.g., dashboard summary).
+ * QBO allows ~500 req/min, so a handful of parallel calls is fine.
+ */
+export async function authorizedQboFetchDirect<T>(
+  path: string,
+  init: RequestInit = {},
+  userId?: string
+): Promise<T> {
+  const { accessToken, realmId } = await ensureAccessToken(userId);
+  const url = `${QBO_API_BASE}/v3/company/${realmId}${path}`;
+  const headers = new Headers(init.headers || {});
+  headers.set("Authorization", `Bearer ${accessToken}`);
+  headers.set("Accept", "application/json");
+  if (init.body) headers.set("Content-Type", "application/json");
+
+  for (let attempt = 0; attempt <= QBO_MAX_RETRIES; attempt++) {
+    const res = await fetch(url, { ...init, headers });
+    if (res.ok) return (await res.json()) as T;
+    if (res.status === 429 && attempt < QBO_MAX_RETRIES) {
+      await sleep(QBO_RETRY_BASE_MS * Math.pow(2, attempt));
+      continue;
+    }
+    const text = await res.text();
+    throw new QboApiError({ status: res.status, statusText: res.statusText, url, body: text });
+  }
+  throw new QboApiError({ status: 429, statusText: "Too Many Requests", url: `${QBO_API_BASE}${path}`, body: "Retries exhausted" });
+}
+
 export async function authorizedQboFetchRaw(path: string, init: RequestInit = {}, userId?: string) {
   const { accessToken, realmId } = await ensureAccessToken(userId);
   const headers = new Headers(init.headers || {});
