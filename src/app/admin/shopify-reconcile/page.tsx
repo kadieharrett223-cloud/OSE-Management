@@ -554,7 +554,7 @@ export default function ShopifyReconcilePage() {
         body: JSON.stringify({
           shopify_order_id: orderId,
           send_invoice: true,
-          send_to_email: "mindy@olympic-equipment.com",
+          send_to_email: "mindy@olympic-equipment.com, kadie@olympic-equipment.com",
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -590,7 +590,7 @@ export default function ShopifyReconcilePage() {
       if (data?.sendWarning) {
         throw new Error(`Resend failed: ${data.sendWarning}`);
       }
-      setActionSuccess(`Invoice ${qboInvoiceId} sent to mindy@olympic-equipment.com`);
+      setActionSuccess(`Invoice ${qboInvoiceId} sent to mindy@olympic-equipment.com, kadie@olympic-equipment.com`);
     } catch (err: any) {
       setActionError(err?.message || "Failed to resend invoice");
     } finally {
@@ -694,7 +694,7 @@ export default function ShopifyReconcilePage() {
               </div>
               <div className="min-w-[260px] rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5">
                 <p className="text-[11px] font-medium text-slate-500">Invoice Send To</p>
-                <p className="text-sm font-semibold text-slate-700">mindy@olympic-equipment.com</p>
+                <p className="text-sm font-semibold text-slate-700">mindy@olympic-equipment.com, kadie@olympic-equipment.com</p>
               </div>
               <button
                 onClick={load}

@@ -5,7 +5,8 @@ import { getShopifyTokens } from "@/lib/shopify";
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 const SHOPIFY_API_VERSION = "2024-01";
-const FORCED_INVOICE_SEND_TO_EMAIL = "mindy@olympic-equipment.com";
+const FORCED_INVOICE_SEND_TO_EMAILS = ["mindy@olympic-equipment.com", "kadie@olympic-equipment.com"];
+const FORCED_INVOICE_SEND_TO_EMAIL = FORCED_INVOICE_SEND_TO_EMAILS.join(", ");
 
 type JsonMap = Record<string, string>;
 

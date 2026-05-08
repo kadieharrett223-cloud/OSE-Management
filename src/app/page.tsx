@@ -348,7 +348,9 @@ export default function Dashboard() {
         const data = await res.json();
         if (!isMounted || !data.ok) return;
 
-        setSalesTodayTotal(data.salesToday ?? 0);
+        // Use the combined total (Payment records + fully-paid invoices dated today)
+        // so this card matches what "Customer Payments Today" shows.
+        setSalesTodayTotal(data.paymentsTotal ?? data.salesToday ?? 0);
         setSalesWeekTotal(data.salesWeek ?? 0);
         setMonthlyTotal(data.salesMonth ?? 0);
         setLastMonthTotal(data.salesLastMonth ?? 0);

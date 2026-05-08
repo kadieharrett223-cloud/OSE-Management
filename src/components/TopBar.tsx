@@ -12,14 +12,6 @@ export function TopBar() {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
 
-  const getLocalDateYmd = () => {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
   const pages = [
     { label: "Dashboard", href: "/" },
     { label: "Expenses", href: "/expenses" },
@@ -69,18 +61,16 @@ export function TopBar() {
 
     const fetchPaymentsToday = async () => {
       try {
-        const today = getLocalDateYmd();
-        const paymentRes = await fetch(
-          `/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`
-        );
+        const paymentRes = await fetch(`/api/qbo/today-total?_=${Date.now()}`);
 
         if (!paymentRes.ok) {
           throw new Error("Failed to fetch payments");
         }
 
         const paymentData = await paymentRes.json();
-        const totalApplied = Number(paymentData?.totalApplied || 0);
-        if (isMounted) setPaymentsTodayTotal(totalApplied);
+        // Uses combined total: Payment records + fully-paid invoices dated today
+        const total = Number(paymentData?.total || 0);
+        if (isMounted) setPaymentsTodayTotal(total);
       } catch (error) {
         // Keep previous value on error
       } finally {

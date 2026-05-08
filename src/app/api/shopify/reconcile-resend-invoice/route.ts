@@ -3,7 +3,8 @@ import { getSession } from "@/lib/auth";
 import { authorizedQboFetch, authorizedQboFetchRaw } from "@/lib/qbo";
 import nodemailer from "nodemailer";
 
-const FORCED_INVOICE_SEND_TO_EMAIL = "mindy@olympic-equipment.com";
+const FORCED_INVOICE_SEND_TO_EMAILS = ["mindy@olympic-equipment.com", "kadie@olympic-equipment.com"];
+const FORCED_INVOICE_SEND_TO_EMAIL = FORCED_INVOICE_SEND_TO_EMAILS.join(", ");
 
 async function requireAdmin() {
   const session: any = await getSession();
