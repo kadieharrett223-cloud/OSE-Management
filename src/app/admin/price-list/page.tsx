@@ -219,8 +219,8 @@ export default function AdminPriceListPage() {
   const [editingItem, setEditingItem] = useState<PriceListItem | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [discountPercentage, setDiscountPercentage] = useState<number>(20); // Default 20% off list
-  const [globalTariffPercent, setGlobalTariffPercent] = useState<number>(50);
-  const [globalTariffInput, setGlobalTariffInput] = useState<string>("50");
+  const [globalTariffPercent, setGlobalTariffPercent] = useState<number>(100);
+  const [globalTariffInput, setGlobalTariffInput] = useState<string>("100");
   const [isSavingTariff, setIsSavingTariff] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
@@ -304,7 +304,7 @@ export default function AdminPriceListPage() {
       const settingsRes = await fetch("/api/pricing/settings");
       if (settingsRes.ok) {
         const settingsPayload = await settingsRes.json();
-        const tariff = Number(settingsPayload?.settings?.global_tariff_percent ?? 50);
+        const tariff = Number(settingsPayload?.settings?.global_tariff_percent ?? 100);
         setGlobalTariffPercent(tariff);
         setGlobalTariffInput(String(tariff));
       }
@@ -1150,7 +1150,7 @@ export default function AdminPriceListPage() {
                       <h3 className="font-semibold text-blue-900">Price List Guide</h3>
                       <div className="mt-3 text-sm text-blue-800 space-y-2">
                         <p><span className="font-semibold">Manual inputs:</span> FOB cost, quantity (container capacity), shipping, markup %, optional list price.</p>
-                        <p><span className="font-semibold">Constants:</span> Tariff rate = {globalTariffPercent}% (currently 50%), Ocean freight = 3000 per container, Importing = 2100 per container.</p>
+                        <p><span className="font-semibold">Constants:</span> Tariff rate = {globalTariffPercent}%, Ocean freight = 3000 per container, Importing = 2100 per container.</p>
                         <div className="rounded-xl bg-white/80 p-4 ring-1 ring-blue-200/70 text-xs text-blue-900 space-y-1">
                           <div>Tariff = FOB × (1 + Tariff%/100)</div>
                           <div>Ocean per unit = 3000 ÷ Quantity</div>
@@ -1232,7 +1232,7 @@ export default function AdminPriceListPage() {
                   </div>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">
-                  Tariff input supports <strong>50</strong> (percent) or <strong>1.5</strong> (1.5x multiplier).
+                  Tariff input supports <strong>25</strong> (percent) or <strong>1.25</strong> (1.25x multiplier).
                 </p>
 
                 <div className="mt-4">
