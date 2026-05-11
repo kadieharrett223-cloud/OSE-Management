@@ -5,7 +5,7 @@ export type PricingInput = {
   fobCost: number;
   quantity: number; // Container capacity
   shipping: number; // Zone 5 shipping
-  margin: number; // Margin % as decimal (e.g., 0.2296 for 22.96%)
+  margin: number; // Markup % as decimal (e.g., 0.2296 for 22.96%)
   listPrice?: number; // Optional manual list price
   discount?: number; // % off list price (default 20)
   tariffExempt?: boolean; // If true, skip tariff, ocean, and importing calculations
@@ -108,8 +108,8 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
 
   const finalCost = costNoShipping + base.shipping;
   
-  // Sell price based on margin: Sell = Final / (1 - Margin)
-  const sellPrice = base.margin < 1 ? finalCost / (1 - base.margin) : finalCost;
+  // Sell price based on markup: Sell = Final × (1 + Markup)
+  const sellPrice = finalCost * (1 + base.margin);
   const profit = sellPrice - finalCost;
   
   // List price: sell ÷ 0.80 (20% off list)

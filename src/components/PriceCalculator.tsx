@@ -69,8 +69,8 @@ export function PriceCalculator({
         };
       }
 
-      // Sell = Final / (1 - Margin)
-      const sellPrice = finalCost / (1 - marginDecimal);
+      // Sell = Final × (1 + Markup)
+      const sellPrice = finalCost * (1 + marginDecimal);
       const listPrice = sellPrice / 0.8;
       const profit = sellPrice - finalCost;
 
@@ -94,8 +94,8 @@ export function PriceCalculator({
         };
       }
 
-      // Margin = (Sell - Final) / Sell
-      const margin = (sellPrice - finalCost) / sellPrice;
+      // Markup = (Sell - Final) / Final
+      const margin = (sellPrice - finalCost) / finalCost;
       if (margin >= 0.95) {
         return {
           sellPrice: null,

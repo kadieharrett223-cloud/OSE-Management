@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function TopBar() {
   const [qboStatus, setQboStatus] = useState<"checking" | "ok" | "error">("checking");
@@ -8,6 +8,7 @@ export function TopBar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [paymentsTodayTotal, setPaymentsTodayTotal] = useState(0);
   const [loadingPaymentsToday, setLoadingPaymentsToday] = useState(true);
+  const prevPaymentsTotalRef = useRef<number | null>(null);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
@@ -27,6 +28,13 @@ export function TopBar() {
   const filteredPages = normalizedQuery
     ? pages.filter((page) => page.label.toLowerCase().includes(normalizedQuery))
     : [];
+
+  // Request browser notification permission once on mount
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -70,7 +78,25 @@ export function TopBar() {
         const paymentData = await paymentRes.json();
         // Uses combined total: Payment records + fully-paid invoices dated today
         const total = Number(paymentData?.total || 0);
-        if (isMounted) setPaymentsTodayTotal(total);
+        if (isMounted) {
+          // Fire OS notification when total increases (new payment detected)
+          if (
+            prevPaymentsTotalRef.current !== null &&
+            total > prevPaymentsTotalRef.current &&
+            typeof window !== "undefined" &&
+            "Notification" in window &&
+            Notification.permission === "granted"
+          ) {
+            const added = total - prevPaymentsTotalRef.current;
+            const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format;
+            new Notification("Payment Received", {
+              body: `+${fmt(added)} recorded — today's total is now ${fmt(total)}`,
+              icon: "/favicon.ico",
+            });
+          }
+          prevPaymentsTotalRef.current = total;
+          setPaymentsTodayTotal(total);
+        }
       } catch (error) {
         // Keep previous value on error
       } finally {

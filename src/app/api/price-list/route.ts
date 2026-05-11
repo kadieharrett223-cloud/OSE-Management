@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
 
       const perUnit = (isTariffExempt ? fobCost : tariff) + oceanPerUnit + importingPerUnit;
       const costWithShipping = perUnit + zone5Shipping;
-      const sellPrice = margin > 0 && margin < 1 ? costWithShipping / (1 - margin) : Number(item?.sell_price || costWithShipping);
+      const sellPrice = costWithShipping * (1 + margin);
       const listPrice = Number(item?.list_price || sellPrice / 0.8 || 0);
 
       return {

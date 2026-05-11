@@ -443,8 +443,8 @@ export default function AdminPriceListPage() {
     // 3) Final cost with shipping: Per unit + Zone 5
     const cost_with_shipping = per_unit + zone5_shipping;
 
-    // 4) Sell price: Final / (1 - Margin)
-    const sell_price = margin > 0 && margin < 1 ? cost_with_shipping / (1 - margin) : cost_with_shipping;
+    // 4) Sell price: Final × (1 + Markup)
+    const sell_price = cost_with_shipping * (1 + margin);
 
     // 5) List price: Sell price / 0.80 (20% off list = sell price)
     const list_price = sell_price / 0.8;

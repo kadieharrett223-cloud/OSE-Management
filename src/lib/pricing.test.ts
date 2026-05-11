@@ -30,17 +30,17 @@ describe("pricing calculations", () => {
     // finalCost = costNoShipping + shipping
     expect(result.finalCost).toBe(281);
     
-    // sellPrice = finalCost / (1 - margin)
-    expect(result.sellPrice).toBeCloseTo(374.6666667);
+    // sellPrice = finalCost × (1 + margin)
+    expect(result.sellPrice).toBeCloseTo(351.25);
     
     // profit = sellPrice - finalCost
-    expect(result.profit).toBeCloseTo(93.6666667);
+    expect(result.profit).toBeCloseTo(70.25);
     
     // calculated list price = sellPrice ÷ 0.80
-    expect(result.calculatedListPrice).toBeCloseTo(468.3333333);
+    expect(result.calculatedListPrice).toBeCloseTo(439.0625);
     
     // discounted price = appliedListPrice × (1 - discountPercent / 100)
-    expect(result.discountedPrice).toBeCloseTo(374.6666667);
+    expect(result.discountedPrice).toBeCloseTo(351.25);
   });
 
   it("allows manual list price override", () => {

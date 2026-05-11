@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
           }
 
           const finalCost = computeFinalCostForTariffChange(row, parsedTariff);
-          const nextMargin = clampMargin(1 - finalCost / existingSell);
+          const nextMargin = clampMargin(existingSell / finalCost - 1);
 
           const { error: updateRowError } = await supabase
             .from("price_list_items")
