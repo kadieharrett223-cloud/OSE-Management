@@ -385,6 +385,7 @@ export default function AdminPriceListPage() {
           importing: editingItem.importing,
           zone5_shipping: editingItem.zone5_shipping,
           margin: editingItem.margin,
+          weight_lbs: editingItem.weight_lbs,
           manual_pricing_override: editingItem.manual_pricing_override,
           tariff_exempt: editingItem.tariff_exempt,
         })
@@ -1711,7 +1712,7 @@ export default function AdminPriceListPage() {
                                   <input
                                     type="number"
                                     step="0.01"
-                                    value={editingItem?.weight_lbs || ""}
+                                    value={editingItem?.weight_lbs ?? ""}
                                     onChange={(e) => updateEditingItem("weight_lbs", e.target.value === "" ? null : Number(e.target.value))}
                                     className="w-24 rounded border border-orange-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
                                     placeholder="—"

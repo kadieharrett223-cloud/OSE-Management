@@ -5,7 +5,7 @@ import { getToken } from "next-auth/jwt";
 const SIGN_IN_PATH = "/auth/signin";
 const AUTH_SECRET = process.env.NEXTAUTH_SECRET || "development-secret-do-not-use-in-production";
 const ACCESS_COOKIE = "app_access_expires";
-const PUBLIC_VIEW_ENABLED = (process.env.APP_PUBLIC_VIEW ?? "true").toLowerCase() === "true";
+const PUBLIC_VIEW_ENABLED = (process.env.APP_PUBLIC_VIEW ?? "false").toLowerCase() === "true";
 
 function hasSharedAccess(req: NextRequest) {
   const raw = req.cookies.get(ACCESS_COOKIE)?.value;
