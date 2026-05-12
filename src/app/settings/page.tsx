@@ -106,6 +106,36 @@ export default function SettingsPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const syncTariffSetting = async () => {
+      try {
+        const pricingRes = await fetch('/api/pricing/settings', { cache: 'no-store' });
+        if (!pricingRes.ok) return;
+        const pricingData = await pricingRes.json();
+        const tariff = Number(pricingData?.settings?.global_tariff_percent ?? 100);
+        if (!Number.isFinite(tariff)) return;
+        if (!savingTariff) {
+          setGlobalTariffPercent(String(tariff));
+        }
+      } catch {
+        // Keep local value on transient sync errors.
+      }
+    };
+
+    const interval = setInterval(syncTariffSetting, 15000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        syncTariffSetting();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [savingTariff]);
+
   const handleDisconnectQbo = async () => {
     if (!confirm('Disconnect QuickBooks? You\'ll need to reconnect to access QB data.')) return;
     try {

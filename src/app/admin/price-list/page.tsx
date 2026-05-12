@@ -288,6 +288,37 @@ export default function AdminPriceListPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const syncTariffSetting = async () => {
+      try {
+        const settingsRes = await fetch("/api/pricing/settings", { cache: "no-store" });
+        if (!settingsRes.ok) return;
+        const settingsPayload = await settingsRes.json();
+        const tariff = Number(settingsPayload?.settings?.global_tariff_percent ?? 100);
+        if (!Number.isFinite(tariff)) return;
+        setGlobalTariffPercent((prev) => (prev === tariff ? prev : tariff));
+        if (!isSavingTariff) {
+          setGlobalTariffInput(String(tariff));
+        }
+      } catch {
+        // Keep current values on transient sync errors.
+      }
+    };
+
+    const interval = setInterval(syncTariffSetting, 15000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        syncTariffSetting();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [isSavingTariff]);
+
   // Recompute items when discount percentage or global tariff changes
   useEffect(() => {
     if (items.length > 0) {
