@@ -13,16 +13,19 @@ function computeFinalCostForTariffChange(row: any, tariffPercent: number) {
   const fobCost = Number(row?.fob_cost ?? 0);
   const quantity = Number(row?.quantity ?? 0);
   const zone5Shipping = Number(row?.zone5_shipping ?? 0);
+  const indirectLabor = Number(row?.indirect_labor ?? 0);
+  const directLabor = Number(row?.direct_labor ?? 0);
+  const overheadCost = Number(row?.overhead_cost ?? 0);
 
   if (tariffExempt) {
-    return fobCost + zone5Shipping;
+    return fobCost + zone5Shipping + indirectLabor + directLabor + overheadCost;
   }
 
   const tariff = fobCost * (1 + tariffPercent / 100);
   const ocean = quantity > 0 ? 3000 / quantity : Number(row?.ocean_frt ?? 0);
   const importing = quantity > 0 ? 2100 / quantity : Number(row?.importing ?? 0);
 
-  return tariff + ocean + importing + zone5Shipping;
+  return tariff + ocean + importing + zone5Shipping + indirectLabor + directLabor + overheadCost;
 }
 
 function clampMargin(margin: number) {
@@ -109,7 +112,7 @@ export async function POST(req: NextRequest) {
       while (true) {
         const { data: rows, error: rowsError } = await supabase
           .from("price_list_items")
-          .select("id,supplier,tariff_exempt,fob_cost,quantity,ocean_frt,importing,zone5_shipping,sell_price")
+          .select("id,supplier,tariff_exempt,fob_cost,quantity,ocean_frt,importing,indirect_labor,direct_labor,overhead_cost,zone5_shipping,sell_price")
           .or("manual_pricing_override.is.null,manual_pricing_override.eq.false")
           .range(from, from + batchSize - 1);
 

@@ -23,6 +23,9 @@ type PriceListItem = {
   quantity: number | null;
   ocean_frt: number | null;
   importing: number | null;
+  indirect_labor: number | null;
+  direct_labor: number | null;
+  overhead_cost: number | null;
   zone5_shipping: number | null;
   margin: number | null; // Margin as decimal (e.g., 0.2296 for 22.96%)
   manual_pricing_override: boolean; // Allow manual control of pricing calculations
@@ -186,7 +189,7 @@ async function bufferFromFile(file: File): Promise<ArrayBuffer> {
 
 type PrintColKey =
   | "item_no" | "description" | "supplier" | "fob_cost" | "quantity"
-  | "tariff_105" | "ocean_frt" | "importing" | "zone5_shipping"
+  | "tariff_105" | "ocean_frt" | "importing" | "indirect_labor" | "direct_labor" | "overhead_cost" | "zone5_shipping"
   | "cost_with_shipping" | "margin" | "sell_price" | "list_price"
   | "profit" | "weight_lbs";
 
@@ -199,6 +202,9 @@ const ALL_PRINT_COLUMNS: { key: PrintColKey; label: string; num: boolean }[] = [
   { key: "tariff_105",       label: "Tariff",        num: true  },
   { key: "ocean_frt",        label: "Ocean/Unit",    num: true  },
   { key: "importing",        label: "Import/Unit",   num: true  },
+  { key: "indirect_labor",   label: "Indirect",      num: true  },
+  { key: "direct_labor",     label: "Direct",        num: true  },
+  { key: "overhead_cost",    label: "Overhead",      num: true  },
   { key: "zone5_shipping",   label: "Shipping",      num: true  },
   { key: "cost_with_shipping",label: "Cost+Ship",    num: true  },
   { key: "margin",           label: "Margin",        num: true  },
@@ -255,6 +261,9 @@ export default function AdminPriceListPage() {
     quantity: null,
     ocean_frt: null,
     importing: null,
+    indirect_labor: null,
+    direct_labor: null,
+    overhead_cost: null,
     zone5_shipping: null,
     margin: 0,
     tariff_exempt: false,
@@ -414,6 +423,9 @@ export default function AdminPriceListPage() {
           tariff_105: editingItem.tariff_105,
           ocean_frt: editingItem.ocean_frt,
           importing: editingItem.importing,
+          indirect_labor: editingItem.indirect_labor,
+          direct_labor: editingItem.direct_labor,
+          overhead_cost: editingItem.overhead_cost,
           zone5_shipping: editingItem.zone5_shipping,
           margin: editingItem.margin,
           weight_lbs: editingItem.weight_lbs,
@@ -440,6 +452,9 @@ export default function AdminPriceListPage() {
     const fob_cost = item.fob_cost || 0;
     const quantity = item.quantity || 0;
     const zone5_shipping = item.zone5_shipping || 0;
+    const indirect_labor = item.indirect_labor || 0;
+    const direct_labor = item.direct_labor || 0;
+    const overhead_cost = item.overhead_cost || 0;
     const margin = item.margin || 0;
     const tariffMultiplier = 1 + globalTariffPercent / 100;
     const isTariffExempt = item.tariff_exempt === true;
@@ -473,7 +488,7 @@ export default function AdminPriceListPage() {
     const per_unit = (isTariffExempt ? fob_cost : tariff_105) + ocean_per_unit + importing_per_unit;
 
     // 3) Final cost with shipping: Per unit + Zone 5
-    const cost_with_shipping = per_unit + zone5_shipping;
+    const cost_with_shipping = per_unit + zone5_shipping + indirect_labor + direct_labor + overhead_cost;
 
     // 4) Sell price: Final × (1 + Markup)
     const sell_price = cost_with_shipping * (1 + margin);
@@ -499,6 +514,9 @@ export default function AdminPriceListPage() {
       tariff_105,
       ocean_frt: ocean_per_unit,
       importing: importing_per_unit,
+      indirect_labor,
+      direct_labor,
+      overhead_cost,
       ocean_per_unit,
       importing_per_unit,
       per_unit,
@@ -651,6 +669,9 @@ export default function AdminPriceListPage() {
           quantity: newProduct.quantity,
           ocean_frt: newProduct.quantity ? null : newProduct.ocean_frt,
           importing: newProduct.quantity ? null : newProduct.importing,
+          indirect_labor: newProduct.indirect_labor,
+          direct_labor: newProduct.direct_labor,
+          overhead_cost: newProduct.overhead_cost,
           zone5_shipping: newProduct.zone5_shipping,
           margin: newProduct.margin || 0,
           tariff_exempt: newProduct.tariff_exempt || false,
@@ -672,6 +693,9 @@ export default function AdminPriceListPage() {
         quantity: null,
         ocean_frt: null,
         importing: null,
+        indirect_labor: null,
+        direct_labor: null,
+        overhead_cost: null,
         zone5_shipping: null,
         margin: 0,
         tariff_exempt: false,
@@ -791,6 +815,12 @@ export default function AdminPriceListPage() {
           return `<td class="num">$${fmt(item.ocean_frt)}</td>`;
         case "importing":
           return `<td class="num">$${fmt(item.importing)}</td>`;
+        case "indirect_labor":
+          return `<td class="num">$${fmt(item.indirect_labor)}</td>`;
+        case "direct_labor":
+          return `<td class="num">$${fmt(item.direct_labor)}</td>`;
+        case "overhead_cost":
+          return `<td class="num">$${fmt(item.overhead_cost)}</td>`;
         case "zone5_shipping":
           return `<td class="num">$${fmt(item.zone5_shipping)}</td>`;
         case "cost_with_shipping":
@@ -917,7 +947,7 @@ export default function AdminPriceListPage() {
     const headers = [
       "Category","Item No","Description","Supplier",
       "FOB Cost","Qty","Tariff","Ocean/Unit","Import/Unit",
-      "Zone5 Shipping","Cost+Ship","Margin %","Sell Price",
+      "Indirect Labor","Direct Labor","Overhead Cost","Zone5 Shipping","Cost+Ship","Margin %","Sell Price",
       "List Price","Profit","Weight (lbs)",
     ];
 
@@ -935,6 +965,9 @@ export default function AdminPriceListPage() {
           fmt(item.tariff_105),
           fmt(item.ocean_frt),
           fmt(item.importing),
+          fmt(item.indirect_labor),
+          fmt(item.direct_labor),
+          fmt(item.overhead_cost),
           fmt(item.zone5_shipping),
           fmt(item.cost_with_shipping),
           item.margin != null ? (item.margin * 100).toFixed(2) : "",
@@ -1516,6 +1549,9 @@ export default function AdminPriceListPage() {
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff</th>
                             <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean</th>
                             <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Import</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Indirect</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Direct</th>
+                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Overhead</th>
                             <th className="px-1 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Shipping</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost+Ship</th>
                             <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin</th>
@@ -1689,6 +1725,49 @@ export default function AdminPriceListPage() {
                                   <input
                                     type="number"
                                     step="0.01"
+                                    value={displayItem.indirect_labor !== null && displayItem.indirect_labor !== undefined ? displayItem.indirect_labor : ""}
+                                    onChange={(e) => updateEditingItem("indirect_labor", e.target.value === "" ? null : Number(e.target.value))}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                  />
+                                ) : (
+                                  <span className="text-blue-900">${money(item.indirect_labor)}</span>
+                                )}
+                              </td>
+
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={displayItem.direct_labor !== null && displayItem.direct_labor !== undefined ? displayItem.direct_labor : ""}
+                                    onChange={(e) => updateEditingItem("direct_labor", e.target.value === "" ? null : Number(e.target.value))}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                  />
+                                ) : (
+                                  <span className="text-blue-900">${money(item.direct_labor)}</span>
+                                )}
+                              </td>
+
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={displayItem.overhead_cost !== null && displayItem.overhead_cost !== undefined ? displayItem.overhead_cost : ""}
+                                    onChange={(e) => updateEditingItem("overhead_cost", e.target.value === "" ? null : Number(e.target.value))}
+                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                  />
+                                ) : (
+                                  <span className="text-blue-900">${money(item.overhead_cost)}</span>
+                                )}
+                              </td>
+
+                              {/* Zone 5 Shipping (INPUT) - labeled as "Price Delivered" for tariff exempt */}
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    step="0.01"
                                     value={displayItem.zone5_shipping !== null && displayItem.zone5_shipping !== undefined ? displayItem.zone5_shipping : ""}
                                     onChange={(e) => updateEditingItem("zone5_shipping", e.target.value === "" ? null : Number(e.target.value))}
                                     className="w-full rounded border border-amber-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
@@ -1810,7 +1889,7 @@ export default function AdminPriceListPage() {
                           );})}
                           {categoryItems.length === 0 && (
                             <tr>
-                              <td colSpan={18} className="px-6 py-4 text-center text-xs text-slate-600">
+                              <td colSpan={20} className="px-6 py-4 text-center text-xs text-slate-600">
                                 No items in this category
                               </td>
                             </tr>
@@ -2108,6 +2187,42 @@ export default function AdminPriceListPage() {
                     onChange={(e) => setNewProduct({ ...newProduct, zone5_shipping: e.target.value ? Number(e.target.value) : null })}
                     placeholder="0.00"
                     className="w-full rounded-lg border border-amber-400 px-3 py-2 text-sm text-slate-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-blue-700 mb-1">Indirect Labor</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newProduct.indirect_labor ?? ""}
+                    onChange={(e) => setNewProduct({ ...newProduct, indirect_labor: e.target.value ? Number(e.target.value) : null })}
+                    placeholder="0.00"
+                    className="w-full rounded-lg border border-blue-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-blue-700 mb-1">Direct Labor</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newProduct.direct_labor ?? ""}
+                    onChange={(e) => setNewProduct({ ...newProduct, direct_labor: e.target.value ? Number(e.target.value) : null })}
+                    placeholder="0.00"
+                    className="w-full rounded-lg border border-blue-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-blue-700 mb-1">Overhead Cost</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newProduct.overhead_cost ?? ""}
+                    onChange={(e) => setNewProduct({ ...newProduct, overhead_cost: e.target.value ? Number(e.target.value) : null })}
+                    placeholder="0.00"
+                    className="w-full rounded-lg border border-blue-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                   />
                 </div>
 

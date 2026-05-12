@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabase
       .from("price_list_items")
-      .select("id, item_no, description, list_price, sell_price, per_unit, cost_with_shipping, zone5_shipping, shipping_included_per_unit, weight_lbs, fob_cost, quantity, tariff_105, ocean_frt, importing, manual_pricing_override, tariff_exempt, margin, shopify_variant_id, category_id, price_list_categories(category_name)")
+      .select("id, item_no, description, list_price, sell_price, per_unit, cost_with_shipping, zone5_shipping, shipping_included_per_unit, weight_lbs, fob_cost, quantity, tariff_105, ocean_frt, importing, indirect_labor, direct_labor, overhead_cost, manual_pricing_override, tariff_exempt, margin, shopify_variant_id, category_id, price_list_categories(category_name)")
       .eq("is_active", true);
 
     if (error) throw error;
@@ -34,6 +34,9 @@ export async function GET(req: NextRequest) {
       const fobCost = Number(item?.fob_cost || 0);
       const quantity = Number(item?.quantity || 0);
       const zone5Shipping = Number(item?.zone5_shipping || 0);
+      const indirectLabor = Number(item?.indirect_labor || 0);
+      const directLabor = Number(item?.direct_labor || 0);
+      const overheadCost = Number(item?.overhead_cost || 0);
       const margin = Number(item?.margin || 0);
       const tariffMultiplier = 1 + globalTariffPercent / 100;
       const isTariffExempt = item?.tariff_exempt === true;
@@ -58,7 +61,7 @@ export async function GET(req: NextRequest) {
       }
 
       const perUnit = (isTariffExempt ? fobCost : tariff) + oceanPerUnit + importingPerUnit;
-      const costWithShipping = perUnit + zone5Shipping;
+      const costWithShipping = perUnit + zone5Shipping + indirectLabor + directLabor + overheadCost;
       const sellPrice = costWithShipping * (1 + margin);
       const listPrice = Number(item?.list_price || sellPrice / 0.8 || 0);
 
@@ -88,6 +91,9 @@ export async function GET(req: NextRequest) {
         per_unit: Number(derived.perUnit || 0),
         cost_with_shipping: Number(derived.costWithShipping || 0),
         zone5_shipping: Number(item.zone5_shipping || 0),
+        indirect_labor: Number(item.indirect_labor || 0),
+        direct_labor: Number(item.direct_labor || 0),
+        overhead_cost: Number(item.overhead_cost || 0),
         weight_lbs: item.weight_lbs ? Number(item.weight_lbs) : null,
         fob_cost: item.fob_cost ? Number(item.fob_cost) : null,
         quantity: item.quantity ? Number(item.quantity) : null,

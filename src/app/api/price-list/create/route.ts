@@ -22,6 +22,9 @@ export async function POST(req: Request) {
       quantity: Number.isFinite(body.quantity) ? Number(body.quantity) : null,
       ocean_frt: Number.isFinite(body.ocean_frt) ? Number(body.ocean_frt) : null,
       importing: Number.isFinite(body.importing) ? Number(body.importing) : null,
+      indirect_labor: Number.isFinite(body.indirect_labor) ? Number(body.indirect_labor) : null,
+      direct_labor: Number.isFinite(body.direct_labor) ? Number(body.direct_labor) : null,
+      overhead_cost: Number.isFinite(body.overhead_cost) ? Number(body.overhead_cost) : null,
       zone5_shipping: Number.isFinite(body.zone5_shipping) ? Number(body.zone5_shipping) : null,
       multiplier: Number.isFinite(body.multiplier) ? Number(body.multiplier) : 1,
       weight_lbs: Number.isFinite(body.weight_lbs) ? Number(body.weight_lbs) : null,
@@ -30,7 +33,7 @@ export async function POST(req: Request) {
     const { data, error } = await supabase
       .from("price_list_items")
       .insert(payload)
-      .select("id, item_no, description, list_price, shipping_included_per_unit, weight_lbs, fob_cost, shopify_variant_id")
+      .select("id, item_no, description, list_price, shipping_included_per_unit, weight_lbs, fob_cost, indirect_labor, direct_labor, overhead_cost, shopify_variant_id")
       .single();
 
     if (error) {
@@ -46,6 +49,9 @@ export async function POST(req: Request) {
       shippingIncludedPerUnit: Number(data.shipping_included_per_unit || 0),
       weight_lbs: data.weight_lbs ? Number(data.weight_lbs) : null,
       fob_cost: data.fob_cost ? Number(data.fob_cost) : null,
+      indirect_labor: data.indirect_labor ? Number(data.indirect_labor) : null,
+      direct_labor: data.direct_labor ? Number(data.direct_labor) : null,
+      overhead_cost: data.overhead_cost ? Number(data.overhead_cost) : null,
       shopify_variant_id: data.shopify_variant_id || null,
     };
 
