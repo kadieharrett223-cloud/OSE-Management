@@ -272,13 +272,16 @@ export default function PurchasingPage() {
       });
       if (!res.ok) {
         console.error("Price list fetch failed with status:", res.status);
+        setPriceList([]);
         return;
       }
-      const data = await res.json();
+      const payload = await res.json();
+      const data = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
       console.log("Price list fetched:", data);
-      setPriceList(data || []);
+      setPriceList(data);
     } catch (error) {
       console.error("Failed to fetch price list:", error);
+      setPriceList([]);
     }
   }
 
@@ -787,9 +790,15 @@ export default function PurchasingPage() {
 
     // Fallback to fresh fetch; apply only if the user still has same SKU typed.
     fetch("/api/price-list?_=" + Date.now(), { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => {
-        const freshItem = data.find((p: any) => normalizeSku(getItemSku(p)) === normalizedSku);
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`Price list refresh failed with status ${res.status}`);
+        }
+        const payload = await res.json();
+        return Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
+      })
+      .then((items) => {
+        const freshItem = items.find((p: any) => normalizeSku(getItemSku(p)) === normalizedSku);
         if (!freshItem) return;
 
         setFormData((prev) => {
