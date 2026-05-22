@@ -18,24 +18,28 @@ export async function GET(req: NextRequest) {
 
     const primarySelect = "id, item_no, description, list_price, sell_price, per_unit, cost_with_shipping, zone5_shipping, shipping_included_per_unit, weight_lbs, fob_cost, quantity, tariff_105, ocean_frt, importing, indirect_labor, direct_labor, overhead_cost, manual_pricing_override, tariff_exempt, margin, shopify_variant_id, category_id, price_list_categories(category_name)";
 
-    let queryResult = await supabase
+    const primaryResult = await supabase
       .from("price_list_items")
       .select(primarySelect)
       .eq("is_active", true);
 
+    let data: any[] = primaryResult.data || [];
+    let queryError: any = primaryResult.error;
+
     // Some environments can be missing newer columns/relationships.
     // Fall back to a minimal, stable query so SKU search still works.
-    if (queryResult.error) {
-      console.warn("Primary price_list_items select failed; using minimal fallback:", queryResult.error.message);
-      queryResult = await supabase
+    if (queryError) {
+      console.warn("Primary price_list_items select failed; using minimal fallback:", queryError.message);
+      const fallbackResult = await supabase
         .from("price_list_items")
         .select("id, item_no, description, list_price, sell_price, cost_with_shipping, zone5_shipping, weight_lbs, fob_cost, quantity")
         .eq("is_active", true);
+
+      data = fallbackResult.data || [];
+      queryError = fallbackResult.error;
     }
 
-    if (queryResult.error) throw queryResult.error;
-
-    const data = queryResult.data || [];
+    if (queryError) throw queryError;
 
     // Sort by list_price from lowest to highest (cheapest to most expensive)
     const sortedData = (data || []).sort((a, b) => {
