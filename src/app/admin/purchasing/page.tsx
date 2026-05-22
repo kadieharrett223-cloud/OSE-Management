@@ -1661,14 +1661,20 @@ export default function PurchasingPage() {
                               required
                             />
 
-                            {!!line.sku && activeSkuSuggestionLine === index && !priceList.some((item) => (item.sku || "").toLowerCase() === (line.sku || "").toLowerCase()) && (
+                            {!!line.sku && activeSkuSuggestionLine === index && (
                               <div className="max-h-36 overflow-y-auto rounded border border-slate-200 bg-white">
                                 {priceList
                                   .filter((item) => {
-                                    const query = (line.sku || "").toLowerCase();
+                                    const rawQuery = line.sku || "";
+                                    const query = rawQuery.toLowerCase();
+                                    const normalizedQuery = normalizeSku(rawQuery);
+                                    const itemSku = item.sku || "";
+                                    const itemDesc = item.description || "";
+
                                     return (
-                                      (item.sku || "").toLowerCase().includes(query) ||
-                                      (item.description || "").toLowerCase().includes(query)
+                                      itemSku.toLowerCase().includes(query) ||
+                                      itemDesc.toLowerCase().includes(query) ||
+                                      normalizeSku(itemSku).includes(normalizedQuery)
                                     );
                                   })
                                   .slice(0, 8)
@@ -1690,7 +1696,7 @@ export default function PurchasingPage() {
                               </div>
                             )}
 
-                            {!priceList.some((item) => item.sku === line.sku) && line.sku && (
+                            {!priceList.some((item) => normalizeSku(item.sku) === normalizeSku(line.sku)) && line.sku && (
                               <button
                                 type="button"
                                 onClick={() => openCreateProductModal(index)}
