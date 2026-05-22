@@ -20,6 +20,7 @@ type PurchaseOrder = {
 type PriceListItem = {
   id: string;
   sku: string;
+  item_no?: string;
   description: string;
   currentSalePricePerUnit: number;
   shippingIncludedPerUnit?: number;
@@ -102,6 +103,9 @@ export default function PurchasingPage() {
     String(value || "")
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "");
+
+  const getItemSku = (item: { sku?: string | null; item_no?: string | null }) =>
+    String(item?.sku || item?.item_no || "");
 
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
   const [priceList, setPriceList] = useState<PriceListItem[]>([]);
@@ -761,7 +765,7 @@ export default function PurchasingPage() {
 
     // Try immediate local cache match first.
     const normalizedSku = normalizeSku(sku);
-    const cachedItem = priceList.find((p) => normalizeSku(p.sku) === normalizedSku);
+    const cachedItem = priceList.find((p) => normalizeSku(getItemSku(p)) === normalizedSku);
     if (cachedItem) {
       setFormData((prev) => {
         const updated = [...prev.lines];
@@ -785,7 +789,7 @@ export default function PurchasingPage() {
     fetch("/api/price-list?_=" + Date.now(), { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
-        const freshItem = data.find((p: any) => normalizeSku(p.sku) === normalizedSku);
+        const freshItem = data.find((p: any) => normalizeSku(getItemSku(p)) === normalizedSku);
         if (!freshItem) return;
 
         setFormData((prev) => {
@@ -882,7 +886,7 @@ export default function PurchasingPage() {
       lines: prev.lines.map((line) => {
         const sku = normalizeSku(line.sku || "");
         if (!sku) return line;
-        const matchedItem = priceList.find((item) => normalizeSku(item.sku) === sku);
+        const matchedItem = priceList.find((item) => normalizeSku(getItemSku(item)) === sku);
         if (!matchedItem) return line;
         return {
           ...line,
@@ -1668,7 +1672,7 @@ export default function PurchasingPage() {
                                     const rawQuery = line.sku || "";
                                     const query = rawQuery.toLowerCase();
                                     const normalizedQuery = normalizeSku(rawQuery);
-                                    const itemSku = item.sku || "";
+                                    const itemSku = getItemSku(item);
                                     const itemDesc = item.description || "";
 
                                     return (
@@ -1684,19 +1688,19 @@ export default function PurchasingPage() {
                                       type="button"
                                       onMouseDown={(e) => e.preventDefault()}
                                       onClick={() => {
-                                        updateLine(index, "sku", item.sku);
+                                        updateLine(index, "sku", getItemSku(item));
                                         setActiveSkuSuggestionLine(null);
                                       }}
                                       className="block w-full border-b border-slate-100 px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-50"
                                     >
-                                      <span className="font-mono font-semibold">{item.sku}</span>
+                                      <span className="font-mono font-semibold">{getItemSku(item)}</span>
                                       <span className="ml-2 text-slate-500">{item.description}</span>
                                     </button>
                                   ))}
                               </div>
                             )}
 
-                            {!priceList.some((item) => normalizeSku(item.sku) === normalizeSku(line.sku)) && line.sku && (
+                            {!priceList.some((item) => normalizeSku(getItemSku(item)) === normalizeSku(line.sku)) && line.sku && (
                               <button
                                 type="button"
                                 onClick={() => openCreateProductModal(index)}
