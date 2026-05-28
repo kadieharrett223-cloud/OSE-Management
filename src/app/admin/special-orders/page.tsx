@@ -16,7 +16,7 @@ type SpecialOrder = {
   internal_notes: string | null;
   internal_updates: string | null;
   status: StatusValue;
-  expected_delivery: string | null;
+  container_name: string | null;
   qbo_invoice_id: string | null;
   qbo_invoice_number: string | null;
 };
@@ -79,6 +79,14 @@ const STATUS_META: Record<StatusValue, { symbol: string; chipClass: string }> = 
 
 const money = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
 export default function SpecialOrdersPage() {
   const [orders, setOrders] = useState<SpecialOrder[]>([]);
@@ -198,7 +206,7 @@ export default function SpecialOrdersPage() {
     try {
       const payload = {
         status: details.status,
-        expected_delivery: details.expected_delivery,
+        container_name: details.container_name || null,
         note_entry: noteEntry,
       };
 
@@ -219,6 +227,95 @@ export default function SpecialOrdersPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function printOrderForm() {
+    if (!details) return;
+
+    const popup = window.open("", "_blank", "width=1000,height=800");
+    if (!popup) {
+      alert("Please allow popups to print the special order form.");
+      return;
+    }
+
+    const invoiceLines = details.invoiceSummary?.lineItems || [];
+    const rows = invoiceLines.length
+      ? invoiceLines
+          .map(
+            (line) => `
+              <tr>
+                <td>${escapeHtml(line.description || "-")}</td>
+                <td style="text-align:right;">${line.quantity}</td>
+                <td style="text-align:right;">${money(line.unitPrice)}</td>
+                <td style="text-align:right;">${money(line.amount)}</td>
+              </tr>
+            `
+          )
+          .join("")
+      : '<tr><td colspan="4" style="text-align:center; color:#64748b;">No invoice line items available.</td></tr>';
+
+    const printableHtml = `
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Special Order Form - ${escapeHtml(details.qbo_invoice_number || details.order_name)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #0f172a; margin: 24px; }
+          h1 { margin: 0 0 8px; font-size: 24px; }
+          .sub { margin: 0 0 20px; color: #475569; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; margin-bottom: 18px; }
+          .label { font-size: 12px; color: #475569; text-transform: uppercase; letter-spacing: .02em; }
+          .value { font-size: 14px; margin-top: 2px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; }
+          th { background: #f1f5f9; text-align: left; }
+          .section { margin-top: 18px; }
+          .notes { border: 1px solid #cbd5e1; min-height: 80px; padding: 8px; white-space: pre-wrap; }
+          @media print { body { margin: 12px; } }
+        </style>
+      </head>
+      <body>
+        <h1>Special Order Form</h1>
+        <p class="sub">Generated on ${new Date().toLocaleString()}</p>
+
+        <div class="grid">
+          <div><div class="label">Invoice Number</div><div class="value">${escapeHtml(details.qbo_invoice_number || "-")}</div></div>
+          <div><div class="label">Order Name</div><div class="value">${escapeHtml(details.order_name || "-")}</div></div>
+          <div><div class="label">Customer</div><div class="value">${escapeHtml(details.customer_name || "-")}</div></div>
+          <div><div class="label">Status</div><div class="value">${escapeHtml(STATUS_OPTIONS.find((o) => o.value === details.status)?.label || details.status)}</div></div>
+          <div><div class="label">Container</div><div class="value">${escapeHtml(details.container_name || "-")}</div></div>
+          <div><div class="label">Sales Rep</div><div class="value">${escapeHtml(details.invoiceSummary?.salesRep || "-")}</div></div>
+        </div>
+
+        <div class="section">
+          <div class="label">Invoice Items</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th style="text-align:right;">Qty</th>
+                <th style="text-align:right;">Unit</th>
+                <th style="text-align:right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <div class="label">Internal Notes</div>
+          <div class="notes">${escapeHtml(details.internal_notes || "")}</div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    popup.document.open();
+    popup.document.write(printableHtml);
+    popup.document.close();
+    popup.focus();
+    popup.print();
   }
 
   async function uploadDocument(file: File) {
@@ -493,13 +590,12 @@ export default function SpecialOrdersPage() {
                         </select>
                       </label>
                       <label className="text-sm text-slate-700">
-                        <span className="mb-1 block font-medium">Expected delivery</span>
+                        <span className="mb-1 block font-medium">Container</span>
                         <input
-                          type="date"
-                          value={details.expected_delivery || ""}
-                          onChange={(e) =>
-                            setDetails({ ...details, expected_delivery: e.target.value || null })
-                          }
+                          type="text"
+                          value={details.container_name || ""}
+                          onChange={(e) => setDetails({ ...details, container_name: e.target.value || null })}
+                          placeholder="e.g. CAXU1234567"
                           className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
                         />
                       </label>
@@ -525,14 +621,22 @@ export default function SpecialOrdersPage() {
                       )}
                     </div>
 
-                    <div className="flex justify-between gap-2">
-                      <button
-                        onClick={deleteOrder}
-                        disabled={deletingOrder}
-                        className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
-                      >
-                        {deletingOrder ? "Deleting..." : "Delete Order"}
-                      </button>
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={printOrderForm}
+                          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                        >
+                          Print Form
+                        </button>
+                        <button
+                          onClick={deleteOrder}
+                          disabled={deletingOrder}
+                          className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                        >
+                          {deletingOrder ? "Deleting..." : "Delete Order"}
+                        </button>
+                      </div>
                       <button
                         onClick={saveDetails}
                         disabled={saving}
