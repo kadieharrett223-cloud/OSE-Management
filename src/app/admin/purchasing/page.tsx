@@ -52,17 +52,6 @@ type Supplier = {
   notes?: string;
 };
 
-type ScheduledPayment = {
-  id: string;
-  poId: string;
-  poNumber: string;
-  vendorName: string;
-  date: string;
-  amount: number;
-  notes: string;
-  createdAt?: string;
-};
-
 const WEIGHT_LIMIT_LBS = 45000;
 
 const money = (value: number | undefined) => {
@@ -152,28 +141,8 @@ export default function PurchasingPage() {
     notes: "",
   });
   const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
-  const [scheduledPayments, setScheduledPayments] = useState<ScheduledPayment[]>([]);
-  const [loadingScheduledPayments, setLoadingScheduledPayments] = useState(false);
-  const [savingSchedule, setSavingSchedule] = useState(false);
-  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
-  const [showCalendarModal, setShowCalendarModal] = useState(false);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [selectedCalendarMonth, setSelectedCalendarMonth] = useState(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    return `${year}-${month}`;
-  });
-  const [scheduleForm, setScheduleForm] = useState({
-    poId: "",
-    date: new Date().toISOString().split("T")[0],
-    amount: 0,
-    amountType: "custom" as "custom" | "down_payment" | "final_payment",
-    notes: "",
-  });
 
-  const [supplierModal, setSupplierModal] = useState<{open:boolean, mode:"create"|"edit", supplier?: Supplier|null}>({open:false, mode:"create"});
-  const [supplierForm, setSupplierForm] = useState<Supplier>({
+  const emptySupplierForm: Supplier = {
     id: "",
     name: "",
     address: "",
@@ -187,7 +156,10 @@ export default function PurchasingPage() {
     ship_to_address: "",
     ship_to_city_state_zip: "",
     notes: "",
-  });
+  };
+
+  const [supplierModal, setSupplierModal] = useState<{open:boolean, mode:"create"|"edit", supplier?: Supplier|null}>({open:false, mode:"create"});
+  const [supplierForm, setSupplierForm] = useState<Supplier>(emptySupplierForm);
 
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
   const [creatingProduct, setCreatingProduct] = useState(false);
@@ -215,7 +187,6 @@ export default function PurchasingPage() {
     fetchPriceList();
     fetchSuppliers();
     fetchCategories();
-    fetchScheduledPayments();
   }, []);
 
   useEffect(() => {
@@ -308,137 +279,6 @@ export default function PurchasingPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function fetchScheduledPayments() {
-    setLoadingScheduledPayments(true);
-    try {
-      const res = await fetch("/api/purchase-orders/payment-schedules", { cache: "no-store" });
-      const payload = await res.json();
-      if (payload.ok) {
-        setScheduledPayments(payload.schedules || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch payment schedules:", error);
-    } finally {
-      setLoadingScheduledPayments(false);
-    }
-  }
-
-  async function handleSaveSchedule() {
-    const selected = pos.find((po) => po.id === scheduleForm.poId);
-    if (!selected) {
-      alert("Please select a purchase order");
-      return;
-    }
-
-    if (!scheduleForm.date) {
-      alert("Please select a date");
-      return;
-    }
-
-    setSavingSchedule(true);
-    try {
-      const isEditing = Boolean(editingScheduleId);
-      const url = isEditing
-        ? `/api/purchase-orders/payment-schedules/${editingScheduleId}`
-        : "/api/purchase-orders/payment-schedules";
-      const method = isEditing ? "PATCH" : "POST";
-
-      const finalAmount =
-        scheduleForm.amountType === "down_payment"
-          ? Number((computedTotal(selected) * 0.3).toFixed(2))
-          : scheduleForm.amountType === "final_payment"
-          ? Number(balance(selected).toFixed(2))
-          : Number(scheduleForm.amount || 0);
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          poId: selected.id,
-          poNumber: selected.po_number,
-          vendorName: selected.vendor_name,
-          date: scheduleForm.date,
-          amount: finalAmount,
-          notes: scheduleForm.notes,
-        }),
-      });
-
-      const payload = await res.json();
-      if (!res.ok || !payload.ok) {
-        alert(payload.error || (isEditing ? "Failed to update schedule" : "Failed to schedule payment"));
-        return;
-      }
-
-      if (isEditing) {
-        setScheduledPayments((prev) =>
-          prev.map((schedule) => (schedule.id === editingScheduleId ? payload.schedule : schedule))
-        );
-      } else {
-        setScheduledPayments((prev) => [...prev, payload.schedule]);
-      }
-
-      setShowScheduleModal(false);
-      setEditingScheduleId(null);
-      setScheduleForm({
-        poId: "",
-        date: new Date().toISOString().split("T")[0],
-        amount: 0,
-        amountType: "custom",
-        notes: "",
-      });
-    } catch (error) {
-      console.error("Failed to save payment schedule:", error);
-      alert(editingScheduleId ? "Failed to update schedule" : "Failed to schedule payment");
-    } finally {
-      setSavingSchedule(false);
-    }
-  }
-
-  async function handleDeleteSchedule(id: string) {
-    if (!confirm("Delete this scheduled payment?")) return;
-
-    try {
-      const res = await fetch(`/api/purchase-orders/payment-schedules/${id}`, {
-        method: "DELETE",
-      });
-      const payload = await res.json();
-      if (!res.ok || !payload.ok) {
-        alert(payload.error || "Failed to delete scheduled payment");
-        return;
-      }
-
-      setScheduledPayments((prev) => prev.filter((schedule) => schedule.id !== id));
-    } catch (error) {
-      console.error("Failed to delete scheduled payment:", error);
-      alert("Failed to delete scheduled payment");
-    }
-  }
-
-  function openScheduleModal(date: string) {
-    const defaultPo = pos[0];
-    setEditingScheduleId(null);
-    setScheduleForm({
-      poId: defaultPo?.id || "",
-      date,
-      amount: 0,
-      amountType: "custom",
-      notes: "",
-    });
-    setShowScheduleModal(true);
-  }
-
-  function openEditScheduleModal(schedule: ScheduledPayment) {
-    setEditingScheduleId(schedule.id);
-    setScheduleForm({
-      poId: schedule.poId,
-      date: schedule.date,
-      amount: Number(schedule.amount || 0),
-      amountType: "custom",
-      notes: schedule.notes || "",
-    });
-    setShowScheduleModal(true);
   }
 
   const fetchCategories = async () => {
@@ -685,21 +525,7 @@ export default function PurchasingPage() {
         return;
       }
       setSupplierModal({ open: false, mode: "create", supplier: null });
-      setSupplierForm({
-        id: "",
-        name: "",
-        address: "",
-        city_state_zip: "",
-        contact_name: "",
-        email: "",
-        phone: "",
-        terms: "",
-        payment_method: "",
-        ship_to_name: "",
-        ship_to_address: "",
-        ship_to_city_state_zip: "",
-        notes: "",
-      });
+      setSupplierForm(emptySupplierForm);
       await fetchSuppliers();
     } catch (error) {
       console.error("Save supplier error:", error);
@@ -934,41 +760,6 @@ export default function PurchasingPage() {
   const totalPages = Math.max(Math.ceil(sortedFilteredPos.length / pageSize), 1);
   const safePage = Math.min(currentPage, totalPages);
   const pagedPos = sortedFilteredPos.slice((safePage - 1) * pageSize, safePage * pageSize);
-
-  const calendarDays = (() => {
-    const [year, month] = selectedCalendarMonth.split("-").map(Number);
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0);
-    const startPadding = firstDay.getDay();
-    const days: (Date | null)[] = [];
-
-    for (let i = 0; i < startPadding; i++) {
-      days.push(null);
-    }
-
-    for (let day = 1; day <= lastDay.getDate(); day++) {
-      days.push(new Date(year, month - 1, day));
-    }
-
-    return days;
-  })();
-
-  const todayIso = new Date().toISOString().split("T")[0];
-
-  const upcomingScheduledPayments = [...scheduledPayments]
-    .filter((schedule) => schedule.date >= todayIso)
-    .sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      return a.poNumber.localeCompare(b.poNumber, undefined, { numeric: true, sensitivity: "base" });
-    });
-
-  const getSchedulesForDate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const dateStr = `${year}-${month}-${day}`;
-    return scheduledPayments.filter((schedule) => schedule.date === dateStr);
-  };
 
   const printContainerPaymentReport = () => {
     const rows = sortedFilteredPos.filter(
@@ -1209,13 +1000,6 @@ export default function PurchasingPage() {
                 <div className="flex w-full sm:w-auto items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowCalendarModal(true)}
-                    className="w-full sm:w-auto rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    Calendar
-                  </button>
-                  <button
-                    type="button"
                     onClick={printContainerPaymentReport}
                     disabled={sortedFilteredPos.length === 0}
                     className="w-full sm:w-auto rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1271,67 +1055,6 @@ export default function PurchasingPage() {
                   ))
                 )}
               </div>
-            </section>
-
-            <section className="rounded-xl bg-white p-4 md:p-5 shadow-md ring-1 ring-slate-200 space-y-3">
-              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <h2 className="text-base md:text-lg font-semibold text-slate-900">Scheduled Payment Notifications</h2>
-                  <p className="text-xs text-slate-500">Upcoming payment reminders from your PO calendar.</p>
-                </div>
-              </div>
-
-              {loadingScheduledPayments ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
-                  Loading scheduled payments...
-                </div>
-              ) : upcomingScheduledPayments.length === 0 ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
-                  No scheduled payments yet.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {upcomingScheduledPayments.slice(0, 8).map((schedule) => (
-                    <div
-                      key={schedule.id}
-                      className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">
-                          {formatDate(schedule.date)} • PO {schedule.poNumber} • {schedule.vendorName}
-                        </div>
-                        <div className="text-xs text-slate-600">
-                          Amount: ${money(schedule.amount || 0)}
-                          {schedule.notes ? ` • ${schedule.notes}` : ""}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditScheduleModal(schedule)}
-                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => window.location.href = `/admin/purchasing/${schedule.poId}`}
-                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                        >
-                          View PO
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSchedule(schedule.id)}
-                          className="rounded border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </section>
 
             {showForm && (
@@ -1405,7 +1128,16 @@ export default function PurchasingPage() {
                             <option key={s.id} value={s.id}>{s.name}</option>
                           ))}
                         </select>
-                        {/* New Supplier button removed; available in main menu */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSupplierForm(emptySupplierForm);
+                            setSupplierModal({ open: true, mode: "create", supplier: null });
+                          }}
+                          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          New
+                        </button>
                         {selectedSupplierId && (
                           <button
                             type="button"
@@ -1526,248 +1258,6 @@ export default function PurchasingPage() {
                   </div>
                 </div>
 
-                {/* Terms Row */}
-                <div className="grid grid-cols-4 gap-3 py-3 border-b border-slate-200">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Authorized By</label>
-                    <input
-                      type="text"
-                      value={formData.authorized_by}
-                      onChange={(e) => setFormData({ ...formData, authorized_by: e.target.value })}
-                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Destination</label>
-                    <input
-                      type="text"
-                      value={formData.destination}
-                      onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Terms</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., 30% advance"
-                      value={formData.terms}
-                      onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
-                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Payment Method</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., WT"
-                      value={formData.payment_method}
-                      onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Line Items Table */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-bold text-slate-700">Line Items</h3>
-                    <div className="flex items-center gap-4">
-                      <div className="inline-flex rounded-md border border-slate-300 bg-white p-1">
-                        <button
-                          type="button"
-                          onClick={() => applyCreatePoCostMode("fob")}
-                          className={`rounded px-2 py-1 text-xs font-semibold ${
-                            createPoCostMode === "fob"
-                              ? "bg-slate-900 text-white"
-                              : "text-slate-600 hover:text-slate-900"
-                          }`}
-                        >
-                          FOB
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => applyCreatePoCostMode("delivered")}
-                          className={`rounded px-2 py-1 text-xs font-semibold ${
-                            createPoCostMode === "delivered"
-                              ? "bg-slate-900 text-white"
-                              : "text-slate-600 hover:text-slate-900"
-                          }`}
-                        >
-                          Cost w/o Shipping
-                        </button>
-                      </div>
-                      <div className="text-xs text-slate-600">
-                        <span className="font-semibold">Container weight:</span> 
-                        <span className={`ml-1 ${
-                          totalWeight > WEIGHT_LIMIT_LBS ? 'text-red-600 font-bold' : 
-                          weightPercentage > 90 ? 'text-yellow-600 font-semibold' : 
-                          'text-slate-700'
-                        }`}>
-                          {(totalWeight || 0).toLocaleString()} / 45,000 lbs
-                        </span>
-                        {totalWeight > WEIGHT_LIMIT_LBS && (
-                          <span className="ml-2 text-red-600 font-bold">⚠ OVER</span>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={addLine}
-                        className="text-sm font-semibold text-blue-600 hover:text-blue-700"
-                      >
-                        + Add Line
-                      </button>
-                    </div>
-                  </div>
-                  <div className="border border-slate-300 rounded">
-                    <div className="grid grid-cols-12 gap-0 bg-slate-100 border-b border-slate-300">
-                      <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300 text-center">⋮</div>
-                      <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Part Number</div>
-                      <div className="col-span-3 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
-                      <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">QTY</div>
-                      <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">Weight</div>
-                      <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">
-                        {createPoCostMode === "fob" ? "FOB Cost" : "Cost w/o Shipping"}
-                      </div>
-                      <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right">Amount</div>
-                    </div>
-                    {formData.lines.map((line, index) => (
-                      <div
-                        key={index}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => {
-                          if (draggedLineIndex !== null && draggedLineIndex !== index) {
-                            reorderLine(draggedLineIndex, index);
-                            setDraggedLineIndex(null);
-                          }
-                        }}
-                        className={`grid grid-cols-12 gap-0 border-b border-slate-200 ${
-                          draggedLineIndex === index ? 'bg-blue-100 opacity-70' : 'hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center text-slate-400 hover:text-slate-600">
-                          <span
-                            draggable
-                            onDragStart={() => setDraggedLineIndex(index)}
-                            onDragEnd={() => setDraggedLineIndex(null)}
-                            className="cursor-move select-none"
-                            title="Drag to reorder"
-                          >
-                            ⋮
-                          </span>
-                        </div>
-                        <div className="col-span-2 border-r border-slate-200 p-2">
-                          <div className="flex flex-col gap-1">
-                            <input
-                              type="text"
-                              placeholder="Type SKU to search product"
-                              value={line.sku}
-                              onChange={(e) => updateLine(index, "sku", e.target.value)}
-                              onFocus={() => setActiveSkuSuggestionLine(index)}
-                              onBlur={() => {
-                                setTimeout(() => {
-                                  setActiveSkuSuggestionLine((prev) => (prev === index ? null : prev));
-                                }, 120);
-                              }}
-                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
-                              autoComplete="off"
-                              required
-                            />
-
-                            {!!line.sku && activeSkuSuggestionLine === index && (
-                              <div className="max-h-36 overflow-y-auto rounded border border-slate-200 bg-white">
-                                {priceList
-                                  .filter((item) => {
-                                    const rawQuery = line.sku || "";
-                                    const query = rawQuery.toLowerCase();
-                                    const normalizedQuery = normalizeSku(rawQuery);
-                                    const itemSku = getItemSku(item);
-                                    const itemDesc = item.description || "";
-
-                                    return (
-                                      itemSku.toLowerCase().includes(query) ||
-                                      itemDesc.toLowerCase().includes(query) ||
-                                      normalizeSku(itemSku).includes(normalizedQuery)
-                                    );
-                                  })
-                                  .slice(0, 8)
-                                  .map((item) => (
-                                    <button
-                                      key={item.id}
-                                      type="button"
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={() => {
-                                        updateLine(index, "sku", getItemSku(item));
-                                        setActiveSkuSuggestionLine(null);
-                                      }}
-                                      className="block w-full border-b border-slate-100 px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-50"
-                                    >
-                                      <span className="font-mono font-semibold">{getItemSku(item)}</span>
-                                      <span className="ml-2 text-slate-500">{item.description}</span>
-                                    </button>
-                                  ))}
-                              </div>
-                            )}
-
-                            {!priceList.some((item) => normalizeSku(getItemSku(item)) === normalizeSku(line.sku)) && line.sku && (
-                              <button
-                                type="button"
-                                onClick={() => openCreateProductModal(index)}
-                                className="text-xs font-semibold text-blue-600 hover:text-blue-800"
-                              >
-                                + Create new product
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="col-span-3 border-r border-slate-200 p-2">
-                          <textarea
-                            placeholder="Description"
-                            value={line.description}
-                            onChange={(e) => updateLine(index, "description", e.target.value)}
-                            className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none bg-transparent"
-                            rows={3}
-                            required
-                          />
-                        </div>
-                        <div className="col-span-1 border-r border-slate-200 p-2">
-                          <input
-                            type="number"
-                            step="1"
-                            value={line.quantity}
-                            onChange={(e) => updateLine(index, "quantity", Number(e.target.value))}
-                            className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
-                            required
-                          />
-                        </div>
-                        <div className="col-span-1 border-r border-slate-200 p-2">
-                          <input
-                            type="number"
-                            step="1"
-                            value={line.weight_lbs || ""}
-                            onChange={(e) => updateLine(index, "weight_lbs", Number(e.target.value) || 0)}
-                            placeholder="lbs"
-                            className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
-                          />
-                        </div>
-                        <div className="col-span-2 border-r border-slate-200 p-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={line.unit_price}
-                            onChange={(e) => updateLine(index, "unit_price", Number(e.target.value))}
-                            className="w-full border-0 px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
-                            required
-                          />
-                        </div>
-                        <div className="col-span-2 p-2 flex items-center justify-between">
-                          <span className="text-sm font-semibold text-slate-900">
-                            ${money(line.quantity * line.unit_price)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeLine(index)}
-                            className="ml-2 text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-xl px-2 py-0 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                             disabled={formData.lines.length === 1}
                             title={formData.lines.length === 1 ? "Cannot delete the last line" : "Delete line"}
                           >
@@ -1937,248 +1427,6 @@ export default function PurchasingPage() {
                       className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                     >
                       {creatingProduct ? "Creating..." : "Create Product"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {showCalendarModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                <div className="w-full max-w-7xl rounded-xl bg-white p-4 md:p-6 shadow-xl">
-                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h2 className="text-xl font-semibold text-slate-900">Purchasing Calendar</h2>
-                      <p className="text-sm text-slate-600">Add notes and schedule PO payments by date.</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="month"
-                        value={selectedCalendarMonth}
-                        onChange={(e) => setSelectedCalendarMonth(e.target.value)}
-                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCalendarModal(false)}
-                        className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mb-3 grid grid-cols-7 gap-2">
-                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                      <div key={day} className="text-center text-xs font-semibold uppercase text-slate-500">
-                        {day}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-7 gap-2">
-                    {calendarDays.map((date, index) => {
-                      if (!date) {
-                        return <div key={`empty-${index}`} className="h-28 rounded border border-transparent" />;
-                      }
-
-                      const daySchedules = getSchedulesForDate(date);
-                      const year = date.getFullYear();
-                      const month = String(date.getMonth() + 1).padStart(2, "0");
-                      const day = String(date.getDate()).padStart(2, "0");
-                      const dateStr = `${year}-${month}-${day}`;
-
-                      return (
-                        <button
-                          key={date.toISOString()}
-                          type="button"
-                          onClick={() => openScheduleModal(dateStr)}
-                          className="h-28 rounded-lg border border-slate-200 bg-slate-50 p-2 text-left hover:bg-slate-100"
-                        >
-                          <div className="text-sm font-semibold text-slate-800">{date.getDate()}</div>
-                          <div className="mt-1 space-y-1">
-                            {daySchedules.slice(0, 2).map((schedule) => (
-                              <div
-                                key={schedule.id}
-                                className="truncate rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-800"
-                                title={`PO ${schedule.poNumber} - $${money(schedule.amount || 0)} ${schedule.notes || ""}`}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openEditScheduleModal(schedule);
-                                }}
-                              >
-                                PO {schedule.poNumber} • ${money(schedule.amount || 0)}
-                              </div>
-                            ))}
-                            {daySchedules.length > 2 && (
-                              <div className="text-[10px] text-slate-500">+{daySchedules.length - 2} more</div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {showScheduleModal && (
-              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-                <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    {editingScheduleId ? "Edit Scheduled Payment" : "Schedule Payment"}
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {editingScheduleId
-                      ? "Update this payment reminder linked to a purchase order."
-                      : "Create a payment reminder linked to a purchase order."}
-                  </p>
-
-                  <div className="mt-4 space-y-3">
-                    <div>
-                      <label className="mb-1 block text-sm font-semibold text-slate-700">Date</label>
-                      <input
-                        type="date"
-                        value={scheduleForm.date}
-                        onChange={(e) => setScheduleForm({ ...scheduleForm, date: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-sm font-semibold text-slate-700">Purchase Order</label>
-                      <select
-                        value={scheduleForm.poId}
-                        onChange={(e) => {
-                          const poId = e.target.value;
-                          const selected = pos.find((po) => po.id === poId);
-                          setScheduleForm({
-                            ...scheduleForm,
-                            poId,
-                            amount: selected ? Number(balance(selected).toFixed(2)) : scheduleForm.amount,
-                          });
-                        }}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      >
-                        <option value="">Select PO...</option>
-                        {pos.map((po) => (
-                          <option key={po.id} value={po.id}>
-                            PO {po.po_number} • {po.vendor_name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-sm font-semibold text-slate-700">Amount</label>
-                      {(() => {
-                        const selPO = pos.find((po) => po.id === scheduleForm.poId);
-                        const downAmt = selPO ? computedTotal(selPO) * 0.3 : null;
-                        const finalAmt = selPO ? balance(selPO) : null;
-                        return (
-                          <div className="space-y-2">
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setScheduleForm({ ...scheduleForm, amountType: "custom" })}
-                                className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
-                                  scheduleForm.amountType === "custom"
-                                    ? "border-blue-600 bg-blue-50 text-blue-700"
-                                    : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-                                }`}
-                              >
-                                Custom
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setScheduleForm({ ...scheduleForm, amountType: "down_payment" })}
-                                className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
-                                  scheduleForm.amountType === "down_payment"
-                                    ? "border-amber-500 bg-amber-50 text-amber-700"
-                                    : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-                                }`}
-                              >
-                                Down Payment
-                                {downAmt !== null && (
-                                  <span className="block text-[10px] font-normal mt-0.5">
-                                    30% = ${money(downAmt)}
-                                  </span>
-                                )}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setScheduleForm({ ...scheduleForm, amountType: "final_payment" })}
-                                className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
-                                  scheduleForm.amountType === "final_payment"
-                                    ? "border-green-600 bg-green-50 text-green-700"
-                                    : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-                                }`}
-                              >
-                                Final Payment
-                                {finalAmt !== null && (
-                                  <span className="block text-[10px] font-normal mt-0.5">
-                                    Balance: ${money(finalAmt)}
-                                  </span>
-                                )}
-                              </button>
-                            </div>
-                            {scheduleForm.amountType === "custom" && (
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={scheduleForm.amount}
-                                onChange={(e) => setScheduleForm({ ...scheduleForm, amount: Number(e.target.value) })}
-                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                placeholder="Enter amount"
-                              />
-                            )}
-                            {scheduleForm.amountType !== "custom" && selPO && (
-                              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                Will use:{" "}
-                                <span className="font-semibold">
-                                  ${money(
-                                    scheduleForm.amountType === "down_payment"
-                                      ? computedTotal(selPO) * 0.3
-                                      : balance(selPO)
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-sm font-semibold text-slate-700">Notes</label>
-                      <textarea
-                        value={scheduleForm.notes}
-                        onChange={(e) => setScheduleForm({ ...scheduleForm, notes: e.target.value })}
-                        rows={3}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                        placeholder="Add reminder details"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowScheduleModal(false);
-                        setEditingScheduleId(null);
-                      }}
-                      className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveSchedule}
-                      disabled={savingSchedule}
-                      className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {savingSchedule ? "Saving..." : editingScheduleId ? "Update Schedule" : "Save Schedule"}
                     </button>
                   </div>
                 </div>
