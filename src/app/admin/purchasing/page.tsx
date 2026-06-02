@@ -1258,19 +1258,267 @@ export default function PurchasingPage() {
                   </div>
                 </div>
 
+                {/* Terms Row */}
+                <div className="grid grid-cols-4 gap-3 py-3 border-b border-slate-200">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Authorized By</label>
+                    <input
+                      type="text"
+                      value={formData.authorized_by}
+                      onChange={(e) => setFormData({ ...formData, authorized_by: e.target.value })}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Destination</label>
+                    <input
+                      type="text"
+                      value={formData.destination}
+                      onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Terms</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., 30% advance"
+                      value={formData.terms}
+                      onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 mb-1 block">Payment Method</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., WT"
+                      value={formData.payment_method}
+                      onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Line Items Table */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-bold text-slate-700">Line Items</h3>
+                    <div className="flex items-center gap-4">
+                      <div className="inline-flex rounded-md border border-slate-300 bg-white p-1">
+                        <button
+                          type="button"
+                          onClick={() => applyCreatePoCostMode("fob")}
+                          className={`rounded px-2 py-1 text-xs font-semibold ${
+                            createPoCostMode === "fob"
+                              ? "bg-slate-900 text-white"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          FOB
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyCreatePoCostMode("delivered")}
+                          className={`rounded px-2 py-1 text-xs font-semibold ${
+                            createPoCostMode === "delivered"
+                              ? "bg-slate-900 text-white"
+                              : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          Cost w/o Shipping
+                        </button>
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        <span className="font-semibold">Container weight:</span>
+                        <span
+                          className={`ml-1 ${
+                            totalWeight > WEIGHT_LIMIT_LBS
+                              ? "text-red-600 font-bold"
+                              : weightPercentage > 90
+                              ? "text-yellow-600 font-semibold"
+                              : "text-slate-700"
+                          }`}
+                        >
+                          {(totalWeight || 0).toLocaleString()} / 45,000 lbs
+                        </span>
+                        {totalWeight > WEIGHT_LIMIT_LBS && (
+                          <span className="ml-2 text-red-600 font-bold">OVER</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addLine}
+                        className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+                      >
+                        + Add Line
+                      </button>
+                    </div>
+                  </div>
+                  <div className="border border-slate-300 rounded">
+                    <div className="grid grid-cols-12 gap-0 bg-slate-100 border-b border-slate-300">
+                      <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300 text-center">...</div>
+                      <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Part Number</div>
+                      <div className="col-span-3 px-3 py-2 text-xs font-semibold text-slate-700 border-r border-slate-300">Description</div>
+                      <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">QTY</div>
+                      <div className="col-span-1 px-3 py-2 text-xs font-semibold text-slate-700 text-center border-r border-slate-300">Weight</div>
+                      <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right border-r border-slate-300">
+                        {createPoCostMode === "fob" ? "FOB Cost" : "Cost w/o Shipping"}
+                      </div>
+                      <div className="col-span-2 px-3 py-2 text-xs font-semibold text-slate-700 text-right">Amount</div>
+                    </div>
+                    {formData.lines.map((line, index) => (
+                      <div
+                        key={index}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => {
+                          if (draggedLineIndex !== null && draggedLineIndex !== index) {
+                            reorderLine(draggedLineIndex, index);
+                            setDraggedLineIndex(null);
+                          }
+                        }}
+                        className={`grid grid-cols-12 gap-0 border-b border-slate-200 ${
+                          draggedLineIndex === index ? "bg-blue-100 opacity-70" : "hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="col-span-1 border-r border-slate-200 p-2 flex items-center justify-center text-slate-400 hover:text-slate-600">
+                          <span
+                            draggable
+                            onDragStart={() => setDraggedLineIndex(index)}
+                            onDragEnd={() => setDraggedLineIndex(null)}
+                            className="cursor-move select-none"
+                            title="Drag to reorder"
+                          >
+                            ...
+                          </span>
+                        </div>
+                        <div className="col-span-2 border-r border-slate-200 p-2">
+                          <div className="flex flex-col gap-1">
+                            <input
+                              type="text"
+                              placeholder="Type SKU to search product"
+                              value={line.sku}
+                              onChange={(e) => updateLine(index, "sku", e.target.value)}
+                              onFocus={() => setActiveSkuSuggestionLine(index)}
+                              onBlur={() => {
+                                setTimeout(() => {
+                                  setActiveSkuSuggestionLine((prev) => (prev === index ? null : prev));
+                                }, 120);
+                              }}
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                              autoComplete="off"
+                              required
+                            />
+
+                            {!!line.sku && activeSkuSuggestionLine === index && (
+                              <div className="max-h-36 overflow-y-auto rounded border border-slate-200 bg-white">
+                                {priceList
+                                  .filter((item) => {
+                                    const rawQuery = line.sku || "";
+                                    const query = rawQuery.toLowerCase();
+                                    const normalizedQuery = normalizeSku(rawQuery);
+                                    const itemSku = getItemSku(item);
+                                    const itemDesc = item.description || "";
+
+                                    return (
+                                      itemSku.toLowerCase().includes(query) ||
+                                      itemDesc.toLowerCase().includes(query) ||
+                                      normalizeSku(itemSku).includes(normalizedQuery)
+                                    );
+                                  })
+                                  .slice(0, 8)
+                                  .map((item) => (
+                                    <button
+                                      key={item.id}
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        updateLine(index, "sku", getItemSku(item));
+                                        setActiveSkuSuggestionLine(null);
+                                      }}
+                                      className="block w-full border-b border-slate-100 px-2 py-1 text-left text-xs text-slate-700 hover:bg-slate-50"
+                                    >
+                                      <span className="font-mono font-semibold">{getItemSku(item)}</span>
+                                      <span className="ml-2 text-slate-500">{item.description}</span>
+                                    </button>
+                                  ))}
+                              </div>
+                            )}
+
+                            {!priceList.some((item) => normalizeSku(getItemSku(item)) === normalizeSku(line.sku)) && line.sku && (
+                              <button
+                                type="button"
+                                onClick={() => openCreateProductModal(index)}
+                                className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                              >
+                                + Create new product
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="col-span-3 border-r border-slate-200 p-2">
+                          <textarea
+                            placeholder="Description"
+                            value={line.description}
+                            onChange={(e) => updateLine(index, "description", e.target.value)}
+                            className="w-full border-0 px-2 py-1 text-sm focus:ring-1 focus:ring-blue-500 focus:outline-none resize-none bg-transparent"
+                            rows={3}
+                            required
+                          />
+                        </div>
+                        <div className="col-span-1 border-r border-slate-200 p-2">
+                          <input
+                            type="number"
+                            step="1"
+                            value={line.quantity}
+                            onChange={(e) => updateLine(index, "quantity", Number(e.target.value))}
+                            className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                            required
+                          />
+                        </div>
+                        <div className="col-span-1 border-r border-slate-200 p-2">
+                          <input
+                            type="number"
+                            step="1"
+                            value={line.weight_lbs || ""}
+                            onChange={(e) => updateLine(index, "weight_lbs", Number(e.target.value) || 0)}
+                            placeholder="lbs"
+                            className="w-full border-0 px-2 py-1 text-sm text-center focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                          />
+                        </div>
+                        <div className="col-span-2 border-r border-slate-200 p-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={line.unit_price}
+                            onChange={(e) => updateLine(index, "unit_price", Number(e.target.value))}
+                            className="w-full border-0 px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 focus:outline-none bg-transparent"
+                            required
+                          />
+                        </div>
+                        <div className="col-span-2 p-2 flex items-center justify-between">
+                          <span className="text-sm font-semibold text-slate-900">
+                            ${money(line.quantity * line.unit_price)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeLine(index)}
+                            className="ml-2 text-red-600 hover:text-red-700 hover:bg-red-50 font-bold text-xl px-2 py-0 rounded disabled:opacity-30 disabled:cursor-not-allowed"
                             disabled={formData.lines.length === 1}
                             title={formData.lines.length === 1 ? "Cannot delete the last line" : "Delete line"}
                           >
-                            ×
+                            x
                           </button>
                         </div>
                       </div>
                     ))}
                     <div className="grid grid-cols-12 gap-0 bg-slate-50 border-t-2 border-slate-300">
                       <div className="col-span-7 px-3 py-3 text-right text-sm font-bold text-slate-700">Total Weight:</div>
-                      <div className="col-span-3 px-3 py-3 text-right text-sm font-bold ${
-                        totalWeight > WEIGHT_LIMIT_LBS ? 'text-red-600' : 'text-slate-900'
-                      }">
+                      <div
+                        className={`col-span-3 px-3 py-3 text-right text-sm font-bold ${
+                          totalWeight > WEIGHT_LIMIT_LBS ? "text-red-600" : "text-slate-900"
+                        }`}
+                      >
                         {(totalWeight || 0).toLocaleString()} lbs
                       </div>
                       <div className="col-span-2"></div>
