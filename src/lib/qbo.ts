@@ -155,9 +155,6 @@ async function writeTokenFile(row: QboTokenRow): Promise<void> {
 export async function getTokenRow(userId?: string): Promise<QboTokenRow | null> {
   try {
     const supabase = getServerSupabaseClient();
-    let data: any = null;
-    let error: any = null;
-
     if (userId) {
       const userRow = await supabase
         .from("qbo_tokens")
@@ -165,30 +162,22 @@ export async function getTokenRow(userId?: string): Promise<QboTokenRow | null> 
         .eq("user_id", userId)
         .maybeSingle();
 
-      data = userRow.data;
-      error = userRow.error;
-
-      if (!error && !data) {
-        const primaryRow = await supabase
-          .from("qbo_tokens")
-          .select("*")
-          .eq("id", "primary")
-          .maybeSingle();
-        data = primaryRow.data;
-        error = primaryRow.error;
+      // If user-specific lookup works and has data, use it.
+      if (!userRow.error && userRow.data) {
+        return userRow.data as QboTokenRow;
       }
-    } else {
-      const primaryRow = await supabase
-        .from("qbo_tokens")
-        .select("*")
-        .eq("id", "primary")
-        .maybeSingle();
-      data = primaryRow.data;
-      error = primaryRow.error;
+      // If user-specific lookup errors (common with RLS when anon key is used),
+      // intentionally continue to primary fallback.
     }
 
-    if (error) throw error;
-    return data as QboTokenRow | null;
+    const primaryRow = await supabase
+      .from("qbo_tokens")
+      .select("*")
+      .eq("id", "primary")
+      .maybeSingle();
+
+    if (primaryRow.error) throw primaryRow.error;
+    return primaryRow.data as QboTokenRow | null;
   } catch (err) {
     // Fallback to local file storage when Supabase is unreachable
     return await readTokenFile();

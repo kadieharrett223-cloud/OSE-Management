@@ -195,7 +195,8 @@ export default function PurchasingPage() {
     const fetchPaymentsTodayTotal = async () => {
       try {
         setLoadingPaymentsToday(true);
-        const today = new Date().toLocaleDateString("en-CA");
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
         const res = await fetch(`/api/qbo/payment/query?startDate=${today}&endDate=${today}&_=${Date.now()}`);
         if (!res.ok) throw new Error("Failed to fetch payments");
         const data = await res.json();
