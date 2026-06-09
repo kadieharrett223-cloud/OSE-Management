@@ -4,7 +4,6 @@ export const fetchCache = "force-no-store";
 
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCodeForToken, saveTokenRow } from "@/lib/qbo";
-import { getSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
@@ -16,11 +15,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Get current user from session for multi-tenant token storage
-    const session: any = await getSession();
-    const isSharedAccess = session?.user?.id === "shared-access";
-    const userId = isSharedAccess ? undefined : session?.user?.id;
-
     // Exchange code for tokens
     const tokenResponse = await exchangeCodeForToken(code, realmId);
 
@@ -28,31 +22,25 @@ export async function GET(req: NextRequest) {
     const allowedRealm = process.env.QBO_ALLOWED_REALM_ID;
     const resolvedRealm = tokenResponse.realmId || realmId || "";
     if (allowedRealm && resolvedRealm !== allowedRealm) {
-      return NextResponse.json(
-        { error: "Unauthorized QuickBooks company (realmId mismatch)" },
-        { status: 403 }
-      );
+      return NextResponse.redirect(new URL("/settings?qbo=realm_mismatch", req.url));
     }
 
-    // Persist tokens with user_id for multi-tenant isolation
     // Ensure realmId is included in the saved payload
     if (!tokenResponse.realmId && realmId) {
       tokenResponse.realmId = realmId;
     }
-    const { expiresAt, refreshExpiresAt } = await saveTokenRow(
-      tokenResponse,
-      state || undefined,
-      userId
-    );
 
-    return NextResponse.json({
-      ok: true,
-      realmId: tokenResponse.realmId || realmId,
-      expires_at: expiresAt,
-      refresh_expires_at: refreshExpiresAt,
-    });
+    // Always save as "primary" — this app connects to a single QBO company.
+    // Saving under a user-specific ID causes RLS failures when the Supabase
+    // service role key is unavailable, which silently falls back to an
+    // ephemeral file that is lost across serverless invocations.
+    await saveTokenRow(tokenResponse, state || undefined, undefined);
+
+    // Redirect back to the app so the user doesn't land on a raw JSON page
+    return NextResponse.redirect(new URL("/settings?qbo=connected", req.url));
   } catch (error: any) {
     console.error("QBO callback error", error);
-    return NextResponse.json({ error: error.message || "Token exchange failed" }, { status: 500 });
+    const msg = encodeURIComponent(error.message || "Token exchange failed");
+    return NextResponse.redirect(new URL(`/settings?qbo=error&msg=${msg}`, req.url));
   }
 }

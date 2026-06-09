@@ -41,11 +41,11 @@ export function TopBar() {
 
     const checkQboStatus = async () => {
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        const res = await fetch(`/api/qbo/invoice/query?startDate=${today}&endDate=${today}`);
+        const res = await fetch("/api/qbo/status");
         if (!res.ok) throw new Error("QBO status check failed");
+        const data = await res.json();
         if (isMounted) {
-          setQboStatus("ok");
+          setQboStatus(data.connected ? "ok" : "error");
           setLastChecked(new Date());
         }
       } catch (error) {
@@ -58,9 +58,12 @@ export function TopBar() {
 
     checkQboStatus();
     const interval = setInterval(checkQboStatus, 5 * 60 * 1000);
+    // Re-check when the tab regains focus (e.g. after returning from OAuth)
+    window.addEventListener("focus", checkQboStatus);
     return () => {
       isMounted = false;
       clearInterval(interval);
+      window.removeEventListener("focus", checkQboStatus);
     };
   }, []);
 

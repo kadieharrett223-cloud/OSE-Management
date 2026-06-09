@@ -46,8 +46,13 @@ export default function SettingsPage() {
     const checkStatus = async () => {
       try {
         // Check QBO status
-        const qboRes = await fetch('/api/qbo/refresh', { method: 'POST' });
-        setQboConnected(qboRes.ok);
+        const qboRes = await fetch('/api/qbo/status');
+        if (qboRes.ok) {
+          const qboData = await qboRes.json();
+          setQboConnected(qboData.connected === true);
+        } else {
+          setQboConnected(false);
+        }
 
         // Check Shopify status
         const shopifyRes = await fetch('/api/shopify/status');
@@ -97,6 +102,17 @@ export default function SettingsPage() {
 
     // Check for Shopify redirect messages
     const params = new URLSearchParams(window.location.search);
+    if (params.get('qbo') === 'connected') {
+      setSuccess('QuickBooks connected successfully!');
+      window.history.replaceState({}, '', '/settings');
+    } else if (params.get('qbo') === 'error') {
+      setError(params.get('msg') || 'Failed to connect QuickBooks');
+      window.history.replaceState({}, '', '/settings');
+    } else if (params.get('qbo') === 'realm_mismatch') {
+      setError('Connected to a different QuickBooks company than expected. Please try again.');
+      window.history.replaceState({}, '', '/settings');
+    }
+
     if (params.get('shopify') === 'connected') {
       setSuccess('Shopify connected successfully!');
       window.history.replaceState({}, '', '/settings');
