@@ -142,7 +142,7 @@ export function TopBar() {
             <span className="text-slate-300">Checking…</span>
           )}
           <div className="flex items-center gap-2 border-l border-slate-500 pl-3 text-slate-100 sm:ml-1">
-            <span className="font-semibold text-slate-300">Payments Received:</span>
+            <span className="font-semibold text-slate-300">Payments Today:</span>
             <span className="text-xs font-bold text-emerald-300 sm:text-sm">
               {loadingPaymentsToday ? "…" : formatCurrency(paymentsTodayTotal)}
             </span>

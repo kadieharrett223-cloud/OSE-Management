@@ -19,7 +19,7 @@ export async function GET() {
     const userId = (await getUserId()) || undefined;
     const today = toYmd(new Date());
 
-    const [rPay, rInv] = await Promise.allSettled([
+    const [rPay, rInv, rSalesReceipt] = await Promise.allSettled([
       authorizedQboFetchDirect<any>(
         `/query?query=${encodeURIComponent(
           `SELECT * FROM Payment WHERE TxnDate >= '${today}' AND TxnDate <= '${today}' MAXRESULTS 1000`
@@ -34,10 +34,22 @@ export async function GET() {
         {},
         userId
       ),
+      authorizedQboFetchDirect<any>(
+        `/query?query=${encodeURIComponent(
+          `SELECT * FROM SalesReceipt WHERE TxnDate >= '${today}' AND TxnDate <= '${today}' MAXRESULTS 1000`
+        )}&minorversion=65`,
+        {},
+        userId
+      ),
     ]);
 
     const payments: any[] = rPay.status === "fulfilled" ? (rPay.value?.QueryResponse?.Payment || []) : [];
     const paidInvoices: any[] = rInv.status === "fulfilled" ? (rInv.value?.QueryResponse?.Invoice || []) : [];
+    const salesReceiptsRaw: any[] = rSalesReceipt.status === "fulfilled" ? (rSalesReceipt.value?.QueryResponse?.SalesReceipt || []) : [];
+    const salesReceipts: any[] = salesReceiptsRaw.filter((receipt: any) => {
+      const txnSource = String(receipt?.TxnSource || "").toUpperCase();
+      return txnSource === "INTUITPAYMENT" || !!receipt?.CreditCardPayment;
+    });
 
     // Deduplicate: paid invoices take priority; payment lines that link to
     // already-counted invoices are skipped to avoid double-counting.
@@ -74,6 +86,11 @@ export async function GET() {
       }
       const unlinked = Math.max(applied - linkedAmount, 0);
       if (unlinked > 0) total += unlinked;
+    });
+
+    // Include same-day SalesReceipt payments (common for card flows).
+    salesReceipts.forEach((receipt: any) => {
+      total += Number(receipt.TotalAmt) || 0;
     });
 
     return NextResponse.json({ ok: true, total });
