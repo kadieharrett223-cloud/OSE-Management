@@ -303,6 +303,7 @@ export default function Dashboard() {
   const [loadingShopifyPayouts, setLoadingShopifyPayouts] = useState(true);
   const [showShopifyPayoutsModal, setShowShopifyPayoutsModal] = useState(false);
   const [shopifyPayoutDiagnostics, setShopifyPayoutDiagnostics] = useState<string | null>(null);
+  const [printReportError, setPrintReportError] = useState<string | null>(null);
 
   const scheduledShopifyPayouts = shopifyPayouts.filter((payout) => {
     const status = normalizePayoutStatus(payout.status);
@@ -390,10 +391,16 @@ export default function Dashboard() {
 
     fetchSummary();
     const interval = setInterval(fetchSummary, 30000);
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 1, 0);
+    const msUntilMidnight = Math.max(nextMidnight.getTime() - now.getTime(), 1000);
+    const midnightRefresh = setTimeout(fetchSummary, msUntilMidnight);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
+      clearTimeout(midnightRefresh);
     };
   }, []);
 
@@ -434,6 +441,15 @@ export default function Dashboard() {
       window.print();
       setPrintingPartialPaid(false);
     }, 150);
+  };
+
+  const handleOpenPrintableReport = (type: string) => {
+    setPrintReportError(null);
+    const url = `/api/reports/print?type=${encodeURIComponent(type)}&_=${Date.now()}`;
+    const reportWindow = window.open(url, "_blank", "noopener,noreferrer");
+    if (!reportWindow) {
+      setPrintReportError("Popup blocked. Please allow popups and try printing again.");
+    }
   };
 
   // Fetch customer payments made today in QuickBooks Payments
@@ -557,6 +573,24 @@ export default function Dashboard() {
                 </div>
               </div>
             </header>
+
+            <div className="bg-white border border-slate-200 rounded-lg p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">Printable Reports</h2>
+                  <p className="mt-0.5 text-xs text-slate-600">Open a printer-friendly report in a new tab.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => handleOpenPrintableReport("open-invoices")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">Open Invoices</button>
+                  <button type="button" onClick={() => handleOpenPrintableReport("estimates")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">Estimates</button>
+                  <button type="button" onClick={() => handleOpenPrintableReport("accepted-estimates-unpaid")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">Accepted Estimates</button>
+                  <button type="button" onClick={() => handleOpenPrintableReport("sales-week")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">This Week</button>
+                  <button type="button" onClick={() => handleOpenPrintableReport("sales-month")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">This Month</button>
+                  <button type="button" onClick={() => handleOpenPrintableReport("sales-ytd")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">Year To Date</button>
+                </div>
+              </div>
+              {printReportError && <p className="mt-2 text-xs text-red-600">{printReportError}</p>}
+            </div>
 
             {/* Key Metrics */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

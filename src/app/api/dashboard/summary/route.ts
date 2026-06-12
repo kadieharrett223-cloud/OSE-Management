@@ -2,13 +2,7 @@
 import { authorizedQboFetchDirect } from "@/lib/qbo";
 import { getUserId } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
-
-function toYmd(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+import { BUSINESS_TIME_ZONE, getBusinessDateContext, parseYmd } from "@/lib/business-date";
 
 async function qbo<T = any>(query: string, userId?: string): Promise<T> {
   return authorizedQboFetchDirect<T>(
@@ -21,25 +15,19 @@ async function qbo<T = any>(query: string, userId?: string): Promise<T> {
 export async function GET() {
   try {
     const userId = (await getUserId()) || undefined;
-
     const now = new Date();
-    const today = toYmd(now);
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-
-    const weekStartDate = new Date(now);
-    weekStartDate.setDate(weekStartDate.getDate() - ((weekStartDate.getDay() + 6) % 7));
-    const weekStart = toYmd(weekStartDate);
-
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-    const lastMonthStartStr = toYmd(lastMonthStart);
-    const lastMonthEndStr = toYmd(lastMonthEnd);
-
-    const daysSoFar = now.getDate();
-    const lastMonthCompareDays = Math.min(daysSoFar, lastMonthEnd.getDate());
-    const lastMonthCompareEndStr = toYmd(
-      new Date(lastMonthStart.getFullYear(), lastMonthStart.getMonth(), lastMonthCompareDays)
-    );
+    const {
+      today,
+      weekStart,
+      monthStart,
+      lastMonthStart,
+      lastMonthEnd,
+      lastMonthCompareEnd,
+      lastMonthCompareDays,
+      daysSoFar,
+      currentYear,
+      currentMonth,
+    } = getBusinessDateContext(now, BUSINESS_TIME_ZONE);
 
     const payQ = (s: string, e: string) =>
       `SELECT * FROM Payment WHERE TxnDate >= '${s}' AND TxnDate <= '${e}' ORDERBY TxnDate DESC MAXRESULTS 1000`;
@@ -61,8 +49,8 @@ export async function GET() {
       qbo(payQ(today, today), userId),
       qbo(payQ(weekStart, today), userId),
       qbo(payQ(monthStart, today), userId),
-      qbo(payQ(lastMonthStartStr, lastMonthEndStr), userId),
-      qbo(payQ(lastMonthStartStr, lastMonthCompareEndStr), userId),
+      qbo(payQ(lastMonthStart, lastMonthEnd), userId),
+      qbo(payQ(lastMonthStart, lastMonthCompareEnd), userId),
       qbo(billQ(monthStart, today), userId),
       qbo(billQ(today, today), userId),
       qbo(`SELECT * FROM Invoice WHERE Balance > '0' ORDERBY TxnDate DESC MAXRESULTS 1000`, userId),
@@ -93,7 +81,9 @@ export async function GET() {
     const buildCumulative = (pmts: any[], days: number) => {
       const daily = Array<number>(days).fill(0);
       pmts.forEach((p: any) => {
-        const idx = Math.max(0, Math.min(days - 1, new Date(p.TxnDate).getDate() - 1));
+        const txn = parseYmd(p.TxnDate);
+        if (!txn) return;
+        const idx = Math.max(0, Math.min(days - 1, txn.day - 1));
         daily[idx] += Math.max((Number(p.TotalAmt)||0) - (Number(p.UnappliedAmt)||0), 0);
       });
       let r = 0; return daily.map(v => (r += v));
@@ -102,9 +92,10 @@ export async function GET() {
     const buildExpenseCumulative = (pmts: any[], days: number, yr: number, mo: number) => {
       const daily = Array<number>(days).fill(0);
       pmts.forEach((p: any) => {
-        const d = new Date(p.TxnDate);
-        if (d.getFullYear() !== yr || d.getMonth() !== mo) return;
-        const idx = Math.max(0, Math.min(days - 1, d.getDate() - 1));
+        const txn = parseYmd(p.TxnDate);
+        if (!txn) return;
+        if (txn.year !== yr || txn.month !== mo) return;
+        const idx = Math.max(0, Math.min(days - 1, txn.day - 1));
         daily[idx] += Number(p.TotalAmt) || 0;
       });
       let r = 0; return daily.map(v => (r += v));
@@ -207,7 +198,7 @@ export async function GET() {
       salesLastMonth: sumApplied(paymentsLastMonth),
       currentMonthTrend: buildCumulative(paymentsMonth, daysSoFar),
       lastMonthTrend: buildCumulative(paymentsLastMonthTrend, lastMonthCompareDays),
-      expenseTrend: buildExpenseCumulative(billPaymentsMonth, daysSoFar, now.getFullYear(), now.getMonth()),
+      expenseTrend: buildExpenseCumulative(billPaymentsMonth, daysSoFar, currentYear, currentMonth),
       paidExpensesTotal: billPaymentsMonth.reduce((s: number, p: any) => s + (Number(p.TotalAmt)||0), 0),
       topExpenses,
       vendorPaymentsTotal,
@@ -219,6 +210,8 @@ export async function GET() {
       paymentsTotal: itemizedCustomerPayments.reduce((s: number, r: any) => s + (Number(r.appliedAmount)||0), 0),
       customerPaymentsToday: itemizedCustomerPayments,
       recentPurchases,
+      businessTimeZone: BUSINESS_TIME_ZONE,
+      businessDate: today,
     });
   } catch (error: any) {
     console.error("[dashboard/summary] fatal:", error);

@@ -1,23 +1,17 @@
 import { NextResponse } from "next/server";
 import { authorizedQboFetchDirect } from "@/lib/qbo";
 import { getUserId } from "@/lib/auth";
+import { BUSINESS_TIME_ZONE, toYmdInTimeZone } from "@/lib/business-date";
 
 // Returns the combined "received today" total: QBO Payment records + fully-paid
 // invoices dated today — deduplicated the same way as the dashboard summary's
 // paymentsTotal field.  Replaces the heavier /api/qbo/payment/query for the
 // topbar so the two numbers stay in sync.
 
-function toYmd(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 export async function GET() {
   try {
     const userId = (await getUserId()) || undefined;
-    const today = toYmd(new Date());
+    const today = toYmdInTimeZone(new Date(), BUSINESS_TIME_ZONE);
 
     const [rPay, rInv, rSalesReceipt] = await Promise.allSettled([
       authorizedQboFetchDirect<any>(

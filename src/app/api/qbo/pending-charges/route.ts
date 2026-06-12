@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizedQboFetch, ensureAccessToken, QboApiError } from "@/lib/qbo";
 import { getUserId } from "@/lib/auth";
+import { BUSINESS_TIME_ZONE, toYmdInTimeZone } from "@/lib/business-date";
 
 // QuickBooks Payments API base – separate from the accounting API
 const QBO_PAYMENTS_BASE = "https://api.intuit.com/quickbooks/v4/payments";
@@ -125,7 +126,7 @@ export async function GET(req: NextRequest) {
       ? data
       : data?.charges ?? data?.Charges ?? data?.data ?? data?.items ?? data?.results ?? [];
 
-    const localToday = new Date();
+    const localTodayYmd = toYmdInTimeZone(new Date(), BUSINESS_TIME_ZONE);
 
     const charges: PendingCharge[] = raw
       .map((c: any) => ({
@@ -153,7 +154,7 @@ export async function GET(req: NextRequest) {
       .filter((c) => {
         if (todayOnly) {
           const createdDate = toDate(c.created);
-          if (!createdDate || !isSameLocalDay(createdDate, localToday)) return false;
+          if (!createdDate || toYmdInTimeZone(createdDate, BUSINESS_TIME_ZONE) !== localTodayYmd) return false;
           const status = (c.status || "").toUpperCase();
           return !["DECLINED", "FAILED", "VOIDED", "CANCELLED", "CANCELED"].includes(status);
         }
@@ -165,7 +166,7 @@ export async function GET(req: NextRequest) {
 
     if (todayOnly && finalCharges.length === 0) {
       try {
-        finalCharges = await fetchQboIntuitPaymentSalesReceipts(userId || undefined, localToday.toISOString().slice(0, 10));
+        finalCharges = await fetchQboIntuitPaymentSalesReceipts(userId || undefined, localTodayYmd);
       } catch (fallbackError) {
         console.error("QBO IntuitPayment fallback failed", fallbackError);
       }
