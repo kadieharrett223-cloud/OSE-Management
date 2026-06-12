@@ -115,6 +115,8 @@ interface ShopifyOrderWithDeposit {
   transactionType: string | null;
 }
 
+type SalesReportRange = "ytd" | "this-week" | "last-week" | "this-month" | "last-month";
+
 const mockReps = [
   {
     id: 1,
@@ -304,6 +306,7 @@ export default function Dashboard() {
   const [showShopifyPayoutsModal, setShowShopifyPayoutsModal] = useState(false);
   const [shopifyPayoutDiagnostics, setShopifyPayoutDiagnostics] = useState<string | null>(null);
   const [printReportError, setPrintReportError] = useState<string | null>(null);
+  const [salesReportRange, setSalesReportRange] = useState<SalesReportRange>("ytd");
 
   const scheduledShopifyPayouts = shopifyPayouts.filter((payout) => {
     const status = normalizePayoutStatus(payout.status);
@@ -443,9 +446,10 @@ export default function Dashboard() {
     }, 150);
   };
 
-  const handleOpenPrintableReport = (type: string) => {
+  const handleOpenPrintableReport = (type: string, range?: SalesReportRange) => {
     setPrintReportError(null);
-    const url = `/api/reports/print?type=${encodeURIComponent(type)}&_=${Date.now()}`;
+    const rangeQuery = range ? `&range=${encodeURIComponent(range)}` : "";
+    const url = `/api/reports/print?type=${encodeURIComponent(type)}${rangeQuery}&_=${Date.now()}`;
     const reportWindow = window.open(url, "_blank", "noopener,noreferrer");
     if (!reportWindow) {
       setPrintReportError("Popup blocked. Please allow popups and try printing again.");
@@ -584,9 +588,18 @@ export default function Dashboard() {
                   <button type="button" onClick={() => handleOpenPrintableReport("open-invoices")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">Open Invoices</button>
                   <button type="button" onClick={() => handleOpenPrintableReport("estimates")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">Estimates</button>
                   <button type="button" onClick={() => handleOpenPrintableReport("accepted-estimates-unpaid")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">Accepted Estimates</button>
-                  <button type="button" onClick={() => handleOpenPrintableReport("sales-week")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">This Week</button>
-                  <button type="button" onClick={() => handleOpenPrintableReport("sales-month")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">This Month</button>
-                  <button type="button" onClick={() => handleOpenPrintableReport("sales-ytd")} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">Year To Date</button>
+                  <select
+                    value={salesReportRange}
+                    onChange={(event) => setSalesReportRange(event.target.value as SalesReportRange)}
+                    className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
+                  >
+                    <option value="ytd">Year To Date</option>
+                    <option value="this-week">This Week</option>
+                    <option value="last-week">Last Week</option>
+                    <option value="this-month">This Month</option>
+                    <option value="last-month">Last Month</option>
+                  </select>
+                  <button type="button" onClick={() => handleOpenPrintableReport("sales", salesReportRange)} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 transition">Sales Report</button>
                 </div>
               </div>
               {printReportError && <p className="mt-2 text-xs text-red-600">{printReportError}</p>}

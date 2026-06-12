@@ -47,13 +47,14 @@ function buildHtml(def: ReportDefinition) {
       ? `<tr><td colspan="${def.columns.length}" class="empty">No records found.</td></tr>`
       : def.rows
           .map((row) => {
+            const rowClass = String(row.__rowClass || "").trim();
             const tds = def.columns
               .map((c) => {
                 const value = row[c.key] ?? "";
                 return `<td class="${c.align === "right" ? "right" : "left"}">${esc(value)}</td>`;
               })
               .join("");
-            return `<tr>${tds}</tr>`;
+            return `<tr class="${esc(rowClass)}">${tds}</tr>`;
           })
           .join("");
 
@@ -76,6 +77,7 @@ function buildHtml(def: ReportDefinition) {
     table { width: 100%; border-collapse: collapse; margin-top: 18px; }
     th, td { border: 1px solid #e2e8f0; padding: 8px 10px; font-size: 12px; }
     th { background: #f8fafc; text-transform: uppercase; letter-spacing: 0.03em; color: #475569; }
+    tr.row-partial td { background: #fef9c3; }
     .right { text-align: right; }
     .left { text-align: left; }
     .empty { text-align: center; color: #64748b; padding: 20px 10px; }
@@ -121,6 +123,10 @@ async function buildOpenInvoicesReport(userId?: string): Promise<ReportDefinitio
       { key: "balance", label: "Balance", align: "right" },
     ],
     rows: invoices.map((inv) => ({
+      __rowClass:
+        (Number(inv.TotalAmt) || 0) > (Number(inv.Balance) || 0) && (Number(inv.Balance) || 0) > 0
+          ? "row-partial"
+          : "",
       docNumber: inv.DocNumber || inv.Id || "N/A",
       txnDate: inv.TxnDate || "",
       customer: inv.CustomerRef?.name || inv.CustomerRef?.value || "Unknown",
@@ -189,11 +195,54 @@ async function buildAcceptedEstimatesReport(userId?: string): Promise<ReportDefi
   };
 }
 
-async function buildSalesRangeReport(range: "week" | "month" | "ytd" | "today", userId?: string): Promise<ReportDefinition> {
+async function buildSalesRangeReport(
+  range: "today" | "this-week" | "last-week" | "this-month" | "last-month" | "ytd",
+  userId?: string
+): Promise<ReportDefinition> {
   const ctx = getBusinessDateContext(new Date(), BUSINESS_TIME_ZONE);
-  const startDate =
-    range === "week" ? ctx.weekStart : range === "month" ? ctx.monthStart : range === "ytd" ? ctx.yearStart : ctx.today;
-  const endDate = ctx.today;
+
+  const shiftYmd = (ymd: string, deltaDays: number) => {
+    const [y, m, d] = ymd.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() + deltaDays);
+    const yy = dt.getUTCFullYear();
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getUTCDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  };
+
+  const lastWeekStart = shiftYmd(ctx.weekStart, -7);
+  const lastWeekEnd = shiftYmd(ctx.weekStart, -1);
+
+  let startDate = ctx.today;
+  let endDate = ctx.today;
+  let label = "Today";
+
+  if (range === "this-week") {
+    startDate = ctx.weekStart;
+    endDate = ctx.today;
+    label = "This Week";
+  } else if (range === "last-week") {
+    startDate = lastWeekStart;
+    endDate = lastWeekEnd;
+    label = "Last Week";
+  } else if (range === "this-month") {
+    startDate = ctx.monthStart;
+    endDate = ctx.today;
+    label = "This Month";
+  } else if (range === "last-month") {
+    startDate = ctx.lastMonthStart;
+    endDate = ctx.lastMonthEnd;
+    label = "Last Month";
+  } else if (range === "ytd") {
+    startDate = ctx.yearStart;
+    endDate = ctx.today;
+    label = "Year To Date";
+  } else if (range === "today") {
+    startDate = ctx.today;
+    endDate = ctx.today;
+    label = "Today";
+  }
 
   const [payResult, salesReceiptResult] = await Promise.allSettled([
     qbo<any>(
@@ -246,8 +295,6 @@ async function buildSalesRangeReport(range: "week" | "month" | "ytd" | "today", 
 
   const total = rows.reduce((sum, r: any) => sum + (Number(r.numericAmount) || 0), 0);
 
-  const label = range === "week" ? "This Week" : range === "month" ? "This Month" : range === "ytd" ? "Year To Date" : "Today";
-
   return {
     title: `Sales Report (${label})`,
     subtitle: `${startDate} to ${endDate}`,
@@ -266,6 +313,7 @@ async function buildSalesRangeReport(range: "week" | "month" | "ytd" | "today", 
 export async function GET(req: NextRequest) {
   try {
     const type = (req.nextUrl.searchParams.get("type") || "").toLowerCase();
+    const range = (req.nextUrl.searchParams.get("range") || "").toLowerCase();
     const userId = (await getUserId()) || undefined;
 
     let report: ReportDefinition;
@@ -279,11 +327,17 @@ export async function GET(req: NextRequest) {
       case "accepted-estimates-unpaid":
         report = await buildAcceptedEstimatesReport(userId);
         break;
+      case "sales":
+        report = await buildSalesRangeReport(
+          (range as "today" | "this-week" | "last-week" | "this-month" | "last-month" | "ytd") || "ytd",
+          userId
+        );
+        break;
       case "sales-week":
-        report = await buildSalesRangeReport("week", userId);
+        report = await buildSalesRangeReport("this-week", userId);
         break;
       case "sales-month":
-        report = await buildSalesRangeReport("month", userId);
+        report = await buildSalesRangeReport("this-month", userId);
         break;
       case "sales-ytd":
         report = await buildSalesRangeReport("ytd", userId);
@@ -292,7 +346,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "Unknown report type. Use one of: open-invoices, estimates, accepted-estimates-unpaid, sales-week, sales-month, sales-ytd",
+              "Unknown report type. Use one of: open-invoices, estimates, accepted-estimates-unpaid, sales (with range), sales-week, sales-month, sales-ytd",
           },
           { status: 400 }
         );
