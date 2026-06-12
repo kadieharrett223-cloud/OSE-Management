@@ -14,6 +14,10 @@ type ReportDefinition = {
   totalValue?: number;
 };
 
+type TimelineKey = "ytd" | "last-year" | "last-3-months" | "this-month" | "last-month" | "this-week" | "last-week";
+type EstimateStatusKey = "all" | "accepted" | "open" | "converted";
+type InvoiceStatusKey = "all" | "open" | "paid";
+
 const nf = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function money(value: number) {
@@ -138,14 +142,79 @@ async function buildOpenInvoicesReport(userId?: string): Promise<ReportDefinitio
   };
 }
 
-async function buildEstimatesReport(userId?: string): Promise<ReportDefinition> {
-  const data = await qbo<any>("SELECT * FROM Estimate ORDERBY TxnDate DESC MAXRESULTS 1000", userId);
+function shiftYmd(ymd: string, deltaDays: number) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + deltaDays);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function toUtcYmd(date: Date) {
+  const yy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function getTimelineRange(timeline: TimelineKey) {
+  const ctx = getBusinessDateContext(new Date(), BUSINESS_TIME_ZONE);
+  const now = new Date();
+
+  if (timeline === "ytd") {
+    return { startDate: ctx.yearStart, endDate: ctx.today, label: "Year To Date" };
+  }
+  if (timeline === "last-year") {
+    const y = ctx.currentYear - 1;
+    return { startDate: `${y}-01-01`, endDate: `${y}-12-31`, label: "Last Year" };
+  }
+  if (timeline === "last-3-months") {
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1));
+    return { startDate: toUtcYmd(start), endDate: ctx.today, label: "Last 3 Months" };
+  }
+  if (timeline === "this-month") {
+    return { startDate: ctx.monthStart, endDate: ctx.today, label: "This Month" };
+  }
+  if (timeline === "last-month") {
+    return { startDate: ctx.lastMonthStart, endDate: ctx.lastMonthEnd, label: "Last Month" };
+  }
+  if (timeline === "this-week") {
+    return { startDate: ctx.weekStart, endDate: ctx.today, label: "This Week" };
+  }
+  const lastWeekStart = shiftYmd(ctx.weekStart, -7);
+  const lastWeekEnd = shiftYmd(ctx.weekStart, -1);
+  return { startDate: lastWeekStart, endDate: lastWeekEnd, label: "Last Week" };
+}
+
+async function buildEstimatesReport(
+  status: EstimateStatusKey,
+  timeline: TimelineKey,
+  userId?: string
+): Promise<ReportDefinition> {
+  const { startDate, endDate, label } = getTimelineRange(timeline);
+  const data = await qbo<any>(
+    `SELECT * FROM Estimate WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' ORDERBY TxnDate DESC MAXRESULTS 1000`,
+    userId
+  );
   const estimates: any[] = data?.QueryResponse?.Estimate || [];
-  const total = estimates.reduce((sum, est) => sum + (Number(est.TotalAmt) || 0), 0);
+
+  const filtered = estimates.filter((est) => {
+    if (status === "all") return true;
+    const txnStatus = String(est.TxnStatus || "").toUpperCase();
+    if (status === "accepted") return txnStatus === "ACCEPTED";
+    if (status === "open") return txnStatus === "PENDING" || txnStatus === "OPEN";
+    return txnStatus === "CLOSED" || txnStatus.includes("CONVERT");
+  });
+
+  const total = filtered.reduce((sum, est) => sum + (Number(est.TotalAmt) || 0), 0);
+  const statusLabel =
+    status === "all" ? "All" : status === "accepted" ? "Accepted" : status === "open" ? "Open" : "Converted";
 
   return {
     title: "Estimates Report",
-    subtitle: "All estimates",
+    subtitle: `${statusLabel} estimates • ${label} (${startDate} to ${endDate})`,
     columns: [
       { key: "docNumber", label: "Estimate #" },
       { key: "txnDate", label: "Date" },
@@ -153,7 +222,7 @@ async function buildEstimatesReport(userId?: string): Promise<ReportDefinition> 
       { key: "status", label: "Status" },
       { key: "amount", label: "Amount", align: "right" },
     ],
-    rows: estimates.map((est) => ({
+    rows: filtered.map((est) => ({
       docNumber: est.DocNumber || est.Id || "N/A",
       txnDate: est.TxnDate || "",
       customer: est.CustomerRef?.name || est.CustomerRef?.value || "Unknown",
@@ -161,6 +230,57 @@ async function buildEstimatesReport(userId?: string): Promise<ReportDefinition> 
       amount: money(Number(est.TotalAmt) || 0),
     })),
     totalLabel: "Total estimate amount",
+    totalValue: total,
+  };
+}
+
+async function buildInvoicesReport(
+  status: InvoiceStatusKey,
+  timeline: TimelineKey,
+  userId?: string
+): Promise<ReportDefinition> {
+  const { startDate, endDate, label } = getTimelineRange(timeline);
+  const data = await qbo<any>(
+    `SELECT * FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' ORDERBY TxnDate DESC MAXRESULTS 1000`,
+    userId
+  );
+  const invoices: any[] = data?.QueryResponse?.Invoice || [];
+
+  const filtered = invoices.filter((inv) => {
+    const balance = Number(inv.Balance) || 0;
+    if (status === "all") return true;
+    if (status === "open") return balance > 0;
+    return balance <= 0;
+  });
+
+  const total = filtered.reduce((sum, inv) => sum + (Number(inv.Balance) || 0), 0);
+  const statusLabel = status === "all" ? "All" : status === "open" ? "Open" : "Paid";
+
+  return {
+    title: "Invoices Report",
+    subtitle: `${statusLabel} invoices • ${label} (${startDate} to ${endDate})`,
+    columns: [
+      { key: "docNumber", label: "Invoice" },
+      { key: "txnDate", label: "Date" },
+      { key: "customer", label: "Customer" },
+      { key: "status", label: "Status" },
+      { key: "total", label: "Total", align: "right" },
+      { key: "balance", label: "Balance", align: "right" },
+    ],
+    rows: filtered.map((inv) => {
+      const totalAmt = Number(inv.TotalAmt) || 0;
+      const balance = Number(inv.Balance) || 0;
+      return {
+        __rowClass: totalAmt > balance && balance > 0 ? "row-partial" : "",
+        docNumber: inv.DocNumber || inv.Id || "N/A",
+        txnDate: inv.TxnDate || "",
+        customer: inv.CustomerRef?.name || inv.CustomerRef?.value || "Unknown",
+        status: balance <= 0 ? "Paid" : "Open",
+        total: money(totalAmt),
+        balance: money(balance),
+      };
+    }),
+    totalLabel: "Outstanding balance",
     totalValue: total,
   };
 }
@@ -314,6 +434,8 @@ export async function GET(req: NextRequest) {
   try {
     const type = (req.nextUrl.searchParams.get("type") || "").toLowerCase();
     const range = (req.nextUrl.searchParams.get("range") || "").toLowerCase();
+    const status = (req.nextUrl.searchParams.get("status") || "").toLowerCase();
+    const timeline = (req.nextUrl.searchParams.get("timeline") || "").toLowerCase();
     const userId = (await getUserId()) || undefined;
 
     let report: ReportDefinition;
@@ -322,7 +444,18 @@ export async function GET(req: NextRequest) {
         report = await buildOpenInvoicesReport(userId);
         break;
       case "estimates":
-        report = await buildEstimatesReport(userId);
+        report = await buildEstimatesReport(
+          (status as EstimateStatusKey) || "all",
+          (timeline as TimelineKey) || "ytd",
+          userId
+        );
+        break;
+      case "invoices":
+        report = await buildInvoicesReport(
+          (status as InvoiceStatusKey) || "all",
+          (timeline as TimelineKey) || "ytd",
+          userId
+        );
         break;
       case "accepted-estimates-unpaid":
         report = await buildAcceptedEstimatesReport(userId);
