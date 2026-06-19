@@ -204,7 +204,6 @@ export default function ReplacementPartsPage() {
     try {
       const payload = {
         part_name: details.part_name,
-        status: details.status,
         request_notes: details.request_notes || null,
         tracking_carrier: details.tracking_carrier || null,
         tracking_number: details.tracking_number || null,
@@ -513,11 +512,11 @@ export default function ReplacementPartsPage() {
                         />
                       </label>
                       <label className="text-sm text-slate-700">
-                        <span className="mb-1 block font-medium">Status</span>
+                        <span className="mb-1 block font-medium">Status (Auto)</span>
                         <select
                           value={details.status}
-                          onChange={(e) => setDetails({ ...details, status: e.target.value as StatusValue })}
-                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
+                          disabled
+                          className="w-full cursor-not-allowed rounded border border-slate-300 bg-slate-100 px-2 py-1.5 text-slate-900"
                         >
                           {STATUS_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -525,6 +524,9 @@ export default function ReplacementPartsPage() {
                             </option>
                           ))}
                         </select>
+                        <span className="mt-1 block text-xs text-slate-500">
+                          Updated automatically from tracking number, delivered date, and live carrier status.
+                        </span>
                       </label>
                       <label className="text-sm text-slate-700">
                         <span className="mb-1 block font-medium">Tracking Carrier</span>
