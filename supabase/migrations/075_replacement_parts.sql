@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS replacement_parts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   part_name TEXT NOT NULL,
   customer_name TEXT,
-  requested_by TEXT,
   request_notes TEXT,
   internal_notes TEXT,
   status TEXT NOT NULL DEFAULT 'REQUESTED',

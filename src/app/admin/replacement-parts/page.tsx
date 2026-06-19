@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
 type StatusValue = "REQUESTED" | "ORDERED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
@@ -11,7 +11,6 @@ type ReplacementPart = {
   updated_at: string;
   part_name: string;
   customer_name: string | null;
-  requested_by: string | null;
   request_notes: string | null;
   internal_notes: string | null;
   status: StatusValue;
@@ -46,7 +45,6 @@ type InvoiceCandidate = {
   total: number;
   balance: number;
   paid: boolean;
-  salesRep: string | null;
 };
 
 type ReplacementPartDetails = ReplacementPart & {
@@ -72,6 +70,20 @@ const STATUS_META: Record<StatusValue, { symbol: string; chipClass: string }> = 
 const money = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
 
+function buildTrackingKey(item: {
+  tracking_carrier: string | null;
+  tracking_number: string | null;
+  shipped_at: string | null;
+  delivered_at: string | null;
+}) {
+  return [
+    item.tracking_carrier || "",
+    item.tracking_number || "",
+    item.shipped_at || "",
+    item.delivered_at || "",
+  ].join("|");
+}
+
 export default function ReplacementPartsPage() {
   const [parts, setParts] = useState<ReplacementPart[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +97,9 @@ export default function ReplacementPartsPage() {
   const [noteEntry, setNoteEntry] = useState("");
   const [invoiceCandidates, setInvoiceCandidates] = useState<InvoiceCandidate[]>([]);
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
+  const [trackingAutoSaving, setTrackingAutoSaving] = useState(false);
+  const [trackingRefreshing, setTrackingRefreshing] = useState(false);
+  const trackingSyncKeyRef = useRef<string>("");
 
   const selectedPart = useMemo(() => parts.find((part) => part.id === selectedId) || null, [parts, selectedId]);
 
@@ -126,6 +141,7 @@ export default function ReplacementPartsPage() {
       if (!res.ok) throw new Error(result?.error || "Failed to load replacement part");
       const row = result.data as ReplacementPartDetails;
       setDetails(row);
+      trackingSyncKeyRef.current = buildTrackingKey(row);
       setNoteEntry("");
     } catch (error: any) {
       alert(error?.message || "Failed to load replacement part");
@@ -189,14 +205,12 @@ export default function ReplacementPartsPage() {
       const payload = {
         part_name: details.part_name,
         status: details.status,
-        requested_by: details.requested_by || null,
         request_notes: details.request_notes || null,
         tracking_carrier: details.tracking_carrier || null,
         tracking_number: details.tracking_number || null,
-        tracking_url: details.tracking_url || null,
-        tracking_status: details.tracking_status || null,
         shipped_at: details.shipped_at || null,
         delivered_at: details.delivered_at || null,
+        refresh_tracking: true,
         note_entry: noteEntry,
       };
 
@@ -211,6 +225,7 @@ export default function ReplacementPartsPage() {
       const updated = result.data as ReplacementPart;
       setParts((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
       setDetails((prev) => (prev ? { ...prev, ...updated } : prev));
+      trackingSyncKeyRef.current = buildTrackingKey(updated);
       setNoteEntry("");
     } catch (error: any) {
       alert(error?.message || "Failed to save replacement part");
@@ -218,6 +233,71 @@ export default function ReplacementPartsPage() {
       setSaving(false);
     }
   }
+
+  async function saveTrackingLive(current: ReplacementPartDetails, options?: { silent?: boolean; refreshOnly?: boolean }) {
+    if (!current) return;
+
+    if (options?.refreshOnly) {
+      setTrackingRefreshing(true);
+    } else if (!options?.silent) {
+      setTrackingAutoSaving(true);
+    }
+
+    try {
+      const payload = options?.refreshOnly
+        ? { refresh_tracking: true }
+        : {
+            tracking_carrier: current.tracking_carrier || null,
+            tracking_number: current.tracking_number || null,
+            shipped_at: current.shipped_at || null,
+            delivered_at: current.delivered_at || null,
+            refresh_tracking: true,
+          };
+
+      const res = await fetch(`/api/replacement-parts/${current.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || "Failed to refresh tracking");
+
+      const updated = result.data as ReplacementPart;
+      setParts((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
+      setDetails((prev) => (prev ? { ...prev, ...updated } : prev));
+      trackingSyncKeyRef.current = buildTrackingKey(updated);
+    } catch (error: any) {
+      if (!options?.silent) {
+        alert(error?.message || "Failed to refresh tracking");
+      }
+    } finally {
+      setTrackingAutoSaving(false);
+      setTrackingRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!details) return;
+
+    const key = buildTrackingKey(details);
+    if (key === trackingSyncKeyRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      void saveTrackingLive(details, { silent: true });
+    }, 800);
+
+    return () => window.clearTimeout(timer);
+  }, [details?.id, details?.tracking_carrier, details?.tracking_number, details?.shipped_at, details?.delivered_at]);
+
+  useEffect(() => {
+    if (!details?.id || !details.tracking_number) return;
+
+    const interval = window.setInterval(() => {
+      void saveTrackingLive(details, { silent: true, refreshOnly: true });
+    }, 60000);
+
+    return () => window.clearInterval(interval);
+  }, [details?.id, details?.tracking_number, details?.tracking_carrier]);
 
   async function deletePart() {
     if (!details || deletingPart) return;
@@ -447,16 +527,6 @@ export default function ReplacementPartsPage() {
                         </select>
                       </label>
                       <label className="text-sm text-slate-700">
-                        <span className="mb-1 block font-medium">Requested By</span>
-                        <input
-                          type="text"
-                          value={details.requested_by || ""}
-                          onChange={(e) => setDetails({ ...details, requested_by: e.target.value || null })}
-                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
-                          placeholder="Sales rep or request owner"
-                        />
-                      </label>
-                      <label className="text-sm text-slate-700">
                         <span className="mb-1 block font-medium">Tracking Carrier</span>
                         <input
                           type="text"
@@ -476,13 +546,13 @@ export default function ReplacementPartsPage() {
                         />
                       </label>
                       <label className="text-sm text-slate-700">
-                        <span className="mb-1 block font-medium">Tracking Status</span>
+                        <span className="mb-1 block font-medium">Tracking Status (Auto)</span>
                         <input
                           type="text"
                           value={details.tracking_status || ""}
-                          onChange={(e) => setDetails({ ...details, tracking_status: e.target.value || null })}
-                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
-                          placeholder="In transit, delayed, delivered"
+                          readOnly
+                          className="w-full rounded border border-slate-300 bg-slate-100 px-2 py-1.5 text-slate-900"
+                          placeholder="Will update automatically"
                         />
                       </label>
                       <label className="text-sm text-slate-700">
@@ -506,14 +576,10 @@ export default function ReplacementPartsPage() {
                     </div>
 
                     <label className="block text-sm text-slate-700">
-                      <span className="mb-1 block font-medium">Tracking URL</span>
-                      <input
-                        type="url"
-                        value={details.tracking_url || ""}
-                        onChange={(e) => setDetails({ ...details, tracking_url: e.target.value || null })}
-                        placeholder="https://..."
-                        className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
-                      />
+                      <span className="mb-1 block font-medium">Tracking URL (Auto)</span>
+                      <div className="w-full rounded border border-slate-300 bg-slate-100 px-2 py-1.5 text-slate-900">
+                        {details.tracking_url || "Will be generated from carrier + tracking number"}
+                      </div>
                       {details.tracking_url ? (
                         <a
                           href={details.tracking_url}
@@ -525,6 +591,12 @@ export default function ReplacementPartsPage() {
                         </a>
                       ) : null}
                     </label>
+
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      {trackingAutoSaving ? <span>Saving tracking updates...</span> : null}
+                      {trackingRefreshing ? <span>Refreshing live tracking...</span> : null}
+                      {!trackingAutoSaving && !trackingRefreshing ? <span>Tracking auto-refreshes every minute when a tracking number exists.</span> : null}
+                    </div>
 
                     <label className="block text-sm text-slate-700">
                       <span className="mb-1 block font-medium">Request Notes</span>
@@ -558,13 +630,22 @@ export default function ReplacementPartsPage() {
                     </div>
 
                     <div className="flex flex-wrap justify-between gap-2">
-                      <button
-                        onClick={deletePart}
-                        disabled={deletingPart}
-                        className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
-                      >
-                        {deletingPart ? "Deleting..." : "Delete Record"}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => details && saveTrackingLive(details, { refreshOnly: true })}
+                          disabled={trackingRefreshing || !details.tracking_number}
+                          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                        >
+                          {trackingRefreshing ? "Refreshing..." : "Refresh Tracking"}
+                        </button>
+                        <button
+                          onClick={deletePart}
+                          disabled={deletingPart}
+                          className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                        >
+                          {deletingPart ? "Deleting..." : "Delete Record"}
+                        </button>
+                      </div>
                       <button
                         onClick={saveDetails}
                         disabled={saving}

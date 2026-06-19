@@ -27,6 +27,116 @@ function formatNoteTimestamp(date: Date) {
   return `${iso.slice(0, 16).replace("T", " ")} UTC`;
 }
 
+function normalizeCarrier(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const carrier = value.trim().toLowerCase();
+  if (!carrier) return null;
+
+  if (carrier.includes("ups")) return "ups";
+  if (carrier.includes("fedex") || carrier.includes("federal express")) return "fedex";
+  if (carrier.includes("usps") || carrier.includes("postal")) return "usps";
+  if (carrier.includes("dhl")) return "dhl";
+
+  return null;
+}
+
+function buildTrackingUrl(carrierInput: string | null | undefined, trackingNumberInput: string | null | undefined): string | null {
+  const trackingNumber = String(trackingNumberInput || "").trim();
+  if (!trackingNumber) return null;
+
+  const carrier = normalizeCarrier(carrierInput);
+  switch (carrier) {
+    case "ups":
+      return `https://www.ups.com/track?tracknum=${encodeURIComponent(trackingNumber)}`;
+    case "fedex":
+      return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(trackingNumber)}`;
+    case "usps":
+      return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(trackingNumber)}`;
+    case "dhl":
+      return `https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=${encodeURIComponent(trackingNumber)}`;
+    default:
+      return `https://parcelsapp.com/en/tracking/${encodeURIComponent(trackingNumber)}`;
+  }
+}
+
+function mapAfterShipTagToStatus(tag: string | null | undefined): string | null {
+  switch ((tag || "").toLowerCase()) {
+    case "delivered":
+      return "Delivered";
+    case "intransit":
+      return "In Transit";
+    case "info_received":
+      return "Label Created";
+    case "attemptfail":
+      return "Delivery Attempt Failed";
+    case "exception":
+      return "Exception";
+    case "pending":
+      return "Pending";
+    case "expired":
+      return "Expired";
+    case "notfound":
+      return "Not Found";
+    default:
+      return null;
+  }
+}
+
+function mapAfterShipTagToWorkflowStatus(tag: string | null | undefined): "SHIPPED" | "DELIVERED" | null {
+  switch ((tag || "").toLowerCase()) {
+    case "delivered":
+      return "DELIVERED";
+    case "intransit":
+    case "info_received":
+    case "attemptfail":
+    case "exception":
+      return "SHIPPED";
+    default:
+      return null;
+  }
+}
+
+function extractDatePart(dateTime: string | null | undefined): string | null {
+  if (!dateTime) return null;
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+async function getAfterShipTrackingSnapshot(carrierInput: string | null, trackingNumberInput: string | null) {
+  const apiKey = process.env.AFTERSHIP_API_KEY;
+  const trackingNumber = String(trackingNumberInput || "").trim();
+  const carrier = normalizeCarrier(carrierInput);
+
+  if (!apiKey || !trackingNumber || !carrier) return null;
+
+  const response = await fetch(`https://api.aftership.com/v4/trackings/${carrier}/${encodeURIComponent(trackingNumber)}`, {
+    headers: {
+      "aftership-api-key": apiKey,
+      "content-type": "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = await response.json();
+  const tracking = payload?.data?.tracking;
+  const tag = tracking?.tag || null;
+  const deliveredAt = extractDatePart(tracking?.delivery_time || null);
+  const shippedAt = extractDatePart(tracking?.shipment_pickup_date || tracking?.shipment_delivery_date || null);
+
+  return {
+    tag,
+    trackingStatus: mapAfterShipTagToStatus(tag),
+    workflowStatus: mapAfterShipTagToWorkflowStatus(tag),
+    shippedAt,
+    deliveredAt,
+  };
+}
+
 function mapInvoiceSummary(invoice: any) {
   if (!invoice) return null;
   const total = Number(invoice.TotalAmt) || 0;
@@ -67,7 +177,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const { data: row, error } = await supabase
       .from("replacement_parts")
       .select(
-        "id, created_at, updated_at, part_name, customer_name, requested_by, request_notes, internal_notes, status, tracking_carrier, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, request_notes, internal_notes, status, tracking_carrier, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .eq("id", params.id)
       .single();
@@ -101,11 +211,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const body = await req.json();
     const noteEntry = String(body?.note_entry || "").trim();
+    const refreshTracking = Boolean(body?.refresh_tracking);
 
     const supabase = getServerSupabaseClient();
     const { data: existing, error: existingError } = await supabase
       .from("replacement_parts")
-      .select("internal_notes")
+      .select("internal_notes, status, tracking_carrier, tracking_number, shipped_at, delivered_at")
       .eq("id", params.id)
       .single();
 
@@ -133,11 +244,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       updatePayload.request_notes = requestNotes || null;
     }
 
-    if (Object.prototype.hasOwnProperty.call(body, "requested_by")) {
-      const requestedBy = String(body?.requested_by || "").trim();
-      updatePayload.requested_by = requestedBy || null;
-    }
-
     if (Object.prototype.hasOwnProperty.call(body, "tracking_carrier")) {
       const trackingCarrier = String(body?.tracking_carrier || "").trim();
       updatePayload.tracking_carrier = trackingCarrier || null;
@@ -146,11 +252,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (Object.prototype.hasOwnProperty.call(body, "tracking_number")) {
       const trackingNumber = String(body?.tracking_number || "").trim();
       updatePayload.tracking_number = trackingNumber || null;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(body, "tracking_url")) {
-      const trackingUrl = String(body?.tracking_url || "").trim();
-      updatePayload.tracking_url = trackingUrl || null;
     }
 
     if (Object.prototype.hasOwnProperty.call(body, "tracking_status")) {
@@ -168,6 +269,49 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       updatePayload.delivered_at = deliveredAt || null;
     }
 
+    const hasTrackingCarrier = Object.prototype.hasOwnProperty.call(updatePayload, "tracking_carrier");
+    const hasTrackingNumber = Object.prototype.hasOwnProperty.call(updatePayload, "tracking_number");
+    const trackingFieldsChanged = hasTrackingCarrier || hasTrackingNumber;
+
+    const nextCarrier = hasTrackingCarrier
+      ? (updatePayload.tracking_carrier as string | null)
+      : (existing?.tracking_carrier as string | null);
+    const nextTrackingNumber = hasTrackingNumber
+      ? (updatePayload.tracking_number as string | null)
+      : (existing?.tracking_number as string | null);
+
+    if (trackingFieldsChanged || refreshTracking) {
+      updatePayload.tracking_url = buildTrackingUrl(nextCarrier, nextTrackingNumber);
+
+      const trackingSnapshot = await getAfterShipTrackingSnapshot(nextCarrier, nextTrackingNumber);
+      if (trackingSnapshot?.trackingStatus) {
+        updatePayload.tracking_status = trackingSnapshot.trackingStatus;
+      }
+
+      const nextShippedAt =
+        (Object.prototype.hasOwnProperty.call(updatePayload, "shipped_at")
+          ? (updatePayload.shipped_at as string | null)
+          : (existing?.shipped_at as string | null)) || trackingSnapshot?.shippedAt || null;
+      const nextDeliveredAt =
+        (Object.prototype.hasOwnProperty.call(updatePayload, "delivered_at")
+          ? (updatePayload.delivered_at as string | null)
+          : (existing?.delivered_at as string | null)) || trackingSnapshot?.deliveredAt || null;
+
+      updatePayload.shipped_at = nextShippedAt;
+      updatePayload.delivered_at = nextDeliveredAt;
+
+      if (!body?.status) {
+        if ((existing?.status as string) !== "CANCELLED") {
+          const workflowStatus = trackingSnapshot?.workflowStatus;
+          if (nextDeliveredAt || workflowStatus === "DELIVERED") {
+            updatePayload.status = "DELIVERED";
+          } else if (nextShippedAt || nextTrackingNumber || workflowStatus === "SHIPPED") {
+            updatePayload.status = "SHIPPED";
+          }
+        }
+      }
+    }
+
     if (body?.status) {
       updatePayload.status = body.status;
     }
@@ -177,7 +321,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .update(updatePayload)
       .eq("id", params.id)
       .select(
-        "id, created_at, updated_at, part_name, customer_name, requested_by, request_notes, internal_notes, status, tracking_carrier, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, request_notes, internal_notes, status, tracking_carrier, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .single();
 
