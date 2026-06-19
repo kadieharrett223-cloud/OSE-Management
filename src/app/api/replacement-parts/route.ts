@@ -32,7 +32,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("replacement_parts")
       .select(
-        "id, created_at, updated_at, part_name, customer_name, request_notes, internal_notes, status, tracking_carrier, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, request_notes, internal_notes, status, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .order("created_at", { ascending: false });
 
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
         created_by: session.user.email || session.user.id || "Unknown",
       })
       .select(
-        "id, created_at, updated_at, part_name, customer_name, request_notes, internal_notes, status, tracking_carrier, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, request_notes, internal_notes, status, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .single();
 

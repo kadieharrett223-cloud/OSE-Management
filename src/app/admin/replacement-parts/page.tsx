@@ -14,7 +14,6 @@ type ReplacementPart = {
   request_notes: string | null;
   internal_notes: string | null;
   status: StatusValue;
-  tracking_carrier: string | null;
   tracking_number: string | null;
   tracking_url: string | null;
   tracking_status: string | null;
@@ -71,13 +70,11 @@ const money = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
 
 function buildTrackingKey(item: {
-  tracking_carrier: string | null;
   tracking_number: string | null;
   shipped_at: string | null;
   delivered_at: string | null;
 }) {
   return [
-    item.tracking_carrier || "",
     item.tracking_number || "",
     item.shipped_at || "",
     item.delivered_at || "",
@@ -205,7 +202,6 @@ export default function ReplacementPartsPage() {
       const payload = {
         part_name: details.part_name,
         request_notes: details.request_notes || null,
-        tracking_carrier: details.tracking_carrier || null,
         tracking_number: details.tracking_number || null,
         shipped_at: details.shipped_at || null,
         delivered_at: details.delivered_at || null,
@@ -246,7 +242,6 @@ export default function ReplacementPartsPage() {
       const payload = options?.refreshOnly
         ? { refresh_tracking: true }
         : {
-            tracking_carrier: current.tracking_carrier || null,
             tracking_number: current.tracking_number || null,
             shipped_at: current.shipped_at || null,
             delivered_at: current.delivered_at || null,
@@ -286,7 +281,7 @@ export default function ReplacementPartsPage() {
     }, 800);
 
     return () => window.clearTimeout(timer);
-  }, [details?.id, details?.tracking_carrier, details?.tracking_number, details?.shipped_at, details?.delivered_at]);
+  }, [details?.id, details?.tracking_number, details?.shipped_at, details?.delivered_at]);
 
   useEffect(() => {
     if (!details?.id || !details.tracking_number) return;
@@ -296,7 +291,7 @@ export default function ReplacementPartsPage() {
     }, 60000);
 
     return () => window.clearInterval(interval);
-  }, [details?.id, details?.tracking_number, details?.tracking_carrier]);
+  }, [details?.id, details?.tracking_number]);
 
   async function deletePart() {
     if (!details || deletingPart) return;
@@ -525,18 +520,8 @@ export default function ReplacementPartsPage() {
                           ))}
                         </select>
                         <span className="mt-1 block text-xs text-slate-500">
-                          Updated automatically from tracking number, delivered date, and live carrier status.
+                          Updated automatically from tracking number and shipped/delivered dates.
                         </span>
-                      </label>
-                      <label className="text-sm text-slate-700">
-                        <span className="mb-1 block font-medium">Tracking Carrier</span>
-                        <input
-                          type="text"
-                          value={details.tracking_carrier || ""}
-                          onChange={(e) => setDetails({ ...details, tracking_carrier: e.target.value || null })}
-                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
-                          placeholder="UPS, FedEx, USPS"
-                        />
                       </label>
                       <label className="text-sm text-slate-700">
                         <span className="mb-1 block font-medium">Tracking Number</span>

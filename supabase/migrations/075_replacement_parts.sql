@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS replacement_parts (
   request_notes TEXT,
   internal_notes TEXT,
   status TEXT NOT NULL DEFAULT 'REQUESTED',
-  tracking_carrier TEXT,
   tracking_number TEXT,
   tracking_url TEXT,
   tracking_status TEXT,
