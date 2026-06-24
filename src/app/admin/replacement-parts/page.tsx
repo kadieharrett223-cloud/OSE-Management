@@ -30,6 +30,7 @@ type InvoiceSummary = {
   dueDate: string | null;
   salesRep: string | null;
   customer: string | null;
+  shippingAddress: string | null;
   total: number;
   balance: number;
   paid: boolean;
@@ -452,6 +453,10 @@ export default function ReplacementPartsPage() {
                           </p>
                           <p>
                             <span className="font-medium text-slate-900">Sales rep:</span> {details.invoiceSummary.salesRep || "-"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-900">Shipping address:</span>{" "}
+                            <span className="whitespace-pre-wrap">{details.invoiceSummary.shippingAddress || "-"}</span>
                           </p>
                           <p>
                             <span className="font-medium text-slate-900">Status:</span>{" "}
