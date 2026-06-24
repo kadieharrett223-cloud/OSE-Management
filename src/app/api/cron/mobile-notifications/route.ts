@@ -101,12 +101,17 @@ async function runJob(req: NextRequest) {
     const paymentData = await authorizedQboFetch<any>(
       `/query?query=${encodeURIComponent(`SELECT * FROM Payment WHERE TxnDate >= '${today}' AND TxnDate <= '${today}' ORDERBY TxnDate DESC`)}&minorversion=65`
     );
+    const billPaymentData = await authorizedQboFetch<any>(
+      `/query?query=${encodeURIComponent(`SELECT * FROM BillPayment WHERE TxnDate >= '${today}' AND TxnDate <= '${today}' ORDERBY TxnDate DESC`)}&minorversion=65`
+    );
 
     const payments = paymentData?.QueryResponse?.Payment || [];
+    const billPayments = billPaymentData?.QueryResponse?.BillPayment || [];
     let paymentAlertsSent = 0;
+    let billPaymentAlertsSent = 0;
 
     for (const payment of payments) {
-      const paymentId = String(payment?.Id || "").trim();
+      const paymentId = `payment:${String(payment?.Id || "").trim()}`;
       if (!paymentId) continue;
 
       const { data: existingLog } = await supabase
@@ -140,6 +145,43 @@ async function runJob(req: NextRequest) {
       });
 
       paymentAlertsSent += 1;
+    }
+
+    for (const billPayment of billPayments) {
+      const billPaymentId = `bill-payment:${String(billPayment?.Id || "").trim()}`;
+      if (!billPaymentId) continue;
+
+      const { data: existingLog } = await supabase
+        .from("customer_payment_sms_logs")
+        .select("id")
+        .eq("qbo_payment_id", billPaymentId)
+        .maybeSingle();
+
+      if (existingLog?.id) continue;
+
+      const amount = Number(billPayment?.TotalAmt) || 0;
+      if (amount <= 0) continue;
+
+      const vendorName = billPayment?.VendorRef?.name || billPayment?.PayeeRef?.name || "Vendor";
+      const paymentDate = billPayment?.TxnDate || today;
+
+      const smsText = `Payment made: ${vendorName}, $${amount.toFixed(2)}, ${paymentDate}`;
+
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: recipients.join(","),
+        subject: "Vendor payment made",
+        text: smsText,
+      });
+
+      await supabase.from("customer_payment_sms_logs").insert({
+        qbo_payment_id: billPaymentId,
+        payment_date: paymentDate,
+        customer_name: vendorName,
+        applied_amount: amount,
+      });
+
+      billPaymentAlertsSent += 1;
     }
 
     // 2) Calendar manual notification reminders at 8 AM local time (day-of)
@@ -192,6 +234,7 @@ async function runJob(req: NextRequest) {
       now: now.toISOString(),
       today,
       paymentAlertsSent,
+      billPaymentAlertsSent,
       calendarAlertsSent,
       recipients,
     });

@@ -9,6 +9,12 @@ export function TopBar() {
   const [paymentsTodayTotal, setPaymentsTodayTotal] = useState(0);
   const [loadingPaymentsToday, setLoadingPaymentsToday] = useState(true);
   const prevPaymentsTotalRef = useRef<number | null>(null);
+  const hasHydratedPaymentEventsRef = useRef(false);
+
+  const paymentEventsStorageKey = () => {
+    const day = new Date().toISOString().slice(0, 10);
+    return `payment-notification-seen:${day}`;
+  };
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
@@ -81,22 +87,55 @@ export function TopBar() {
         const paymentData = await paymentRes.json();
         // Uses combined total: Payment records + fully-paid invoices dated today
         const total = Number(paymentData?.total || 0);
+        const events = Array.isArray(paymentData?.events) ? paymentData.events : [];
         if (isMounted) {
-          // Fire OS notification when total increases (new payment detected)
-          if (
-            prevPaymentsTotalRef.current !== null &&
-            total > prevPaymentsTotalRef.current &&
+          const storageKey = paymentEventsStorageKey();
+          let seen = new Set<string>();
+          if (typeof window !== "undefined") {
+            try {
+              const rawSeen = window.localStorage.getItem(storageKey);
+              seen = new Set<string>(rawSeen ? JSON.parse(rawSeen) : []);
+            } catch {
+              seen = new Set<string>();
+            }
+          }
+
+          if (!hasHydratedPaymentEventsRef.current) {
+            events.forEach((event: any) => {
+              if (event?.id) seen.add(String(event.id));
+            });
+            hasHydratedPaymentEventsRef.current = true;
+          } else if (
             typeof window !== "undefined" &&
             "Notification" in window &&
             Notification.permission === "granted"
           ) {
-            const added = total - prevPaymentsTotalRef.current;
             const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format;
-            new Notification("Payment Received", {
-              body: `+${fmt(added)} recorded — today's total is now ${fmt(total)}`,
-              icon: "/favicon.ico",
+            events.forEach((event: any) => {
+              const eventId = String(event?.id || "").trim();
+              if (!eventId || seen.has(eventId)) return;
+
+              const type = String(event?.type || "payment");
+              const customerName = String(event?.customerName || "Customer");
+              const amount = Number(event?.amount || 0);
+
+              const isOutgoing = type === "bill_payment";
+              const title = isOutgoing ? "Payment Made" : "Payment Recorded";
+              const actionLabel = isOutgoing ? "Paid" : "Received";
+
+              new Notification(title, {
+                body: `${actionLabel}: ${customerName} — ${fmt(amount)}`,
+                icon: "/favicon.ico",
+              });
+
+              seen.add(eventId);
             });
           }
+
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(storageKey, JSON.stringify(Array.from(seen)));
+          }
+
           prevPaymentsTotalRef.current = total;
           setPaymentsTodayTotal(total);
         }
