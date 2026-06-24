@@ -101,7 +101,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const { data: row, error } = await supabase
       .from("replacement_parts")
       .select(
-        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .eq("id", params.id)
       .single();
@@ -140,7 +140,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const supabase = getServerSupabaseClient();
     const { data: existing, error: existingError } = await supabase
       .from("replacement_parts")
-      .select("internal_notes, status, tracking_number, shipped_at, delivered_at")
+      .select("internal_notes, status, tracking_number, shipped_at, delivered_at, emailed_to_customer")
       .eq("id", params.id)
       .single();
 
@@ -171,6 +171,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (Object.prototype.hasOwnProperty.call(body, "ebay_order_number")) {
       const ebayOrderNumber = String(body?.ebay_order_number || "").trim();
       updatePayload.ebay_order_number = ebayOrderNumber || null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "emailed_to_customer")) {
+      const emailedToCustomer = Boolean(body?.emailed_to_customer);
+      const wasEmailed = Boolean(existing?.emailed_to_customer);
+      updatePayload.emailed_to_customer = emailedToCustomer;
+      if (emailedToCustomer && !wasEmailed) {
+        updatePayload.emailed_at = new Date().toISOString();
+      } else if (!emailedToCustomer) {
+        updatePayload.emailed_at = null;
+      }
     }
 
     if (Object.prototype.hasOwnProperty.call(body, "tracking_number")) {
@@ -245,7 +256,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .update(updatePayload)
       .eq("id", params.id)
       .select(
-        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .single();
 

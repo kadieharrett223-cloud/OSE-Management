@@ -15,6 +15,8 @@ type ReplacementPart = {
   request_notes: string | null;
   internal_notes: string | null;
   status: StatusValue;
+  emailed_to_customer: boolean;
+  emailed_at: string | null;
   tracking_number: string | null;
   tracking_url: string | null;
   tracking_status: string | null;
@@ -208,6 +210,7 @@ export default function ReplacementPartsPage() {
         part_name: details.part_name,
         request_notes: details.request_notes || null,
         ebay_order_number: details.ebay_order_number || null,
+        emailed_to_customer: details.emailed_to_customer,
         tracking_number: details.tracking_number || null,
         shipped_at: details.shipped_at || null,
         delivered_at: details.delivered_at || null,
@@ -440,6 +443,9 @@ export default function ReplacementPartsPage() {
                         <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>
                           eBay order: {part.ebay_order_number || "-"}
                         </p>
+                        <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700" : part.emailed_to_customer ? "text-emerald-700" : "text-slate-600"}`}>
+                          Emailed: {part.emailed_to_customer ? `Yes${part.emailed_at ? ` (${new Date(part.emailed_at).toLocaleString()})` : ""}` : "No"}
+                        </p>
                         <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700 font-medium" : "text-slate-500"}`}>
                           {STATUS_OPTIONS.find((s) => s.value === part.status)?.label || part.status}
                         </p>
@@ -552,6 +558,32 @@ export default function ReplacementPartsPage() {
                           placeholder="e.g. 12-34567-89012"
                           className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
                         />
+                      </label>
+                      <label className="text-sm text-slate-700">
+                        <span className="mb-1 block font-medium">Email Sent</span>
+                        <div className="flex items-center gap-2 rounded border border-slate-300 bg-white px-2 py-2">
+                          <input
+                            id="emailed-to-customer"
+                            type="checkbox"
+                            checked={details.emailed_to_customer}
+                            onChange={(e) =>
+                              setDetails({
+                                ...details,
+                                emailed_to_customer: e.target.checked,
+                                emailed_at: e.target.checked ? details.emailed_at || new Date().toISOString() : null,
+                              })
+                            }
+                            className="h-4 w-4"
+                          />
+                          <label htmlFor="emailed-to-customer" className="text-sm text-slate-900">
+                            Mark as emailed
+                          </label>
+                        </div>
+                        <span className="mt-1 block text-xs text-slate-500">
+                          {details.emailed_to_customer
+                            ? `Marked emailed${details.emailed_at ? ` at ${new Date(details.emailed_at).toLocaleString()}` : ""}`
+                            : "Not emailed yet"}
+                        </span>
                       </label>
                       <label className="text-sm text-slate-700">
                         <span className="mb-1 block font-medium">Tracking Number</span>
