@@ -39,6 +39,7 @@ type InvoiceSummary = {
   dueDate: string | null;
   salesRep: string | null;
   customer: string | null;
+  shippingAddress: string | null;
   total: number;
   balance: number;
   paid: boolean;
@@ -267,6 +268,7 @@ export default function SpecialOrdersPage() {
           .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; margin-bottom: 18px; }
           .label { font-size: 12px; color: #475569; text-transform: uppercase; letter-spacing: .02em; }
           .value { font-size: 14px; margin-top: 2px; }
+          .value.multiline { white-space: pre-wrap; }
           table { width: 100%; border-collapse: collapse; margin-top: 8px; }
           th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; }
           th { background: #f1f5f9; text-align: left; }
@@ -286,6 +288,7 @@ export default function SpecialOrdersPage() {
           <div><div class="label">Status</div><div class="value">${escapeHtml(STATUS_OPTIONS.find((o) => o.value === details.status)?.label || details.status)}</div></div>
           <div><div class="label">Container</div><div class="value">${escapeHtml(details.container_name || "-")}</div></div>
           <div><div class="label">Sales Rep</div><div class="value">${escapeHtml(details.invoiceSummary?.salesRep || "-")}</div></div>
+          <div style="grid-column: 1 / span 2;"><div class="label">Shipping Address</div><div class="value multiline">${escapeHtml(details.invoiceSummary?.shippingAddress || "-")}</div></div>
         </div>
 
         <div class="section">
@@ -530,6 +533,10 @@ export default function SpecialOrdersPage() {
                           </p>
                           <p>
                             <span className="font-medium text-slate-900">Sales rep:</span> {details.invoiceSummary.salesRep || "-"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-900">Shipping address:</span>{" "}
+                            <span className="whitespace-pre-wrap">{details.invoiceSummary.shippingAddress || "-"}</span>
                           </p>
                           <p>
                             <span className="font-medium text-slate-900">Status:</span>{" "}

@@ -29,6 +29,32 @@ function formatNoteTimestamp(date: Date) {
   return `${iso.slice(0, 16).replace("T", " ")} UTC`;
 }
 
+function getShippingAddress(invoice: any): string | null {
+  const shipAddr = invoice?.ShipAddr;
+  if (!shipAddr || typeof shipAddr !== "object") return null;
+
+  const lines = [
+    shipAddr.Line1,
+    shipAddr.Line2,
+    shipAddr.Line3,
+    shipAddr.Line4,
+    shipAddr.Line5,
+  ]
+    .map((line: any) => String(line || "").trim())
+    .filter(Boolean);
+
+  const city = String(shipAddr.City || "").trim();
+  const state = String(shipAddr.CountrySubDivisionCode || "").trim();
+  const postalCode = String(shipAddr.PostalCode || "").trim();
+  const country = String(shipAddr.Country || "").trim();
+
+  const cityStatePostal = [city, state, postalCode].filter(Boolean).join(", ");
+  if (cityStatePostal) lines.push(cityStatePostal);
+  if (country) lines.push(country);
+
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
 function mapInvoiceSummary(invoice: any) {
   if (!invoice) return null;
   const total = Number(invoice.TotalAmt) || 0;
@@ -54,6 +80,7 @@ function mapInvoiceSummary(invoice: any) {
     paid,
     salesRep: getSalesRep(invoice),
     customer: invoice?.CustomerRef?.name || null,
+    shippingAddress: getShippingAddress(invoice),
     lineItems,
   };
 }
