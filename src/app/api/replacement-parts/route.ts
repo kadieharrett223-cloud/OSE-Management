@@ -32,7 +32,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("replacement_parts")
       .select(
-        "id, created_at, updated_at, part_name, customer_name, request_notes, internal_notes, status, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .order("created_at", { ascending: false });
 
@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const invoiceNumber = (body?.invoiceNumber || "").toString().trim();
     const invoiceId = (body?.invoiceId || "").toString().trim();
+    const ebayOrderNumber = (body?.ebayOrderNumber || "").toString().trim();
 
     if (!invoiceNumber) {
       return NextResponse.json({ error: "Invoice number is required" }, { status: 400 });
@@ -106,13 +107,14 @@ export async function POST(req: NextRequest) {
       .insert({
         part_name: partName,
         customer_name: customerName,
+        ebay_order_number: ebayOrderNumber || null,
         status: "REQUESTED",
         qbo_invoice_id: qboInvoiceId,
         qbo_invoice_number: invoiceNumber,
         created_by: session.user.email || session.user.id || "Unknown",
       })
       .select(
-        "id, created_at, updated_at, part_name, customer_name, request_notes, internal_notes, status, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .single();
 

@@ -11,6 +11,7 @@ type ReplacementPart = {
   updated_at: string;
   part_name: string;
   customer_name: string | null;
+  ebay_order_number: string | null;
   request_notes: string | null;
   internal_notes: string | null;
   status: StatusValue;
@@ -91,6 +92,7 @@ export default function ReplacementPartsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingPart, setDeletingPart] = useState(false);
   const [newInvoiceNumber, setNewInvoiceNumber] = useState("");
+  const [newEbayOrderNumber, setNewEbayOrderNumber] = useState("");
   const [creatingPart, setCreatingPart] = useState(false);
   const [noteEntry, setNoteEntry] = useState("");
   const [invoiceCandidates, setInvoiceCandidates] = useState<InvoiceCandidate[]>([]);
@@ -167,6 +169,7 @@ export default function ReplacementPartsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           invoiceNumber,
+          ebayOrderNumber: newEbayOrderNumber.trim() || null,
           ...(selectedInvoiceId ? { invoiceId: selectedInvoiceId } : {}),
         }),
       });
@@ -187,6 +190,7 @@ export default function ReplacementPartsPage() {
       setParts((prev) => [created, ...prev]);
       setSelectedId(created.id);
       setNewInvoiceNumber("");
+      setNewEbayOrderNumber("");
       setInvoiceCandidates([]);
       setSelectedCandidateId("");
     } catch (error: any) {
@@ -203,6 +207,7 @@ export default function ReplacementPartsPage() {
       const payload = {
         part_name: details.part_name,
         request_notes: details.request_notes || null,
+        ebay_order_number: details.ebay_order_number || null,
         tracking_number: details.tracking_number || null,
         shipped_at: details.shipped_at || null,
         delivered_at: details.delivered_at || null,
@@ -353,6 +358,13 @@ export default function ReplacementPartsPage() {
                     className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 placeholder-slate-400"
                     required
                   />
+                  <input
+                    type="text"
+                    value={newEbayOrderNumber}
+                    onChange={(e) => setNewEbayOrderNumber(e.target.value)}
+                    placeholder="eBay order number (optional)"
+                    className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 placeholder-slate-400"
+                  />
                   {invoiceCandidates.length > 0 && (
                     <div className="space-y-2 rounded border border-amber-200 bg-amber-50 p-2">
                       <p className="text-xs font-medium text-amber-800">
@@ -425,6 +437,9 @@ export default function ReplacementPartsPage() {
                           </p>
                         </div>
                         <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>{part.customer_name || "No customer"}</p>
+                        <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>
+                          eBay order: {part.ebay_order_number || "-"}
+                        </p>
                         <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700 font-medium" : "text-slate-500"}`}>
                           {STATUS_OPTIONS.find((s) => s.value === part.status)?.label || part.status}
                         </p>
@@ -527,6 +542,16 @@ export default function ReplacementPartsPage() {
                         <span className="mt-1 block text-xs text-slate-500">
                           Updated automatically from tracking number and shipped/delivered dates.
                         </span>
+                      </label>
+                      <label className="text-sm text-slate-700">
+                        <span className="mb-1 block font-medium">eBay Order Number</span>
+                        <input
+                          type="text"
+                          value={details.ebay_order_number || ""}
+                          onChange={(e) => setDetails({ ...details, ebay_order_number: e.target.value || null })}
+                          placeholder="e.g. 12-34567-89012"
+                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
+                        />
                       </label>
                       <label className="text-sm text-slate-700">
                         <span className="mb-1 block font-medium">Tracking Number</span>
