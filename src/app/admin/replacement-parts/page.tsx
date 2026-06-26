@@ -334,15 +334,12 @@ export default function ReplacementPartsPage() {
 
     const rowsHtml = fittingPartsForPrint
       .map(
-        (part, index) => `
+        (part) => `
           <tr>
-            <td>${index + 1}</td>
-            <td>${escapeHtml(new Date(part.created_at).toLocaleDateString())}</td>
             <td>${escapeHtml(part.qbo_invoice_number || "-")}</td>
             <td>${escapeHtml(part.customer_name || "-")}</td>
-            <td>${escapeHtml(part.part_name || "-")}</td>
-            <td>${escapeHtml(part.ebay_order_number || "-")}</td>
             <td>${escapeHtml(STATUS_OPTIONS.find((s) => s.value === part.status)?.label || part.status)}</td>
+            <td>${escapeHtml(part.ebay_order_number || "-")}</td>
           </tr>
         `
       )
@@ -386,13 +383,10 @@ export default function ReplacementPartsPage() {
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Created</th>
                   <th>Invoice</th>
-                  <th>Customer</th>
-                  <th>Part Name</th>
-                  <th>eBay Order</th>
+                  <th>Customer QuickBooks Name</th>
                   <th>Status</th>
+                  <th>eBay Order Number</th>
                 </tr>
               </thead>
               <tbody>${rowsHtml}</tbody>
