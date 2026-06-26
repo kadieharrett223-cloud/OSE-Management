@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 
 type StatusValue = "REQUESTED" | "ORDERED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 type FittingPrintRange = "THIS_WEEK" | "LAST_WEEK" | "THIS_MONTH";
-type ListViewFilter = "FITTINGS" | "EVERYTHING_ELSE";
+type ListViewFilter = "FITTINGS" | "EVERYTHING_ELSE" | "ALL";
 
 type ReplacementPart = {
   id: string;
@@ -158,11 +158,16 @@ export default function ReplacementPartsPage() {
   const [trackingAutoSaving, setTrackingAutoSaving] = useState(false);
   const [trackingRefreshing, setTrackingRefreshing] = useState(false);
   const [fittingPrintRange, setFittingPrintRange] = useState<FittingPrintRange>("THIS_WEEK");
-  const [listViewFilter, setListViewFilter] = useState<ListViewFilter>("EVERYTHING_ELSE");
+  const [listViewFilter, setListViewFilter] = useState<ListViewFilter>("ALL");
   const trackingSyncKeyRef = useRef<string>("");
 
   const filteredParts = useMemo(
-    () => parts.filter((part) => (listViewFilter === "FITTINGS" ? part.fitting : !part.fitting)),
+    () =>
+      parts.filter((part) => {
+        if (listViewFilter === "ALL") return true;
+        if (listViewFilter === "FITTINGS") return part.fitting;
+        return !part.fitting;
+      }),
     [parts, listViewFilter]
   );
 
@@ -498,14 +503,45 @@ export default function ReplacementPartsPage() {
         <main className="flex-1 p-4 md:p-6">
           <div className="mx-auto max-w-7xl space-y-5">
             <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
-              <h1 className="text-2xl font-bold text-slate-900">Replacement Parts</h1>
-              <p className="text-sm text-slate-600">Track replacement parts by invoice, update tracking, and monitor delivery progress.</p>
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">Replacement Parts</h1>
+                  <p className="text-sm text-slate-600">Track replacement parts by invoice, update tracking, and monitor delivery progress.</p>
+                </div>
+                <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 md:max-w-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">Fitting report</p>
+                  <p className="mt-1 text-xs text-slate-600">Print only replacement parts marked as fitting.</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <select
+                      value={fittingPrintRange}
+                      onChange={(e) => setFittingPrintRange(e.target.value as FittingPrintRange)}
+                      className="flex-1 rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
+                    >
+                      {FITTING_PRINT_RANGE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={printFittingReport}
+                      className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                    >
+                      Print
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-600">
+                    {fittingPartsForPrint.length} fitting replacement{fittingPartsForPrint.length === 1 ? "" : "s"} in {getRangeLabel(fittingPrintRange).toLowerCase()}.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
               <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
                 <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                  <div className="grid grid-cols-2 gap-1">
+                  <div className="grid grid-cols-3 gap-1">
                     <button
                       type="button"
                       onClick={() => setListViewFilter("FITTINGS")}
@@ -527,6 +563,17 @@ export default function ReplacementPartsPage() {
                       }`}
                     >
                       Everything Else
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setListViewFilter("ALL")}
+                      className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+                        listViewFilter === "ALL"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-white text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      All
                     </button>
                   </div>
                 </div>
@@ -589,34 +636,6 @@ export default function ReplacementPartsPage() {
                   </button>
                 </form>
 
-                <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">Fitting report</p>
-                  <p className="mt-1 text-xs text-slate-600">Print only replacement parts marked as fitting.</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <select
-                      value={fittingPrintRange}
-                      onChange={(e) => setFittingPrintRange(e.target.value as FittingPrintRange)}
-                      className="flex-1 rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
-                    >
-                      {FITTING_PRINT_RANGE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={printFittingReport}
-                      className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
-                    >
-                      Print
-                    </button>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-600">
-                    {fittingPartsForPrint.length} fitting replacement{fittingPartsForPrint.length === 1 ? "" : "s"} in {getRangeLabel(fittingPrintRange).toLowerCase()}.
-                  </p>
-                </div>
-
                 <div className="mt-4 space-y-2">
                   {loading ? (
                     <p className="text-sm text-slate-500">Loading...</p>
@@ -624,7 +643,9 @@ export default function ReplacementPartsPage() {
                     <p className="text-sm text-slate-500">
                       {listViewFilter === "FITTINGS"
                         ? "No fitting replacement records yet."
-                        : "No non-fitting replacement records yet."}
+                        : listViewFilter === "EVERYTHING_ELSE"
+                          ? "No non-fitting replacement records yet."
+                          : "No replacement records yet."}
                     </p>
                   ) : (
                     filteredParts.map((part) => (
