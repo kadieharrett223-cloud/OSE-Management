@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 
 type StatusValue = "REQUESTED" | "ORDERED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 type FittingPrintRange = "THIS_WEEK" | "LAST_WEEK" | "THIS_MONTH";
+type ListViewFilter = "FITTINGS" | "EVERYTHING_ELSE";
 
 type ReplacementPart = {
   id: string;
@@ -132,13 +133,11 @@ function getRangeLabel(range: FittingPrintRange) {
 
 function buildTrackingKey(item: {
   tracking_number: string | null;
-  shipped_at: string | null;
-  delivered_at: string | null;
+  tracking_status: string | null;
 }) {
   return [
     item.tracking_number || "",
-    item.shipped_at || "",
-    item.delivered_at || "",
+    item.tracking_status || "",
   ].join("|");
 }
 
@@ -159,9 +158,18 @@ export default function ReplacementPartsPage() {
   const [trackingAutoSaving, setTrackingAutoSaving] = useState(false);
   const [trackingRefreshing, setTrackingRefreshing] = useState(false);
   const [fittingPrintRange, setFittingPrintRange] = useState<FittingPrintRange>("THIS_WEEK");
+  const [listViewFilter, setListViewFilter] = useState<ListViewFilter>("EVERYTHING_ELSE");
   const trackingSyncKeyRef = useRef<string>("");
 
-  const selectedPart = useMemo(() => parts.find((part) => part.id === selectedId) || null, [parts, selectedId]);
+  const filteredParts = useMemo(
+    () => parts.filter((part) => (listViewFilter === "FITTINGS" ? part.fitting : !part.fitting)),
+    [parts, listViewFilter]
+  );
+
+  const selectedPart = useMemo(
+    () => filteredParts.find((part) => part.id === selectedId) || null,
+    [filteredParts, selectedId]
+  );
   const fittingPartsForPrint = useMemo(
     () => parts.filter((part) => part.fitting && isCreatedAtInRange(part.created_at, fittingPrintRange)),
     [parts, fittingPrintRange]
@@ -178,6 +186,20 @@ export default function ReplacementPartsPage() {
     }
     loadDetails(selectedId);
   }, [selectedId]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (filteredParts.length === 0) {
+      setSelectedId(null);
+      setDetails(null);
+      return;
+    }
+
+    if (!selectedId || !filteredParts.some((part) => part.id === selectedId)) {
+      setSelectedId(filteredParts[0].id);
+    }
+  }, [filteredParts, selectedId, loading]);
 
   async function loadParts() {
     setLoading(true);
@@ -275,8 +297,6 @@ export default function ReplacementPartsPage() {
         fitting: details.fitting,
         emailed_to_customer: details.emailed_to_customer,
         tracking_number: details.tracking_number || null,
-        shipped_at: details.shipped_at || null,
-        delivered_at: details.delivered_at || null,
         refresh_tracking: true,
         note_entry: noteEntry,
       };
@@ -393,8 +413,6 @@ export default function ReplacementPartsPage() {
         ? { refresh_tracking: true }
         : {
             tracking_number: current.tracking_number || null,
-            shipped_at: current.shipped_at || null,
-            delivered_at: current.delivered_at || null,
             refresh_tracking: true,
           };
 
@@ -431,7 +449,7 @@ export default function ReplacementPartsPage() {
     }, 800);
 
     return () => window.clearTimeout(timer);
-  }, [details?.id, details?.tracking_number, details?.shipped_at, details?.delivered_at]);
+  }, [details?.id, details?.tracking_number]);
 
   useEffect(() => {
     if (!details?.id || !details.tracking_number) return;
@@ -473,19 +491,46 @@ export default function ReplacementPartsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100">
       <div className="flex min-h-screen">
         <Sidebar activePage="Replacement Parts" />
 
         <main className="flex-1 p-4 md:p-6">
-          <div className="mx-auto max-w-7xl space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="mx-auto max-w-7xl space-y-5">
+            <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <h1 className="text-2xl font-bold text-slate-900">Replacement Parts</h1>
-              <p className="text-sm text-slate-600">Track replacement parts by invoice, update shipping details, and monitor delivery progress.</p>
+              <p className="text-sm text-slate-600">Track replacement parts by invoice, update tracking, and monitor delivery progress.</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-              <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+              <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
+                <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setListViewFilter("FITTINGS")}
+                      className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+                        listViewFilter === "FITTINGS"
+                          ? "bg-red-600 text-white shadow-sm"
+                          : "bg-white text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      Fittings
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setListViewFilter("EVERYTHING_ELSE")}
+                      className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+                        listViewFilter === "EVERYTHING_ELSE"
+                          ? "bg-slate-900 text-white shadow-sm"
+                          : "bg-white text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      Everything Else
+                    </button>
+                  </div>
+                </div>
+
                 <form onSubmit={createPart} className="space-y-2 border-b border-slate-200 pb-4">
                   <p className="text-sm font-semibold text-slate-800">Create Replacement Record</p>
                   <input
@@ -575,10 +620,14 @@ export default function ReplacementPartsPage() {
                 <div className="mt-4 space-y-2">
                   {loading ? (
                     <p className="text-sm text-slate-500">Loading...</p>
-                  ) : parts.length === 0 ? (
-                    <p className="text-sm text-slate-500">No replacement part records yet.</p>
+                  ) : filteredParts.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      {listViewFilter === "FITTINGS"
+                        ? "No fitting replacement records yet."
+                        : "No non-fitting replacement records yet."}
+                    </p>
                   ) : (
-                    parts.map((part) => (
+                    filteredParts.map((part) => (
                       <button
                         key={part.id}
                         onClick={() => {
@@ -587,11 +636,11 @@ export default function ReplacementPartsPage() {
                             loadDetails(part.id);
                           }
                         }}
-                        className={`w-full rounded border px-3 py-2 text-left text-sm ${
+                        className={`w-full rounded-lg border px-3 py-2.5 text-left text-sm shadow-sm transition hover:shadow ${
                           selectedId === part.id
                             ? part.status === "CANCELLED"
-                              ? "border-red-400 bg-red-50"
-                              : "border-blue-400 bg-blue-50"
+                              ? "border-red-300 bg-red-50"
+                              : "border-blue-300 bg-blue-50"
                             : part.status === "CANCELLED"
                               ? "border-red-200 bg-red-50"
                               : "border-slate-200 bg-white"
@@ -632,7 +681,7 @@ export default function ReplacementPartsPage() {
                 </div>
               </section>
 
-              <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
                 {!selectedPart ? (
                   <p className="text-sm text-slate-500">Select a replacement part record to view details.</p>
                 ) : detailsLoading || !details ? (
@@ -640,7 +689,7 @@ export default function ReplacementPartsPage() {
                 ) : (
                   <div className="space-y-5">
                     {details.invoiceSummary && (
-                      <div className="rounded border border-slate-200 bg-slate-50 p-4 text-slate-700">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-slate-700">
                         <p className="mb-3 text-sm font-semibold text-slate-900">QuickBooks Invoice</p>
                         <div className="space-y-1 text-sm text-slate-700">
                           <p>
@@ -723,7 +772,7 @@ export default function ReplacementPartsPage() {
                           ))}
                         </select>
                         <span className="mt-1 block text-xs text-slate-500">
-                          Updated automatically from tracking number and shipped/delivered dates.
+                          Updated automatically from tracking updates.
                         </span>
                       </label>
                       <label className="text-sm text-slate-700">
@@ -797,24 +846,6 @@ export default function ReplacementPartsPage() {
                           readOnly
                           className="w-full rounded border border-slate-300 bg-slate-100 px-2 py-1.5 text-slate-900"
                           placeholder="Will update automatically"
-                        />
-                      </label>
-                      <label className="text-sm text-slate-700">
-                        <span className="mb-1 block font-medium">Shipped Date</span>
-                        <input
-                          type="date"
-                          value={details.shipped_at || ""}
-                          onChange={(e) => setDetails({ ...details, shipped_at: e.target.value || null })}
-                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
-                        />
-                      </label>
-                      <label className="text-sm text-slate-700">
-                        <span className="mb-1 block font-medium">Delivered Date</span>
-                        <input
-                          type="date"
-                          value={details.delivered_at || ""}
-                          onChange={(e) => setDetails({ ...details, delivered_at: e.target.value || null })}
-                          className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
                         />
                       </label>
                     </div>
