@@ -348,7 +348,7 @@ export default function ReplacementPartsPage() {
       )
       .join("");
 
-    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1100,height=900");
+    const printWindow = window.open("about:blank", "_blank", "width=1100,height=900");
     if (!printWindow) {
       alert("Unable to open print preview. Please allow pop-ups and try again.");
       return;
@@ -357,51 +357,59 @@ export default function ReplacementPartsPage() {
     const generatedAt = new Date().toLocaleString();
     const title = `Fitting Replacement Parts - ${getRangeLabel(fittingPrintRange)}`;
 
-    printWindow.document.open();
-    printWindow.document.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>${escapeHtml(title)}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
-            h1 { margin: 0 0 8px 0; font-size: 22px; }
-            p { margin: 0 0 12px 0; color: #334155; }
-            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-            th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; text-align: left; }
-            th { background: #f1f5f9; }
-            .meta { display: flex; gap: 16px; flex-wrap: wrap; }
-            .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-weight: 700; }
-            @media print { body { margin: 12mm; } }
-          </style>
-        </head>
-        <body>
-          <h1>${escapeHtml(title)}</h1>
-          <div class="meta">
-            <p><strong>Generated:</strong> ${escapeHtml(generatedAt)}</p>
-            <p><strong>Total Fitting Replacements:</strong> <span class="badge">${fittingPartsForPrint.length}</span></p>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Created</th>
-                <th>Invoice</th>
-                <th>Customer</th>
-                <th>Part Name</th>
-                <th>eBay Order</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>${rowsHtml}</tbody>
-          </table>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
+    try {
+      printWindow.document.open();
+      printWindow.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>${escapeHtml(title)}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
+              h1 { margin: 0 0 8px 0; font-size: 22px; }
+              p { margin: 0 0 12px 0; color: #334155; }
+              table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+              th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; text-align: left; }
+              th { background: #f1f5f9; }
+              .meta { display: flex; gap: 16px; flex-wrap: wrap; }
+              .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-weight: 700; }
+              @media print { body { margin: 12mm; } }
+            </style>
+          </head>
+          <body>
+            <h1>${escapeHtml(title)}</h1>
+            <div class="meta">
+              <p><strong>Generated:</strong> ${escapeHtml(generatedAt)}</p>
+              <p><strong>Total Fitting Replacements:</strong> <span class="badge">${fittingPartsForPrint.length}</span></p>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Created</th>
+                  <th>Invoice</th>
+                  <th>Customer</th>
+                  <th>Part Name</th>
+                  <th>eBay Order</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+
+      window.setTimeout(() => {
+        printWindow.print();
+      }, 200);
+    } catch {
+      printWindow.close();
+      alert("Failed to render print preview. Please try again.");
+    }
   }
 
   async function saveTrackingLive(current: ReplacementPartDetails, options?: { silent?: boolean; refreshOnly?: boolean }) {
