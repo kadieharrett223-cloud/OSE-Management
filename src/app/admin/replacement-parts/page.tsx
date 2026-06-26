@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
 type StatusValue = "REQUESTED" | "ORDERED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+type FittingPrintRange = "THIS_WEEK" | "LAST_WEEK" | "THIS_MONTH";
 
 type ReplacementPart = {
   id: string;
@@ -15,6 +16,7 @@ type ReplacementPart = {
   request_notes: string | null;
   internal_notes: string | null;
   status: StatusValue;
+  fitting: boolean;
   emailed_to_customer: boolean;
   emailed_at: string | null;
   tracking_number: string | null;
@@ -73,6 +75,61 @@ const STATUS_META: Record<StatusValue, { symbol: string; chipClass: string }> = 
 const money = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
 
+const FITTING_PRINT_RANGE_OPTIONS: Array<{ value: FittingPrintRange; label: string }> = [
+  { value: "THIS_WEEK", label: "This Week" },
+  { value: "LAST_WEEK", label: "Last Week" },
+  { value: "THIS_MONTH", label: "This Month" },
+];
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function toStartOfDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
+}
+
+function toEndOfDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 23, 59, 59, 999);
+}
+
+function getFittingRangeBounds(range: FittingPrintRange) {
+  const now = new Date();
+
+  if (range === "THIS_MONTH") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return { start, end };
+  }
+
+  const thisWeekStart = toStartOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()));
+  if (range === "LAST_WEEK") {
+    const start = new Date(thisWeekStart);
+    start.setDate(start.getDate() - 7);
+    const end = toEndOfDay(new Date(thisWeekStart.getFullYear(), thisWeekStart.getMonth(), thisWeekStart.getDate() - 1));
+    return { start, end };
+  }
+
+  const end = toEndOfDay(new Date(thisWeekStart.getFullYear(), thisWeekStart.getMonth(), thisWeekStart.getDate() + 6));
+  return { start: thisWeekStart, end };
+}
+
+function isCreatedAtInRange(createdAt: string, range: FittingPrintRange) {
+  const createdDate = new Date(createdAt);
+  if (Number.isNaN(createdDate.getTime())) return false;
+  const { start, end } = getFittingRangeBounds(range);
+  return createdDate >= start && createdDate <= end;
+}
+
+function getRangeLabel(range: FittingPrintRange) {
+  return FITTING_PRINT_RANGE_OPTIONS.find((option) => option.value === range)?.label || "This Week";
+}
+
 function buildTrackingKey(item: {
   tracking_number: string | null;
   shipped_at: string | null;
@@ -101,9 +158,14 @@ export default function ReplacementPartsPage() {
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
   const [trackingAutoSaving, setTrackingAutoSaving] = useState(false);
   const [trackingRefreshing, setTrackingRefreshing] = useState(false);
+  const [fittingPrintRange, setFittingPrintRange] = useState<FittingPrintRange>("THIS_WEEK");
   const trackingSyncKeyRef = useRef<string>("");
 
   const selectedPart = useMemo(() => parts.find((part) => part.id === selectedId) || null, [parts, selectedId]);
+  const fittingPartsForPrint = useMemo(
+    () => parts.filter((part) => part.fitting && isCreatedAtInRange(part.created_at, fittingPrintRange)),
+    [parts, fittingPrintRange]
+  );
 
   useEffect(() => {
     loadParts();
@@ -210,6 +272,7 @@ export default function ReplacementPartsPage() {
         part_name: details.part_name,
         request_notes: details.request_notes || null,
         ebay_order_number: details.ebay_order_number || null,
+        fitting: details.fitting,
         emailed_to_customer: details.emailed_to_customer,
         tracking_number: details.tracking_number || null,
         shipped_at: details.shipped_at || null,
@@ -236,6 +299,84 @@ export default function ReplacementPartsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function printFittingReport() {
+    if (fittingPartsForPrint.length === 0) {
+      alert(`No fitting replacement parts found for ${getRangeLabel(fittingPrintRange).toLowerCase()}.`);
+      return;
+    }
+
+    const rowsHtml = fittingPartsForPrint
+      .map(
+        (part, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(new Date(part.created_at).toLocaleDateString())}</td>
+            <td>${escapeHtml(part.qbo_invoice_number || "-")}</td>
+            <td>${escapeHtml(part.customer_name || "-")}</td>
+            <td>${escapeHtml(part.part_name || "-")}</td>
+            <td>${escapeHtml(part.ebay_order_number || "-")}</td>
+            <td>${escapeHtml(STATUS_OPTIONS.find((s) => s.value === part.status)?.label || part.status)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1100,height=900");
+    if (!printWindow) {
+      alert("Unable to open print preview. Please allow pop-ups and try again.");
+      return;
+    }
+
+    const generatedAt = new Date().toLocaleString();
+    const title = `Fitting Replacement Parts - ${getRangeLabel(fittingPrintRange)}`;
+
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(title)}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
+            h1 { margin: 0 0 8px 0; font-size: 22px; }
+            p { margin: 0 0 12px 0; color: #334155; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; text-align: left; }
+            th { background: #f1f5f9; }
+            .meta { display: flex; gap: 16px; flex-wrap: wrap; }
+            .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-weight: 700; }
+            @media print { body { margin: 12mm; } }
+          </style>
+        </head>
+        <body>
+          <h1>${escapeHtml(title)}</h1>
+          <div class="meta">
+            <p><strong>Generated:</strong> ${escapeHtml(generatedAt)}</p>
+            <p><strong>Total Fitting Replacements:</strong> <span class="badge">${fittingPartsForPrint.length}</span></p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Created</th>
+                <th>Invoice</th>
+                <th>Customer</th>
+                <th>Part Name</th>
+                <th>eBay Order</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   }
 
   async function saveTrackingLive(current: ReplacementPartDetails, options?: { silent?: boolean; refreshOnly?: boolean }) {
@@ -403,6 +544,34 @@ export default function ReplacementPartsPage() {
                   </button>
                 </form>
 
+                <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">Fitting report</p>
+                  <p className="mt-1 text-xs text-slate-600">Print only replacement parts marked as fitting.</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <select
+                      value={fittingPrintRange}
+                      onChange={(e) => setFittingPrintRange(e.target.value as FittingPrintRange)}
+                      className="flex-1 rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
+                    >
+                      {FITTING_PRINT_RANGE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={printFittingReport}
+                      className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                    >
+                      Print
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-600">
+                    {fittingPartsForPrint.length} fitting replacement{fittingPartsForPrint.length === 1 ? "" : "s"} in {getRangeLabel(fittingPrintRange).toLowerCase()}.
+                  </p>
+                </div>
+
                 <div className="mt-4 space-y-2">
                   {loading ? (
                     <p className="text-sm text-slate-500">Loading...</p>
@@ -429,6 +598,14 @@ export default function ReplacementPartsPage() {
                         }`}
                       >
                         <div className="flex items-center gap-2">
+                          {part.fitting ? (
+                            <span
+                              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white"
+                              title="Fitting replacement"
+                            >
+                              !
+                            </span>
+                          ) : null}
                           <span
                             className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold ${STATUS_META[part.status].chipClass}`}
                             title={STATUS_OPTIONS.find((s) => s.value === part.status)?.label || part.status}
@@ -558,6 +735,24 @@ export default function ReplacementPartsPage() {
                           placeholder="e.g. 12-34567-89012"
                           className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
                         />
+                      </label>
+                      <label className="text-sm text-slate-700">
+                        <span className="mb-1 block font-medium">Replacement Type</span>
+                        <div className="flex items-center gap-2 rounded border border-slate-300 bg-white px-2 py-2">
+                          <input
+                            id="fitting-replacement"
+                            type="checkbox"
+                            checked={details.fitting}
+                            onChange={(e) => setDetails({ ...details, fitting: e.target.checked })}
+                            className="h-4 w-4"
+                          />
+                          <label htmlFor="fitting-replacement" className="text-sm text-slate-900">
+                            Mark as fitting replacement
+                          </label>
+                        </div>
+                        <span className="mt-1 block text-xs text-slate-500">
+                          Fitting replacements show a red ! marker in the list.
+                        </span>
                       </label>
                       <label className="text-sm text-slate-700">
                         <span className="mb-1 block font-medium">Email Sent</span>

@@ -101,7 +101,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const { data: row, error } = await supabase
       .from("replacement_parts")
       .select(
-        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .eq("id", params.id)
       .single();
@@ -171,6 +171,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (Object.prototype.hasOwnProperty.call(body, "ebay_order_number")) {
       const ebayOrderNumber = String(body?.ebay_order_number || "").trim();
       updatePayload.ebay_order_number = ebayOrderNumber || null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "fitting")) {
+      updatePayload.fitting = Boolean(body?.fitting);
     }
 
     if (Object.prototype.hasOwnProperty.call(body, "emailed_to_customer")) {
@@ -256,7 +260,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .update(updatePayload)
       .eq("id", params.id)
       .select(
-        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .single();
 
