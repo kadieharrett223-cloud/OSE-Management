@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
 type ProductRow = {
@@ -13,109 +13,170 @@ type ProductRow = {
   orderCount: number;
 };
 
-type ParsedImportRow = {
-  name: string;
-  onFloor: number;
-  sold: number;
-  available: number;
+type ContainerStatus = "in_transit" | "arrived" | "unloading" | "complete" | "delayed";
+
+type ContainerItem = {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
 };
 
-const toInt = (value: string) => {
-  const cleaned = value.replace(/,/g, "").trim();
-  const n = Number(cleaned);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.trunc(n));
+type ContainerRow = {
+  id: string;
+  containerCode: string;
+  status: ContainerStatus;
+  createdAt: string;
+  updatedAt: string;
+  items: ContainerItem[];
 };
 
-function parseLine(line: string): ParsedImportRow | null {
-  const delimiter = line.includes("\t") ? "\t" : ",";
-  const parts = line
-    .split(delimiter)
-    .map((part) => part.trim())
-    .filter((part, index) => index === 0 || part.length > 0);
+const STATUS_LABELS: Record<ContainerStatus, string> = {
+  in_transit: "In Transit",
+  arrived: "Arrived",
+  unloading: "Unloading",
+  complete: "Complete",
+  delayed: "Delayed",
+};
 
-  if (parts.length < 4) return null;
-
-  const joined = parts.join(" ").toLowerCase();
-  const looksLikeHeader =
-    joined.includes("product") &&
-    (joined.includes("floor") || joined.includes("available") || joined.includes("sold"));
-  if (looksLikeHeader) return null;
-
-  return {
-    name: parts[0],
-    onFloor: toInt(parts[1] || "0"),
-    sold: toInt(parts[2] || "0"),
-    available: toInt(parts[3] || "0"),
-  };
-}
-
-function parsePastedProducts(input: string): ParsedImportRow[] {
-  const rows = input
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map(parseLine)
-    .filter((row): row is ParsedImportRow => !!row && row.name.length > 0);
-
-  const deduped = new Map<string, ParsedImportRow>();
-  for (const row of rows) {
-    deduped.set(row.name.toLowerCase(), row);
-  }
-
-  return Array.from(deduped.values());
-}
+const STATUS_OPTIONS: ContainerStatus[] = ["in_transit", "arrived", "unloading", "complete", "delayed"];
 
 export default function InventoryTrackerPage() {
   const [products, setProducts] = useState<ProductRow[]>([]);
+  const [containers, setContainers] = useState<ContainerRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
-  const [pasteText, setPasteText] = useState("");
-  const [mode, setMode] = useState<"replace" | "append">("replace");
-
-  const previewRows = useMemo(() => parsePastedProducts(pasteText), [pasteText]);
+  const [creatingContainer, setCreatingContainer] = useState(false);
+  const [containerCode, setContainerCode] = useState("");
+  const [containerStatus, setContainerStatus] = useState<ContainerStatus>("in_transit");
+  const [addingItemForContainerId, setAddingItemForContainerId] = useState<string | null>(null);
+  const [selectedProductIdByContainer, setSelectedProductIdByContainer] = useState<Record<string, string>>({});
+  const [quantityByContainer, setQuantityByContainer] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    loadProducts();
+    loadAll();
   }, []);
 
-  async function loadProducts() {
+  async function loadAll() {
     setLoading(true);
     try {
-      const res = await fetch("/api/inventory/products", { cache: "no-store" });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result?.error || "Failed to load products");
-      setProducts((result.data || []) as ProductRow[]);
+      const [productsRes, containersRes] = await Promise.all([
+        fetch("/api/inventory/products", { cache: "no-store" }),
+        fetch("/api/inventory/containers", { cache: "no-store" }),
+      ]);
+
+      const productsResult = await productsRes.json();
+      if (!productsRes.ok) throw new Error(productsResult?.error || "Failed to load products");
+
+      const containersResult = await containersRes.json();
+      if (!containersRes.ok) throw new Error(containersResult?.error || "Failed to load containers");
+
+      setProducts((productsResult.data || []) as ProductRow[]);
+      setContainers((containersResult.data || []) as ContainerRow[]);
     } catch (error: any) {
-      alert(error?.message || "Failed to load products");
+      alert(error?.message || "Failed to load inventory tracker data");
     } finally {
       setLoading(false);
     }
   }
 
-  async function runImport() {
-    if (previewRows.length === 0) {
-      alert("Paste at least one valid row before importing.");
+  async function createContainer(e: React.FormEvent) {
+    e.preventDefault();
+    const code = containerCode.trim();
+    if (!code) {
+      alert("Container code is required.");
       return;
     }
 
-    setImporting(true);
+    setCreatingContainer(true);
     try {
-      const res = await fetch("/api/inventory/import", {
+      const res = await fetch("/api/inventory/containers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: previewRows, mode }),
+        body: JSON.stringify({ containerCode: code, status: containerStatus }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result?.error || "Import failed");
+      if (!res.ok) throw new Error(result?.error || "Failed to create container");
 
-      setPasteText("");
-      await loadProducts();
-      alert(`Imported ${result.imported} products.`);
+      setContainerCode("");
+      setContainerStatus("in_transit");
+      await loadAll();
     } catch (error: any) {
-      alert(error?.message || "Import failed");
+      alert(error?.message || "Failed to create container");
     } finally {
-      setImporting(false);
+      setCreatingContainer(false);
+    }
+  }
+
+  async function updateContainerStatus(containerId: string, status: ContainerStatus) {
+    try {
+      const res = await fetch(`/api/inventory/containers/${containerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || "Failed to update status");
+
+      setContainers((prev) => prev.map((container) => (container.id === containerId ? { ...container, status } : container)));
+    } catch (error: any) {
+      alert(error?.message || "Failed to update status");
+    }
+  }
+
+  async function deleteContainer(containerId: string) {
+    if (!confirm("Delete this container and all items on it?")) return;
+
+    try {
+      const res = await fetch(`/api/inventory/containers/${containerId}`, { method: "DELETE" });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || "Failed to delete container");
+      setContainers((prev) => prev.filter((container) => container.id !== containerId));
+    } catch (error: any) {
+      alert(error?.message || "Failed to delete container");
+    }
+  }
+
+  async function addItemToContainer(containerId: string) {
+    const productId = String(selectedProductIdByContainer[containerId] || "").trim();
+    const quantity = Number(quantityByContainer[containerId] || "0");
+
+    if (!productId) {
+      alert("Select a product first.");
+      return;
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      alert("Enter a quantity greater than 0.");
+      return;
+    }
+
+    setAddingItemForContainerId(containerId);
+    try {
+      const res = await fetch(`/api/inventory/containers/${containerId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId, quantity }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || "Failed to add item");
+
+      setQuantityByContainer((prev) => ({ ...prev, [containerId]: "" }));
+      await loadAll();
+    } catch (error: any) {
+      alert(error?.message || "Failed to add item");
+    } finally {
+      setAddingItemForContainerId(null);
+    }
+  }
+
+  async function removeContainerItem(itemId: string) {
+    try {
+      const res = await fetch(`/api/inventory/container-items/${itemId}`, { method: "DELETE" });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || "Failed to remove item");
+      await loadAll();
+    } catch (error: any) {
+      alert(error?.message || "Failed to remove item");
     }
   }
 
@@ -128,51 +189,152 @@ export default function InventoryTrackerPage() {
           <header className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h1 className="text-2xl font-semibold">Inventory Tracker</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Paste product name, on-floor count, sold count, and available count. Website price and sale percentage are not used.
+              Track product inventory, customer orders, and incoming containers. Container contents are linked to your real inventory products.
             </p>
           </header>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold">Bulk Import</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Accepts tab-separated or comma-separated rows. Expected order: Product, On Floor, Sold, Available.
-            </p>
-
-            <textarea
-              value={pasteText}
-              onChange={(e) => setPasteText(e.target.value)}
-              placeholder={"Product A\t5\t1\t4\nProduct B\t8\t2\t6"}
-              className="mt-3 h-40 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none ring-blue-400 focus:ring"
-            />
-
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="text-sm">
-                Import mode
-                <select
-                  value={mode}
-                  onChange={(e) => setMode((e.target.value as "replace" | "append") || "replace")}
-                  className="ml-2 rounded border border-slate-300 px-2 py-1"
-                >
-                  <option value="replace">Replace all products</option>
-                  <option value="append">Append/update by product name</option>
-                </select>
-              </label>
-              <span className="text-sm text-slate-600">Preview rows: {previewRows.length}</span>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Containers</h2>
               <button
-                onClick={runImport}
-                disabled={importing}
-                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={loadAll}
+                className="rounded-md border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50"
               >
-                {importing ? "Importing..." : "Import Products"}
+                Refresh
               </button>
             </div>
+
+            <form onSubmit={createContainer} className="grid gap-3 sm:grid-cols-[1fr_180px_auto]">
+              <input
+                value={containerCode}
+                onChange={(e) => setContainerCode(e.target.value)}
+                placeholder="Container code (e.g. OSE-CN-1142)"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-blue-400 focus:ring"
+              />
+              <select
+                value={containerStatus}
+                onChange={(e) => setContainerStatus((e.target.value as ContainerStatus) || "in_transit")}
+                className="rounded-md border border-slate-300 px-2 py-2 text-sm"
+              >
+                {STATUS_OPTIONS.map((status) => (
+                  <option key={status} value={status}>
+                    {STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                disabled={creatingContainer}
+                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {creatingContainer ? "Creating..." : "Create Container"}
+              </button>
+            </form>
+
+            {containers.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-600">No containers yet.</p>
+            ) : (
+              <div className="mt-4 space-y-4">
+                {containers.map((container) => (
+                  <div key={container.id} className="rounded-lg border border-slate-200 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-base font-semibold">{container.containerCode}</p>
+                        <p className="text-xs text-slate-500">Items on container: {container.items.length}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={container.status}
+                          onChange={(e) => updateContainerStatus(container.id, e.target.value as ContainerStatus)}
+                          className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                        >
+                          {STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {STATUS_LABELS[status]}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => deleteContainer(container.id)}
+                          className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_140px_auto]">
+                      <select
+                        value={selectedProductIdByContainer[container.id] || ""}
+                        onChange={(e) => setSelectedProductIdByContainer((prev) => ({ ...prev, [container.id]: e.target.value }))}
+                        className="rounded-md border border-slate-300 px-2 py-2 text-sm"
+                      >
+                        <option value="">Select product</option>
+                        {products.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        value={quantityByContainer[container.id] || ""}
+                        onChange={(e) => setQuantityByContainer((prev) => ({ ...prev, [container.id]: e.target.value }))}
+                        placeholder="Quantity"
+                        className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                      />
+                      <button
+                        onClick={() => addItemToContainer(container.id)}
+                        disabled={addingItemForContainerId === container.id}
+                        className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {addingItemForContainerId === container.id ? "Adding..." : "Add Product"}
+                      </button>
+                    </div>
+
+                    {container.items.length === 0 ? (
+                      <p className="mt-3 text-sm text-slate-600">No products added to this container yet.</p>
+                    ) : (
+                      <div className="mt-3 overflow-x-auto">
+                        <table className="min-w-full border-collapse text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-200 text-left text-slate-600">
+                              <th className="px-2 py-2 font-medium">Product</th>
+                              <th className="px-2 py-2 font-medium">Quantity</th>
+                              <th className="px-2 py-2 font-medium">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {container.items.map((item) => (
+                              <tr key={item.id} className="border-b border-slate-100">
+                                <td className="px-2 py-2">{item.productName}</td>
+                                <td className="px-2 py-2">{item.quantity}</td>
+                                <td className="px-2 py-2">
+                                  <button
+                                    onClick={() => removeContainerItem(item.id)}
+                                    className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                                  >
+                                    Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Products</h2>
               <button
-                onClick={loadProducts}
+                onClick={loadAll}
                 className="rounded-md border border-slate-300 px-3 py-1 text-sm hover:bg-slate-50"
               >
                 Refresh
@@ -182,7 +344,7 @@ export default function InventoryTrackerPage() {
             {loading ? (
               <p className="text-sm text-slate-600">Loading products...</p>
             ) : products.length === 0 ? (
-              <p className="text-sm text-slate-600">No products yet. Paste and import your first list above.</p>
+              <p className="text-sm text-slate-600">No products available yet.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse text-sm">
