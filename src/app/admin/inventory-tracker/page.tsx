@@ -51,6 +51,10 @@ export default function InventoryTrackerPage() {
   const [addingItemForContainerId, setAddingItemForContainerId] = useState<string | null>(null);
   const [selectedProductIdByContainer, setSelectedProductIdByContainer] = useState<Record<string, string>>({});
   const [quantityByContainer, setQuantityByContainer] = useState<Record<string, string>>({});
+  const [savingProductId, setSavingProductId] = useState<string | null>(null);
+  const [productDrafts, setProductDrafts] = useState<Record<string, { name: string; onFloor: string; sold: string; available: string }>>({});
+  const [newProduct, setNewProduct] = useState({ name: "", onFloor: "0", sold: "0", available: "0" });
+  const [creatingProduct, setCreatingProduct] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -72,10 +76,87 @@ export default function InventoryTrackerPage() {
 
       setProducts((productsResult.data || []) as ProductRow[]);
       setContainers((containersResult.data || []) as ContainerRow[]);
+      const nextDrafts: Record<string, { name: string; onFloor: string; sold: string; available: string }> = {};
+      for (const product of (productsResult.data || []) as ProductRow[]) {
+        nextDrafts[product.id] = {
+          name: product.name,
+          onFloor: String(product.onFloor),
+          sold: String(product.sold),
+          available: String(product.available),
+        };
+      }
+      setProductDrafts(nextDrafts);
     } catch (error: any) {
       alert(error?.message || "Failed to load inventory tracker data");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveProduct(productId: string) {
+    const draft = productDrafts[productId];
+    if (!draft) return;
+
+    const payload = {
+      name: draft.name.trim(),
+      onFloor: Number(draft.onFloor || "0"),
+      sold: Number(draft.sold || "0"),
+      available: Number(draft.available || "0"),
+    };
+
+    if (!payload.name) {
+      alert("Product name is required.");
+      return;
+    }
+
+    setSavingProductId(productId);
+    try {
+      const res = await fetch(`/api/inventory/products/${productId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || "Failed to update product");
+      await loadAll();
+    } catch (error: any) {
+      alert(error?.message || "Failed to update product");
+    } finally {
+      setSavingProductId(null);
+    }
+  }
+
+  async function createProduct(e: React.FormEvent) {
+    e.preventDefault();
+
+    const payload = {
+      name: newProduct.name.trim(),
+      onFloor: Number(newProduct.onFloor || "0"),
+      sold: Number(newProduct.sold || "0"),
+      available: Number(newProduct.available || "0"),
+    };
+
+    if (!payload.name) {
+      alert("Product name is required.");
+      return;
+    }
+
+    setCreatingProduct(true);
+    try {
+      const res = await fetch("/api/inventory/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || "Failed to create product");
+
+      setNewProduct({ name: "", onFloor: "0", sold: "0", available: "0" });
+      await loadAll();
+    } catch (error: any) {
+      alert(error?.message || "Failed to create product");
+    } finally {
+      setCreatingProduct(false);
     }
   }
 
@@ -341,6 +422,46 @@ export default function InventoryTrackerPage() {
               </button>
             </div>
 
+            <form onSubmit={createProduct} className="mb-4 grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_120px_120px_120px_auto]">
+              <input
+                value={newProduct.name}
+                onChange={(e) => setNewProduct((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Missing product name"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+              <input
+                type="number"
+                min={0}
+                value={newProduct.onFloor}
+                onChange={(e) => setNewProduct((prev) => ({ ...prev, onFloor: e.target.value }))}
+                placeholder="On floor"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+              <input
+                type="number"
+                min={0}
+                value={newProduct.sold}
+                onChange={(e) => setNewProduct((prev) => ({ ...prev, sold: e.target.value }))}
+                placeholder="Sold"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+              <input
+                type="number"
+                min={0}
+                value={newProduct.available}
+                onChange={(e) => setNewProduct((prev) => ({ ...prev, available: e.target.value }))}
+                placeholder="Available"
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={creatingProduct}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {creatingProduct ? "Adding..." : "Add Product"}
+              </button>
+            </form>
+
             {loading ? (
               <p className="text-sm text-slate-600">Loading products...</p>
             ) : products.length === 0 ? (
@@ -355,17 +476,89 @@ export default function InventoryTrackerPage() {
                       <th className="px-2 py-2 font-medium">Sold</th>
                       <th className="px-2 py-2 font-medium">Available</th>
                       <th className="px-2 py-2 font-medium">Orders</th>
-                      <th className="px-2 py-2 font-medium">Actions</th>
+                      <th className="px-2 py-2 font-medium">Save</th>
+                      <th className="px-2 py-2 font-medium">Orders</th>
                     </tr>
                   </thead>
                   <tbody>
                     {products.map((product) => (
                       <tr key={product.id} className="border-b border-slate-100">
-                        <td className="px-2 py-2">{product.name}</td>
-                        <td className="px-2 py-2">{product.onFloor}</td>
-                        <td className="px-2 py-2">{product.sold}</td>
-                        <td className="px-2 py-2">{product.available}</td>
+                        <td className="px-2 py-2">
+                          <input
+                            value={productDrafts[product.id]?.name || ""}
+                            onChange={(e) =>
+                              setProductDrafts((prev) => ({
+                                ...prev,
+                                [product.id]: {
+                                  ...(prev[product.id] || { name: "", onFloor: "0", sold: "0", available: "0" }),
+                                  name: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-full min-w-56 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            min={0}
+                            value={productDrafts[product.id]?.onFloor || "0"}
+                            onChange={(e) =>
+                              setProductDrafts((prev) => ({
+                                ...prev,
+                                [product.id]: {
+                                  ...(prev[product.id] || { name: "", onFloor: "0", sold: "0", available: "0" }),
+                                  onFloor: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            min={0}
+                            value={productDrafts[product.id]?.sold || "0"}
+                            onChange={(e) =>
+                              setProductDrafts((prev) => ({
+                                ...prev,
+                                [product.id]: {
+                                  ...(prev[product.id] || { name: "", onFloor: "0", sold: "0", available: "0" }),
+                                  sold: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input
+                            type="number"
+                            min={0}
+                            value={productDrafts[product.id]?.available || "0"}
+                            onChange={(e) =>
+                              setProductDrafts((prev) => ({
+                                ...prev,
+                                [product.id]: {
+                                  ...(prev[product.id] || { name: "", onFloor: "0", sold: "0", available: "0" }),
+                                  available: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                          />
+                        </td>
                         <td className="px-2 py-2">{product.orderCount}</td>
+                        <td className="px-2 py-2">
+                          <button
+                            onClick={() => saveProduct(product.id)}
+                            disabled={savingProductId === product.id}
+                            className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {savingProductId === product.id ? "Saving..." : "Save"}
+                          </button>
+                        </td>
                         <td className="px-2 py-2">
                           <Link
                             href={`/admin/inventory-tracker/${product.id}`}
