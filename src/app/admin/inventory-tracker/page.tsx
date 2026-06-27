@@ -21,6 +21,7 @@ export default function InventoryTrackerPage() {
   const [productDrafts, setProductDrafts] = useState<Record<string, { name: string; onFloor: string; sold: string; available: string }>>({});
   const [newProduct, setNewProduct] = useState({ name: "", onFloor: "0", sold: "0", available: "0" });
   const [creatingProduct, setCreatingProduct] = useState(false);
+  const [syncingInvoices, setSyncingInvoices] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -132,6 +133,29 @@ export default function InventoryTrackerPage() {
     }));
   }
 
+  async function syncAllInvoicesWithQbo() {
+    if (!confirm("Sync all existing inventory invoice numbers with connected QuickBooks now?")) return;
+
+    setSyncingInvoices(true);
+    try {
+      const res = await fetch("/api/inventory/orders/sync-qbo", {
+        method: "POST",
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || "Failed to sync invoices");
+
+      const stats = result?.data || {};
+      alert(
+        `QBO sync complete.\nProcessed: ${stats.processed || 0}\nSynced: ${stats.synced || 0}\nUnchanged: ${stats.unchanged || 0}\nMissing in QBO: ${stats.missingInQbo || 0}\nConflicts: ${stats.conflicts || 0}`
+      );
+      await loadProducts();
+    } catch (error: any) {
+      alert(error?.message || "Failed to sync invoices");
+    } finally {
+      setSyncingInvoices(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 lg:flex">
       <Sidebar activePage="Inventory Tracker" />
@@ -150,6 +174,13 @@ export default function InventoryTrackerPage() {
               >
                 Open Containers
               </Link>
+              <button
+                onClick={syncAllInvoicesWithQbo}
+                disabled={syncingInvoices}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {syncingInvoices ? "Syncing Invoices..." : "Sync All Invoices with QBO"}
+              </button>
             </div>
           </header>
 
