@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getServerSupabaseClient } from "@/lib/supabase";
 
 type InventoryImportRow = {
   name: string;
@@ -42,31 +42,63 @@ export async function POST(req: Request) {
   }
 
   try {
+    const supabase = getServerSupabaseClient();
+
     if (mode === "replace") {
-      await prisma.$transaction(async (tx) => {
-        await tx.inventoryOrderEntry.deleteMany({});
-        await tx.inventoryProduct.deleteMany({});
-        await tx.inventoryProduct.createMany({
-          data: rows,
-        });
-      });
-    } else {
-      await prisma.$transaction(
-        rows.map((row) =>
-          prisma.inventoryProduct.upsert({
-            where: { name: row.name },
-            create: row,
-            update: {
-              onFloor: row.onFloor,
-              sold: row.sold,
-              available: row.available,
-            },
-          })
-        )
+      const { data: existingProducts, error: existingProductsError } = await supabase
+        .from("inventory_products")
+        .select("id");
+
+      if (existingProductsError) throw existingProductsError;
+
+      const productIds = (existingProducts || []).map((row: any) => row.id).filter(Boolean);
+
+      if (productIds.length > 0) {
+        const { error: deleteOrdersError } = await supabase
+          .from("inventory_order_entries")
+          .delete()
+          .in("product_id", productIds);
+
+        if (deleteOrdersError) throw deleteOrdersError;
+
+        const { error: deleteProductsError } = await supabase
+          .from("inventory_products")
+          .delete()
+          .in("id", productIds);
+
+        if (deleteProductsError) throw deleteProductsError;
+      }
+
+      const { error: insertError } = await supabase.from("inventory_products").insert(
+        rows.map((row) => ({
+          name: row.name,
+          on_floor: row.onFloor,
+          sold: row.sold,
+          available: row.available,
+        }))
       );
+
+      if (insertError) throw insertError;
+    } else {
+      const { error: upsertError } = await supabase.from("inventory_products").upsert(
+        rows.map((row) => ({
+          name: row.name,
+          on_floor: row.onFloor,
+          sold: row.sold,
+          available: row.available,
+        })),
+        { onConflict: "name" }
+      );
+
+      if (upsertError) throw upsertError;
     }
 
-    const total = await prisma.inventoryProduct.count();
+    const { count: total, error: countError } = await supabase
+      .from("inventory_products")
+      .select("id", { head: true, count: "exact" });
+
+    if (countError) throw countError;
+
     return NextResponse.json({ imported: rows.length, totalProducts: total, mode });
   } catch (error) {
     console.error("inventory import error", error);

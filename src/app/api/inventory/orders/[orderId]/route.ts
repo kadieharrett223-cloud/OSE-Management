@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getServerSupabaseClient } from "@/lib/supabase";
 
 export async function DELETE(_req: NextRequest, { params }: { params: { orderId: string } }) {
   const session: any = await getSession();
@@ -9,18 +9,26 @@ export async function DELETE(_req: NextRequest, { params }: { params: { orderId:
   }
 
   try {
-    const existing = await prisma.inventoryOrderEntry.findUnique({
-      where: { id: params.orderId },
-      select: { id: true },
-    });
+    const supabase = getServerSupabaseClient();
+
+    const { data: existing, error: existingError } = await supabase
+      .from("inventory_order_entries")
+      .select("id")
+      .eq("id", params.orderId)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
 
     if (!existing) {
       return NextResponse.json({ error: "Order entry not found" }, { status: 404 });
     }
 
-    await prisma.inventoryOrderEntry.delete({
-      where: { id: params.orderId },
-    });
+    const { error: deleteError } = await supabase
+      .from("inventory_order_entries")
+      .delete()
+      .eq("id", params.orderId);
+
+    if (deleteError) throw deleteError;
 
     return NextResponse.json({ ok: true });
   } catch (error) {

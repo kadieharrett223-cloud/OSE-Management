@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getServerSupabaseClient } from "@/lib/supabase";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session: any = await getSession();
@@ -9,27 +9,35 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    const product = await prisma.inventoryProduct.findUnique({
-      where: { id: params.id },
-      include: {
-        _count: {
-          select: { orderEntries: true },
-        },
-      },
-    });
+    const supabase = getServerSupabaseClient();
+
+    const { data: product, error: productError } = await supabase
+      .from("inventory_products")
+      .select("id, name, on_floor, sold, available")
+      .eq("id", params.id)
+      .maybeSingle();
+
+    if (productError) throw productError;
 
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
+    const { count: orderCount, error: countError } = await supabase
+      .from("inventory_order_entries")
+      .select("id", { head: true, count: "exact" })
+      .eq("product_id", params.id);
+
+    if (countError) throw countError;
+
     return NextResponse.json({
       data: {
         id: product.id,
         name: product.name,
-        onFloor: product.onFloor,
-        sold: product.sold,
-        available: product.available,
-        orderCount: product._count.orderEntries,
+        onFloor: Number((product as any).on_floor) || 0,
+        sold: Number(product.sold) || 0,
+        available: Number(product.available) || 0,
+        orderCount: orderCount || 0,
       },
     });
   } catch (error) {
