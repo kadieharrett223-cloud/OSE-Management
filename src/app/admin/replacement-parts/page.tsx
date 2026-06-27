@@ -120,11 +120,13 @@ function getFittingRangeBounds(range: FittingPrintRange) {
   return { start: thisWeekStart, end };
 }
 
-function isCreatedAtInRange(createdAt: string, range: FittingPrintRange) {
-  const createdDate = new Date(createdAt);
-  if (Number.isNaN(createdDate.getTime())) return false;
+function isDateInRange(dateValue: string | null, range: FittingPrintRange) {
+  if (!dateValue) return false;
+
+  const targetDate = new Date(dateValue);
+  if (Number.isNaN(targetDate.getTime())) return false;
   const { start, end } = getFittingRangeBounds(range);
-  return createdDate >= start && createdDate <= end;
+  return targetDate >= start && targetDate <= end;
 }
 
 function getRangeLabel(range: FittingPrintRange) {
@@ -176,7 +178,7 @@ export default function ReplacementPartsPage() {
     [filteredParts, selectedId]
   );
   const fittingPartsForPrint = useMemo(
-    () => parts.filter((part) => part.fitting && isCreatedAtInRange(part.created_at, fittingPrintRange)),
+    () => parts.filter((part) => part.fitting && isDateInRange(part.shipped_at, fittingPrintRange)),
     [parts, fittingPrintRange]
   );
 

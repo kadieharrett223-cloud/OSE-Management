@@ -1,7 +1,1 @@
--- Add fitting replacement marker to replacement parts
-
-ALTER TABLE replacement_parts
-ADD COLUMN IF NOT EXISTS fitting BOOLEAN NOT NULL DEFAULT FALSE;
-
-CREATE INDEX IF NOT EXISTS idx_replacement_parts_fitting
-  ON replacement_parts(fitting);
+I need to create a simple inventory tracking app. i will start by copying and pasting all of my producst, alon ewith if its on floor, how many are sold, plus how many are available. ignore website prcie and sale percentage. then i will go to each product, and write a list of customers plus their invoice numbers who currently have that product on order. start by creating the shell of the app. it will sync with quickbooks, supabase, github, etc. 

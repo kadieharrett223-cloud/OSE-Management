@@ -106,6 +106,33 @@ model CommissionSnapshot {
   @@unique([repId, year, month])
 }
 
+model InventoryProduct {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  name        String
+  onFloor     Int      @default(0)
+  sold        Int      @default(0)
+  available   Int      @default(0)
+
+  orderEntries InventoryOrderEntry[]
+
+  @@unique([name])
+}
+
+model InventoryOrderEntry {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  productId    String
+  customerName String
+  invoiceNumber String
+
+  product      InventoryProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
 model PurchaseOrder {
   id                  String   @id @default(cuid())
   po_number           String   @unique
