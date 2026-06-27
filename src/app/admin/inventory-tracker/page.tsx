@@ -151,7 +151,7 @@ export default function InventoryTrackerPage() {
                 Open Containers
               </Link>
             </div>
-          </section>
+          </header>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
