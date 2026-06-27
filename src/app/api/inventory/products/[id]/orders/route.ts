@@ -1,6 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
+import { getUserId } from "@/lib/auth";
+import { authorizedQboFetchDirect, QboApiError } from "@/lib/qbo";
+
+type QboInvoice = {
+  Id?: string;
+  DocNumber?: string;
+  CustomerRef?: {
+    name?: string;
+    value?: string;
+  };
+};
+
+function escapeQboString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+async function findQboInvoiceByNumber(invoiceNumber: string, userId?: string) {
+  const byDocNumber = await authorizedQboFetchDirect<any>(
+    `/query?query=${encodeURIComponent(
+      `SELECT Id, DocNumber, CustomerRef FROM Invoice WHERE DocNumber = '${escapeQboString(invoiceNumber)}' MAXRESULTS 1`
+    )}&minorversion=65`,
+    {},
+    userId
+  );
+
+  const firstMatch = (byDocNumber?.QueryResponse?.Invoice || [])[0] as QboInvoice | undefined;
+  if (firstMatch) return firstMatch;
+
+  const byId = await authorizedQboFetchDirect<any>(
+    `/query?query=${encodeURIComponent(
+      `SELECT Id, DocNumber, CustomerRef FROM Invoice WHERE Id = '${escapeQboString(invoiceNumber)}' MAXRESULTS 1`
+    )}&minorversion=65`,
+    {},
+    userId
+  );
+
+  return (byId?.QueryResponse?.Invoice || [])[0] as QboInvoice | undefined;
+}
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session: any = await getSession();
@@ -56,12 +94,33 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const customerName = String(body?.customerName || "").trim();
   const invoiceNumber = String(body?.invoiceNumber || "").trim();
 
-  if (!customerName || !invoiceNumber) {
-    return NextResponse.json({ error: "Customer name and invoice number are required" }, { status: 400 });
+  if (!invoiceNumber) {
+    return NextResponse.json({ error: "Invoice number is required" }, { status: 400 });
   }
 
   try {
     const supabase = getServerSupabaseClient();
+    const userId = (await getUserId()) || undefined;
+
+    let qboInvoice: QboInvoice | undefined;
+    try {
+      qboInvoice = await findQboInvoiceByNumber(invoiceNumber, userId);
+    } catch (error) {
+      if (error instanceof QboApiError) {
+        return NextResponse.json(
+          { error: "Failed to verify invoice with QuickBooks", details: error.message },
+          { status: error.status }
+        );
+      }
+      throw error;
+    }
+
+    if (!qboInvoice) {
+      return NextResponse.json({ error: "Invoice number not found in QuickBooks" }, { status: 404 });
+    }
+
+    const canonicalInvoiceNumber = String(qboInvoice.DocNumber || invoiceNumber).trim();
+    const canonicalCustomerName = String(qboInvoice.CustomerRef?.name || customerName || "").trim() || "Unknown Customer";
 
     const { data: product, error: productError } = await supabase
       .from("inventory_products")
@@ -79,7 +138,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .from("inventory_order_entries")
       .select("id, customer_name, invoice_number")
       .eq("product_id", params.id)
-      .eq("invoice_number", invoiceNumber)
+      .eq("invoice_number", canonicalInvoiceNumber)
       .maybeSingle();
 
     if (existingError) throw existingError;
@@ -102,8 +161,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .from("inventory_order_entries")
       .insert({
         product_id: params.id,
-        customer_name: customerName,
-        invoice_number: invoiceNumber,
+        customer_name: canonicalCustomerName,
+        invoice_number: canonicalInvoiceNumber,
       })
       .select("id, created_at, updated_at, customer_name, invoice_number")
       .single();

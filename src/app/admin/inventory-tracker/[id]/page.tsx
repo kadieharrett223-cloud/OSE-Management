@@ -65,8 +65,8 @@ export default function ProductOrdersPage() {
     const customer = customerName.trim();
     const invoice = invoiceNumber.trim();
 
-    if (!customer || !invoice) {
-      alert("Customer name and invoice number are required.");
+    if (!invoice) {
+      alert("Invoice number is required.");
       return;
     }
 
@@ -146,11 +146,12 @@ export default function ProductOrdersPage() {
 
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 className="text-lg font-semibold">Add Customer Order</h2>
+                <p className="mt-1 text-sm text-slate-600">Invoice number is verified against QuickBooks when you add it.</p>
                 <form onSubmit={addOrder} className="mt-3 grid gap-3 sm:grid-cols-[1fr_220px_auto]">
                   <input
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Customer name"
+                    placeholder="Customer name (optional)"
                     className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-blue-400 focus:ring"
                   />
                   <input
