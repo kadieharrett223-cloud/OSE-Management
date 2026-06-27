@@ -5,6 +5,20 @@ import { getUserId } from "@/lib/auth";
 import { QboApiError } from "@/lib/qbo";
 import { findQboInvoiceByNumber, QboInvoice } from "@/lib/inventory-qbo";
 
+const ALLOWED_ORDER_STATUSES = new Set([
+  "on_order",
+  "urgent",
+  "in_warehouse",
+  "ready_pickup",
+  "delivered",
+  "other",
+]);
+
+function normalizeOrderStatus(value: unknown) {
+  const status = String(value || "").trim().toLowerCase();
+  return ALLOWED_ORDER_STATUSES.has(status) ? status : "on_order";
+}
+
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session: any = await getSession();
   if (!session?.user) {
@@ -28,7 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
     const { data: orders, error: ordersError } = await supabase
       .from("inventory_order_entries")
-      .select("id, created_at, updated_at, customer_name, invoice_number")
+      .select("id, created_at, updated_at, customer_name, invoice_number, order_status")
       .eq("product_id", params.id)
       .order("created_at", { ascending: false });
 
@@ -41,6 +55,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         updatedAt: order.updated_at,
         customerName: order.customer_name,
         invoiceNumber: order.invoice_number,
+        orderStatus: order.order_status,
       })),
     });
   } catch (error) {
@@ -58,6 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const body = await req.json().catch(() => null);
   const customerName = String(body?.customerName || "").trim();
   const invoiceNumber = String(body?.invoiceNumber || "").trim();
+  const orderStatus = normalizeOrderStatus(body?.orderStatus);
 
   if (!invoiceNumber) {
     return NextResponse.json({ error: "Invoice number is required" }, { status: 400 });
@@ -128,8 +144,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         product_id: params.id,
         customer_name: canonicalCustomerName,
         invoice_number: canonicalInvoiceNumber,
+        order_status: orderStatus,
       })
-      .select("id, created_at, updated_at, customer_name, invoice_number")
+      .select("id, created_at, updated_at, customer_name, invoice_number, order_status")
       .single();
 
     if (createdError) {
@@ -147,6 +164,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           updatedAt: (created as any).updated_at,
           customerName: (created as any).customer_name,
           invoiceNumber: (created as any).invoice_number,
+          orderStatus: (created as any).order_status,
         },
       },
       { status: 201 }

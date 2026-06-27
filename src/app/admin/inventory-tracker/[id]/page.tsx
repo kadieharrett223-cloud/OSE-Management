@@ -19,7 +19,23 @@ type ProductOrder = {
   customerName: string;
   invoiceNumber: string;
   createdAt: string;
+  orderStatus?: string;
 };
+
+const ORDER_STATUS_OPTIONS = [
+  { value: "on_order", label: "On Order" },
+  { value: "urgent", label: "Urgent" },
+  { value: "in_warehouse", label: "In Warehouse" },
+  { value: "ready_pickup", label: "Ready Pickup" },
+  { value: "delivered", label: "Delivered" },
+  { value: "other", label: "Other" },
+];
+
+function statusLabel(value?: string) {
+  const normalized = String(value || "on_order").trim().toLowerCase();
+  const match = ORDER_STATUS_OPTIONS.find((option) => option.value === normalized);
+  return match ? match.label : "On Order";
+}
 
 export default function ProductOrdersPage() {
   const params = useParams<{ id: string }>();
@@ -29,8 +45,10 @@ export default function ProductOrdersPage() {
   const [orders, setOrders] = useState<ProductOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [newOrderStatus, setNewOrderStatus] = useState("on_order");
 
   useEffect(() => {
     if (!productId) return;
@@ -75,18 +93,40 @@ export default function ProductOrdersPage() {
       const res = await fetch(`/api/inventory/products/${productId}/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerName: customer, invoiceNumber: invoice }),
+        body: JSON.stringify({ customerName: customer, invoiceNumber: invoice, orderStatus: newOrderStatus }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result?.error || "Failed to add order entry");
 
       setCustomerName("");
       setInvoiceNumber("");
+      setNewOrderStatus("on_order");
       await loadAll();
     } catch (error: any) {
       alert(error?.message || "Failed to add order entry");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function updateOrderStatus(orderId: string, orderStatus: string) {
+    setUpdatingStatusId(orderId);
+    try {
+      const res = await fetch(`/api/inventory/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderStatus }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result?.error || "Failed to update order status");
+
+      setOrders((prev) =>
+        prev.map((order) => (order.id === orderId ? { ...order, orderStatus: result?.data?.orderStatus || orderStatus } : order))
+      );
+    } catch (error: any) {
+      alert(error?.message || "Failed to update order status");
+    } finally {
+      setUpdatingStatusId(null);
     }
   }
 
@@ -147,7 +187,7 @@ export default function ProductOrdersPage() {
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 className="text-lg font-semibold">Add Customer Order</h2>
                 <p className="mt-1 text-sm text-slate-600">Invoice number is verified against QuickBooks when you add it.</p>
-                <form onSubmit={addOrder} className="mt-3 grid gap-3 sm:grid-cols-[1fr_220px_auto]">
+                <form onSubmit={addOrder} className="mt-3 grid gap-3 sm:grid-cols-[1fr_220px_180px_auto]">
                   <input
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
@@ -160,6 +200,17 @@ export default function ProductOrdersPage() {
                     placeholder="Invoice number"
                     className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-blue-400 focus:ring"
                   />
+                  <select
+                    value={newOrderStatus}
+                    onChange={(e) => setNewOrderStatus(e.target.value)}
+                    className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-blue-400 focus:ring"
+                  >
+                    {ORDER_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     type="submit"
                     disabled={saving}
@@ -181,6 +232,7 @@ export default function ProductOrdersPage() {
                         <tr className="border-b border-slate-200 text-left text-slate-600">
                           <th className="px-2 py-2 font-medium">Customer</th>
                           <th className="px-2 py-2 font-medium">Invoice #</th>
+                          <th className="px-2 py-2 font-medium">Status</th>
                           <th className="px-2 py-2 font-medium">Added</th>
                           <th className="px-2 py-2 font-medium">Actions</th>
                         </tr>
@@ -190,6 +242,25 @@ export default function ProductOrdersPage() {
                           <tr key={order.id} className="border-b border-slate-100">
                             <td className="px-2 py-2">{order.customerName}</td>
                             <td className="px-2 py-2">{order.invoiceNumber}</td>
+                            <td className="px-2 py-2">
+                              <div className="flex items-center gap-2">
+                                <span className="rounded-full border border-slate-300 px-2 py-0.5 text-xs">
+                                  {statusLabel(order.orderStatus)}
+                                </span>
+                                <select
+                                  value={String(order.orderStatus || "on_order")}
+                                  onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                  disabled={updatingStatusId === order.id}
+                                  className="rounded border border-slate-300 px-2 py-1 text-xs"
+                                >
+                                  {ORDER_STATUS_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </td>
                             <td className="px-2 py-2">{new Date(order.createdAt).toLocaleString()}</td>
                             <td className="px-2 py-2">
                               <button
