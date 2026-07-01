@@ -521,8 +521,8 @@ export default function ReplacementPartsPage() {
       <div className="flex min-h-screen">
         <Sidebar activePage="Replacement Parts" />
 
-        <main className="flex-1 p-4 md:p-6">
-          <div className="mx-auto max-w-7xl space-y-5">
+        <main className="flex-1 p-4 md:p-6 xl:p-8">
+          <div className="mx-auto max-w-[1600px] space-y-5">
             <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
@@ -559,7 +559,7 @@ export default function ReplacementPartsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-5 xl:gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
               <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
                 <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
                   <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
@@ -570,7 +570,7 @@ export default function ReplacementPartsPage() {
                         listViewFilter === "FITTINGS"
                           ? "bg-red-600 text-white shadow-sm"
                           : "bg-white text-slate-700 hover:bg-slate-100"
-                      }`}
+                      } whitespace-nowrap`}
                     >
                       Fittings
                     </button>
@@ -581,7 +581,7 @@ export default function ReplacementPartsPage() {
                         listViewFilter === "EVERYTHING_ELSE"
                           ? "bg-slate-900 text-white shadow-sm"
                           : "bg-white text-slate-700 hover:bg-slate-100"
-                      }`}
+                      } whitespace-nowrap`}
                     >
                       Everything Else
                     </button>
@@ -592,7 +592,7 @@ export default function ReplacementPartsPage() {
                         listViewFilter === "UNORDERED"
                           ? "bg-amber-600 text-white shadow-sm"
                           : "bg-white text-slate-700 hover:bg-slate-100"
-                      }`}
+                      } whitespace-nowrap`}
                     >
                       Unordered
                     </button>
@@ -603,7 +603,7 @@ export default function ReplacementPartsPage() {
                         listViewFilter === "ALL"
                           ? "bg-blue-600 text-white shadow-sm"
                           : "bg-white text-slate-700 hover:bg-slate-100"
-                      }`}
+                      } whitespace-nowrap`}
                     >
                       All
                     </button>
@@ -668,7 +668,7 @@ export default function ReplacementPartsPage() {
                   </button>
                 </form>
 
-                <div className="mt-4 space-y-2">
+                <div className="mt-4 space-y-3">
                   {loading ? (
                     <p className="text-sm text-slate-500">Loading...</p>
                   ) : filteredParts.length === 0 ? (
@@ -691,7 +691,7 @@ export default function ReplacementPartsPage() {
                             loadDetails(part.id);
                           }
                         }}
-                        className={`w-full rounded-lg border px-3 py-2.5 text-left text-sm shadow-sm transition hover:shadow ${
+                        className={`w-full rounded-xl border px-4 py-3 text-left text-sm shadow-sm transition hover:shadow-md ${
                           selectedId === part.id
                             ? part.status === "CANCELLED"
                               ? "border-red-300 bg-red-50"
@@ -727,14 +727,14 @@ export default function ReplacementPartsPage() {
                             </span>
                           ) : null}
                         </div>
-                        <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>{part.customer_name || "No customer"}</p>
-                        <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>
+                        <p className={`mt-1 text-sm leading-5 ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-700"}`}>{part.customer_name || "No customer"}</p>
+                        <p className={`text-xs leading-5 ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>
                           eBay order: {part.ebay_order_number || "-"}
                         </p>
-                        <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700" : part.emailed_to_customer ? "text-emerald-700" : "text-slate-600"}`}>
+                        <p className={`text-xs leading-5 ${part.status === "CANCELLED" ? "text-red-700" : part.emailed_to_customer ? "text-emerald-700" : "text-slate-600"}`}>
                           Emailed: {part.emailed_to_customer ? `Yes${part.emailed_at ? ` (${new Date(part.emailed_at).toLocaleString()})` : ""}` : "No"}
                         </p>
-                        <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700 font-medium" : "text-slate-500"}`}>
+                        <p className={`text-xs leading-5 ${part.status === "CANCELLED" ? "text-red-700 font-medium" : "text-slate-500"}`}>
                           {STATUS_OPTIONS.find((s) => s.value === part.status)?.label || part.status}
                         </p>
                       </button>
@@ -743,7 +743,7 @@ export default function ReplacementPartsPage() {
                 </div>
               </section>
 
-              <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
+              <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm xl:p-6">
                 {!selectedPart ? (
                   <p className="text-sm text-slate-500">Select a replacement part record to view details.</p>
                 ) : detailsLoading || !details ? (
@@ -753,54 +753,62 @@ export default function ReplacementPartsPage() {
                     {details.invoiceSummary && (
                       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-slate-700">
                         <p className="mb-3 text-sm font-semibold text-slate-900">QuickBooks Invoice</p>
-                        <div className="space-y-1 text-sm text-slate-700">
-                          <p>
-                            <span className="font-medium text-slate-900">Invoice:</span> {details.invoiceSummary.docNumber || "-"}
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Customer:</span> {details.invoiceSummary.customer || "-"}
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Sales rep:</span> {details.invoiceSummary.salesRep || "-"}
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Shipping address:</span>{" "}
-                            <span className="whitespace-pre-wrap">{details.invoiceSummary.shippingAddress || "-"}</span>
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Status:</span>{" "}
-                            {details.invoiceSummary.paid ? (
-                              <span className="text-emerald-700">Paid off</span>
-                            ) : (
-                              <span className="text-amber-700">Not paid</span>
-                            )}
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Total:</span> {money(details.invoiceSummary.total)}
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Balance:</span> {money(details.invoiceSummary.balance)}
-                          </p>
+                        <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm text-slate-700 md:grid-cols-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+                          <div className="space-y-2">
+                            <p>
+                              <span className="font-medium text-slate-900">Invoice:</span> {details.invoiceSummary.docNumber || "-"}
+                            </p>
+                            <p>
+                              <span className="font-medium text-slate-900">Customer:</span> {details.invoiceSummary.customer || "-"}
+                            </p>
+                            <p>
+                              <span className="font-medium text-slate-900">Sales rep:</span> {details.invoiceSummary.salesRep || "-"}
+                            </p>
+                            <p>
+                              <span className="font-medium text-slate-900">Shipping address:</span>{" "}
+                              <span className="whitespace-pre-wrap">{details.invoiceSummary.shippingAddress || "-"}</span>
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-white/70 p-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+                              <p className={`mt-1 font-medium ${details.invoiceSummary.paid ? "text-emerald-700" : "text-amber-700"}`}>
+                                {details.invoiceSummary.paid ? "Paid off" : "Not paid"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Balance</p>
+                              <p className="mt-1 font-medium text-slate-900">{money(details.invoiceSummary.balance)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+                              <p className="mt-1 font-medium text-slate-900">{money(details.invoiceSummary.total)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Due Date</p>
+                              <p className="mt-1 font-medium text-slate-900">{details.invoiceSummary.dueDate || "-"}</p>
+                            </div>
+                          </div>
                         </div>
 
                         {details.invoiceSummary.lineItems.length > 0 && (
-                          <div className="mt-3 overflow-x-auto">
+                          <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
                             <table className="min-w-full text-xs text-slate-700">
-                              <thead>
-                                <tr className="border-b border-slate-300 text-left text-slate-900">
-                                  <th className="px-2 py-1">Description</th>
-                                  <th className="px-2 py-1 text-right">Qty</th>
-                                  <th className="px-2 py-1 text-right">Unit</th>
-                                  <th className="px-2 py-1 text-right">Amount</th>
+                              <thead className="bg-slate-100/80">
+                                <tr className="border-b border-slate-200 text-left text-slate-900">
+                                  <th className="px-3 py-2">Description</th>
+                                  <th className="px-3 py-2 text-right">Qty</th>
+                                  <th className="px-3 py-2 text-right">Unit</th>
+                                  <th className="px-3 py-2 text-right">Amount</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {details.invoiceSummary.lineItems.map((line, idx) => (
-                                  <tr key={`${line.description}-${idx}`} className="border-b border-slate-100">
-                                    <td className="px-2 py-1">{line.description}</td>
-                                    <td className="px-2 py-1 text-right">{line.quantity}</td>
-                                    <td className="px-2 py-1 text-right">{money(line.unitPrice)}</td>
-                                    <td className="px-2 py-1 text-right">{money(line.amount)}</td>
+                                  <tr key={`${line.description}-${idx}`} className="border-b border-slate-100 align-top last:border-b-0">
+                                    <td className="px-3 py-2 leading-5">{line.description}</td>
+                                    <td className="px-3 py-2 text-right">{line.quantity}</td>
+                                    <td className="px-3 py-2 text-right">{money(line.unitPrice)}</td>
+                                    <td className="px-3 py-2 text-right">{money(line.amount)}</td>
                                   </tr>
                                 ))}
                               </tbody>
