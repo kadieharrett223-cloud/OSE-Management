@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     const invoiceNumber = (body?.invoiceNumber || "").toString().trim();
     const invoiceId = (body?.invoiceId || "").toString().trim();
     const ebayOrderNumber = (body?.ebayOrderNumber || "").toString().trim();
+    const allowDuplicateCustomer = Boolean(body?.allowDuplicateCustomer);
 
     if (!invoiceNumber) {
       return NextResponse.json({ error: "Invoice number is required" }, { status: 400 });
@@ -101,6 +102,29 @@ export async function POST(req: NextRequest) {
 
     const supabase = getServerSupabaseClient();
     const partName = customerName ? `${customerName} replacement` : `Replacement for Invoice ${invoiceNumber}`;
+
+    if (customerName && !allowDuplicateCustomer) {
+      const { data: existingRows, error: existingRowsError } = await supabase
+        .from("replacement_parts")
+        .select("id, qbo_invoice_number, status, created_at")
+        .ilike("customer_name", customerName)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (existingRowsError) throw existingRowsError;
+
+      if ((existingRows || []).length > 0) {
+        return NextResponse.json(
+          {
+            error: `A replacement part already exists for customer \"${customerName}\". Continue anyway?`,
+            requiresCustomerConfirmation: true,
+            duplicateCustomerName: customerName,
+            existingRecords: existingRows,
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     const { data, error } = await supabase
       .from("replacement_parts")

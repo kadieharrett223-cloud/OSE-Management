@@ -248,7 +248,7 @@ export default function ReplacementPartsPage() {
     await submitCreatePart();
   }
 
-  async function submitCreatePart(selectedInvoiceId?: string) {
+  async function submitCreatePart(selectedInvoiceId?: string, allowDuplicateCustomer = false) {
     const invoiceNumber = newInvoiceNumber.trim();
     if (!invoiceNumber) {
       alert("Enter a QuickBooks invoice number.");
@@ -263,11 +263,23 @@ export default function ReplacementPartsPage() {
         body: JSON.stringify({
           invoiceNumber,
           ebayOrderNumber: newEbayOrderNumber.trim() || null,
+          allowDuplicateCustomer,
           ...(selectedInvoiceId ? { invoiceId: selectedInvoiceId } : {}),
         }),
       });
       const result = await res.json();
       if (res.status === 409) {
+        if (result?.requiresCustomerConfirmation) {
+          const duplicateName = result?.duplicateCustomerName || "this customer";
+          const proceed = window.confirm(
+            `${result?.error || `A replacement part already exists for ${duplicateName}.`}\n\nPress OK to continue anyway, or Cancel to stop.`
+          );
+          if (proceed) {
+            await submitCreatePart(selectedInvoiceId, true);
+          }
+          return;
+        }
+
         const candidates = Array.isArray(result?.candidates) ? (result.candidates as InvoiceCandidate[]) : [];
         if (candidates.length > 0) {
           setInvoiceCandidates(candidates);
