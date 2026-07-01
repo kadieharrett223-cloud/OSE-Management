@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 
 type StatusValue = "REQUESTED" | "ORDERED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 type FittingPrintRange = "THIS_WEEK" | "LAST_WEEK" | "THIS_MONTH";
-type ListViewFilter = "FITTINGS" | "EVERYTHING_ELSE" | "ALL";
+type ListViewFilter = "FITTINGS" | "EVERYTHING_ELSE" | "UNORDERED" | "ALL";
 
 type ReplacementPart = {
   id: string;
@@ -143,6 +143,10 @@ function buildTrackingKey(item: {
   ].join("|");
 }
 
+function hasEbayOrderNumber(part: { ebay_order_number: string | null }) {
+  return Boolean(part.ebay_order_number?.trim());
+}
+
 export default function ReplacementPartsPage() {
   const [parts, setParts] = useState<ReplacementPart[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,6 +172,7 @@ export default function ReplacementPartsPage() {
       parts.filter((part) => {
         if (listViewFilter === "ALL") return true;
         if (listViewFilter === "FITTINGS") return part.fitting;
+        if (listViewFilter === "UNORDERED") return !hasEbayOrderNumber(part);
         return !part.fitting;
       }),
     [parts, listViewFilter]
@@ -557,7 +562,7 @@ export default function ReplacementPartsPage() {
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
               <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
                 <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                  <div className="grid grid-cols-3 gap-1">
+                  <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
                     <button
                       type="button"
                       onClick={() => setListViewFilter("FITTINGS")}
@@ -579,6 +584,17 @@ export default function ReplacementPartsPage() {
                       }`}
                     >
                       Everything Else
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setListViewFilter("UNORDERED")}
+                      className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+                        listViewFilter === "UNORDERED"
+                          ? "bg-amber-600 text-white shadow-sm"
+                          : "bg-white text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      Unordered
                     </button>
                     <button
                       type="button"
@@ -659,6 +675,8 @@ export default function ReplacementPartsPage() {
                     <p className="text-sm text-slate-500">
                       {listViewFilter === "FITTINGS"
                         ? "No fitting replacement records yet."
+                        : listViewFilter === "UNORDERED"
+                          ? "No unordered replacement records yet."
                         : listViewFilter === "EVERYTHING_ELSE"
                           ? "No non-fitting replacement records yet."
                           : "No replacement records yet."}
@@ -683,24 +701,31 @@ export default function ReplacementPartsPage() {
                               : "border-slate-200 bg-white"
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          {part.fitting ? (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            {part.fitting ? (
+                              <span
+                                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white"
+                                title="Fitting replacement"
+                              >
+                                !
+                              </span>
+                            ) : null}
                             <span
-                              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white"
-                              title="Fitting replacement"
+                              className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold ${STATUS_META[part.status].chipClass}`}
+                              title={STATUS_OPTIONS.find((s) => s.value === part.status)?.label || part.status}
                             >
-                              !
+                              {STATUS_META[part.status].symbol}
+                            </span>
+                            <p className={`truncate font-semibold ${part.status === "CANCELLED" ? "text-red-700 line-through" : "text-slate-900"}`}>
+                              {part.qbo_invoice_number || part.part_name}
+                            </p>
+                          </div>
+                          {!hasEbayOrderNumber(part) ? (
+                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                              unordered
                             </span>
                           ) : null}
-                          <span
-                            className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold ${STATUS_META[part.status].chipClass}`}
-                            title={STATUS_OPTIONS.find((s) => s.value === part.status)?.label || part.status}
-                          >
-                            {STATUS_META[part.status].symbol}
-                          </span>
-                          <p className={`font-semibold ${part.status === "CANCELLED" ? "text-red-700 line-through" : "text-slate-900"}`}>
-                            {part.qbo_invoice_number || part.part_name}
-                          </p>
                         </div>
                         <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>{part.customer_name || "No customer"}</p>
                         <p className={`text-xs ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>
