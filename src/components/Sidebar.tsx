@@ -20,7 +20,6 @@ const navGroups: { title: string; items: { label: string; hint: string; href: st
   {
     title: "Inventory",
     items: [
-      { label: "Inventory Tracker", hint: "Product counts + on-order list", href: "/admin/inventory-tracker" },
       { label: "Price List", hint: "SKU shipping + sale", href: "/admin/price-list" },
       { label: "Purchasing", hint: "POs and payments", href: "/admin/purchasing" },
       { label: "Special Orders", hint: "Factory colors & status", href: "/admin/special-orders" },
