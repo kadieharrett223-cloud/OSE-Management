@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 
 type StatusValue = "REQUESTED" | "ORDERED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 type FittingPrintRange = "THIS_WEEK" | "LAST_WEEK" | "THIS_MONTH";
-type ListViewFilter = "FITTINGS" | "EVERYTHING_ELSE" | "UNORDERED" | "ALL";
+type ListViewFilter = "FITTINGS" | "EVERYTHING_ELSE" | "UNORDERED" | "MISSING_TRACKING" | "ALL";
 
 type ReplacementPart = {
   id: string;
@@ -184,6 +184,7 @@ export default function ReplacementPartsPage() {
         if (listViewFilter === "ALL") return true;
         if (listViewFilter === "FITTINGS") return part.fitting;
         if (listViewFilter === "UNORDERED") return !hasEbayOrderNumber(part);
+        if (listViewFilter === "MISSING_TRACKING") return hasMissingTracking(part);
         return !part.fitting;
       }),
     [parts, listViewFilter]
@@ -573,7 +574,7 @@ export default function ReplacementPartsPage() {
             <div className="grid grid-cols-1 gap-5 xl:gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
               <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
                 <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                  <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-1 sm:grid-cols-5">
                     <button
                       type="button"
                       onClick={() => setListViewFilter("FITTINGS")}
@@ -606,6 +607,17 @@ export default function ReplacementPartsPage() {
                       } whitespace-nowrap`}
                     >
                       Unordered
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setListViewFilter("MISSING_TRACKING")}
+                      className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
+                        listViewFilter === "MISSING_TRACKING"
+                          ? "bg-red-600 text-white shadow-sm"
+                          : "bg-white text-slate-700 hover:bg-slate-100"
+                      } whitespace-nowrap`}
+                    >
+                      Missing Tracking
                     </button>
                     <button
                       type="button"
@@ -688,6 +700,8 @@ export default function ReplacementPartsPage() {
                         ? "No fitting replacement records yet."
                         : listViewFilter === "UNORDERED"
                           ? "No unordered replacement records yet."
+                          : listViewFilter === "MISSING_TRACKING"
+                            ? "No replacement records are missing tracking."
                         : listViewFilter === "EVERYTHING_ELSE"
                           ? "No non-fitting replacement records yet."
                           : "No replacement records yet."}
