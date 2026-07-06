@@ -101,7 +101,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const { data: row, error } = await supabase
       .from("replacement_parts")
       .select(
-        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, priority_note, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .eq("id", params.id)
       .single();
@@ -166,6 +166,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (Object.prototype.hasOwnProperty.call(body, "request_notes")) {
       const requestNotes = String(body?.request_notes || "").trim();
       updatePayload.request_notes = requestNotes || null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, "priority_note")) {
+      const priorityNote = String(body?.priority_note || "").trim();
+      updatePayload.priority_note = priorityNote || null;
     }
 
     if (Object.prototype.hasOwnProperty.call(body, "ebay_order_number")) {
@@ -260,7 +265,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .update(updatePayload)
       .eq("id", params.id)
       .select(
-        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
+        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, priority_note, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
       )
       .single();
 

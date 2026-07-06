@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 
 type StatusValue = "REQUESTED" | "ORDERED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 type FittingPrintRange = "THIS_WEEK" | "LAST_WEEK" | "THIS_MONTH";
-type ListViewFilter = "FITTINGS" | "EVERYTHING_ELSE" | "UNORDERED" | "MISSING_TRACKING" | "ALL";
+type ListViewFilter = "FITTINGS" | "UNORDERED" | "MISSING_TRACKING" | "PRIORITY" | "ALL";
 
 type ReplacementPart = {
   id: string;
@@ -14,6 +14,7 @@ type ReplacementPart = {
   part_name: string;
   customer_name: string | null;
   ebay_order_number: string | null;
+  priority_note: string | null;
   request_notes: string | null;
   internal_notes: string | null;
   status: StatusValue;
@@ -158,6 +159,10 @@ function hasMissingTracking(part: {
   return hasEbayOrderNumber(part) && !hasTrackingNumber(part);
 }
 
+function hasPriorityNote(part: { priority_note: string | null }) {
+  return Boolean(part.priority_note?.trim());
+}
+
 export default function ReplacementPartsPage() {
   const [parts, setParts] = useState<ReplacementPart[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,7 +190,8 @@ export default function ReplacementPartsPage() {
         if (listViewFilter === "FITTINGS") return part.fitting;
         if (listViewFilter === "UNORDERED") return !hasEbayOrderNumber(part);
         if (listViewFilter === "MISSING_TRACKING") return hasMissingTracking(part);
-        return !part.fitting;
+        if (listViewFilter === "PRIORITY") return hasPriorityNote(part);
+        return false;
       }),
     [parts, listViewFilter]
   );
@@ -329,6 +335,7 @@ export default function ReplacementPartsPage() {
       const payload = {
         part_name: details.part_name,
         request_notes: details.request_notes || null,
+        priority_note: details.priority_note || null,
         ebay_order_number: details.ebay_order_number || null,
         fitting: details.fitting,
         emailed_to_customer: details.emailed_to_customer,
@@ -588,14 +595,14 @@ export default function ReplacementPartsPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setListViewFilter("EVERYTHING_ELSE")}
+                      onClick={() => setListViewFilter("PRIORITY")}
                       className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
-                        listViewFilter === "EVERYTHING_ELSE"
-                          ? "bg-slate-900 text-white shadow-sm"
+                        listViewFilter === "PRIORITY"
+                          ? "bg-rose-600 text-white shadow-sm"
                           : "bg-white text-slate-700 hover:bg-slate-100"
                       } whitespace-nowrap`}
                     >
-                      Everything Else
+                      Priority
                     </button>
                     <button
                       type="button"
@@ -702,8 +709,8 @@ export default function ReplacementPartsPage() {
                           ? "No unordered replacement records yet."
                           : listViewFilter === "MISSING_TRACKING"
                             ? "No replacement records are missing tracking."
-                        : listViewFilter === "EVERYTHING_ELSE"
-                          ? "No non-fitting replacement records yet."
+                        : listViewFilter === "PRIORITY"
+                          ? "No priority replacement records yet."
                           : "No replacement records yet."}
                     </p>
                   ) : (
@@ -757,9 +764,19 @@ export default function ReplacementPartsPage() {
                                 missing tracking
                               </span>
                             ) : null}
+                            {hasPriorityNote(part) ? (
+                              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-rose-800">
+                                priority
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                         <p className={`mt-1 text-sm leading-5 ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-700"}`}>{part.customer_name || "No customer"}</p>
+                        {hasPriorityNote(part) ? (
+                          <p className="text-xs font-semibold leading-5 text-rose-700">
+                            Priority note: {part.priority_note}
+                          </p>
+                        ) : null}
                         <p className={`text-xs leading-5 ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>
                           eBay order: {part.ebay_order_number || "-"}
                         </p>
@@ -974,6 +991,21 @@ export default function ReplacementPartsPage() {
                       {trackingRefreshing ? <span>Refreshing live tracking...</span> : null}
                       {!trackingAutoSaving && !trackingRefreshing ? <span>Tracking auto-refreshes every minute when a tracking number exists.</span> : null}
                     </div>
+
+                    <label className="block text-sm text-slate-700">
+                      <span className="mb-1 block font-medium">Priority Note</span>
+                      <input
+                        type="text"
+                        value={details.priority_note || ""}
+                        onChange={(e) => setDetails({ ...details, priority_note: e.target.value || null })}
+                        maxLength={160}
+                        className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
+                        placeholder="Short note to mark this order as priority"
+                      />
+                      <span className="mt-1 block text-xs text-rose-700">
+                        Any record with a priority note is flagged as priority until this note is cleared.
+                      </span>
+                    </label>
 
                     <label className="block text-sm text-slate-700">
                       <span className="mb-1 block font-medium">Request Notes</span>
