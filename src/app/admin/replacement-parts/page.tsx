@@ -147,6 +147,17 @@ function hasEbayOrderNumber(part: { ebay_order_number: string | null }) {
   return Boolean(part.ebay_order_number?.trim());
 }
 
+function hasTrackingNumber(part: { tracking_number: string | null }) {
+  return Boolean(part.tracking_number?.trim());
+}
+
+function hasMissingTracking(part: {
+  ebay_order_number: string | null;
+  tracking_number: string | null;
+}) {
+  return hasEbayOrderNumber(part) && !hasTrackingNumber(part);
+}
+
 export default function ReplacementPartsPage() {
   const [parts, setParts] = useState<ReplacementPart[]>([]);
   const [loading, setLoading] = useState(true);
@@ -721,11 +732,18 @@ export default function ReplacementPartsPage() {
                               {part.qbo_invoice_number || part.part_name}
                             </p>
                           </div>
-                          {!hasEbayOrderNumber(part) ? (
-                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
-                              unordered
-                            </span>
-                          ) : null}
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            {!hasEbayOrderNumber(part) ? (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                                unordered
+                              </span>
+                            ) : null}
+                            {hasMissingTracking(part) ? (
+                              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800">
+                                missing tracking
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                         <p className={`mt-1 text-sm leading-5 ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-700"}`}>{part.customer_name || "No customer"}</p>
                         <p className={`text-xs leading-5 ${part.status === "CANCELLED" ? "text-red-700" : "text-slate-600"}`}>
