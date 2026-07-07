@@ -3,6 +3,11 @@ import { getSession } from "@/lib/auth";
 import { authorizedQboFetch } from "@/lib/qbo";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
+const SELECT_WITH_PRIORITY_NOTE =
+  "id, created_at, updated_at, part_name, customer_name, ebay_order_number, priority_note, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number";
+const SELECT_BASE =
+  "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number";
+
 function getSalesRep(invoice: any): string | null {
   if (!invoice) return null;
 
@@ -98,13 +103,21 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     }
 
     const supabase = getServerSupabaseClient();
-    const { data: row, error } = await supabase
+    let { data: row, error } = await supabase
       .from("replacement_parts")
-      .select(
-        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, priority_note, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
-      )
+      .select(SELECT_WITH_PRIORITY_NOTE)
       .eq("id", params.id)
       .single();
+
+    if (error?.message?.toLowerCase().includes("priority_note")) {
+      const fallback = await supabase
+        .from("replacement_parts")
+        .select(SELECT_BASE)
+        .eq("id", params.id)
+        .single();
+      error = fallback.error;
+      row = fallback.data ? { ...fallback.data, priority_note: null } : null;
+    }
 
     if (error || !row) {
       return NextResponse.json({ error: "Replacement part record not found" }, { status: 404 });
@@ -260,14 +273,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       updatePayload.status = body.status;
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("replacement_parts")
       .update(updatePayload)
       .eq("id", params.id)
-      .select(
-        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, priority_note, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
-      )
+      .select(SELECT_WITH_PRIORITY_NOTE)
       .single();
+
+    if (error?.message?.toLowerCase().includes("priority_note")) {
+      const fallbackPayload = { ...updatePayload } as Record<string, unknown>;
+      delete fallbackPayload.priority_note;
+
+      const fallback = await supabase
+        .from("replacement_parts")
+        .update(fallbackPayload)
+        .eq("id", params.id)
+        .select(SELECT_BASE)
+        .single();
+
+      error = fallback.error;
+      data = fallback.data ? { ...fallback.data, priority_note: null } : null;
+    }
 
     if (error) throw error;
 

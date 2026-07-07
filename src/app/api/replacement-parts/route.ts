@@ -3,6 +3,11 @@ import { getSession } from "@/lib/auth";
 import { authorizedQboFetch } from "@/lib/qbo";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
+const SELECT_WITH_PRIORITY_NOTE =
+  "id, created_at, updated_at, part_name, customer_name, ebay_order_number, priority_note, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number";
+const SELECT_BASE =
+  "id, created_at, updated_at, part_name, customer_name, ebay_order_number, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number";
+
 function escapeQboString(value: string) {
   return value.replace(/'/g, "''");
 }
@@ -29,12 +34,19 @@ export async function GET() {
     }
 
     const supabase = getServerSupabaseClient();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("replacement_parts")
-      .select(
-        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, priority_note, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
-      )
+      .select(SELECT_WITH_PRIORITY_NOTE)
       .order("created_at", { ascending: false });
+
+    if (error?.message?.toLowerCase().includes("priority_note")) {
+      const fallback = await supabase
+        .from("replacement_parts")
+        .select(SELECT_BASE)
+        .order("created_at", { ascending: false });
+      error = fallback.error;
+      data = (fallback.data || []).map((row) => ({ ...row, priority_note: null }));
+    }
 
     if (error) throw error;
     return NextResponse.json({ ok: true, data: data || [] });
@@ -126,13 +138,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("replacement_parts")
       .insert({
         part_name: partName,
         customer_name: customerName,
         ebay_order_number: ebayOrderNumber || null,
-        priority_note: null,
         status: "REQUESTED",
         fitting: false,
         emailed_to_customer: false,
@@ -141,10 +152,30 @@ export async function POST(req: NextRequest) {
         qbo_invoice_number: invoiceNumber,
         created_by: session.user.email || session.user.id || "Unknown",
       })
-      .select(
-        "id, created_at, updated_at, part_name, customer_name, ebay_order_number, priority_note, request_notes, internal_notes, status, fitting, emailed_to_customer, emailed_at, tracking_number, tracking_url, tracking_status, shipped_at, delivered_at, qbo_invoice_id, qbo_invoice_number"
-      )
+      .select(SELECT_WITH_PRIORITY_NOTE)
       .single();
+
+    if (error?.message?.toLowerCase().includes("priority_note")) {
+      const fallback = await supabase
+        .from("replacement_parts")
+        .insert({
+          part_name: partName,
+          customer_name: customerName,
+          ebay_order_number: ebayOrderNumber || null,
+          status: "REQUESTED",
+          fitting: false,
+          emailed_to_customer: false,
+          emailed_at: null,
+          qbo_invoice_id: qboInvoiceId,
+          qbo_invoice_number: invoiceNumber,
+          created_by: session.user.email || session.user.id || "Unknown",
+        })
+        .select(SELECT_BASE)
+        .single();
+
+      error = fallback.error;
+      data = fallback.data ? { ...fallback.data, priority_note: null } : null;
+    }
 
     if (error) throw error;
     return NextResponse.json({ ok: true, data }, { status: 201 });
