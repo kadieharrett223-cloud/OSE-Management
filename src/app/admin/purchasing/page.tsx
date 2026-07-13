@@ -733,11 +733,20 @@ export default function PurchasingPage() {
   };
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
+  const normalizedSkuQuery = normalizeSku(searchQuery);
   const filteredPos = pos.filter((po) => {
-    const matchesQuery =
-      !normalizedQuery ||
+    const poMatchesText =
       po.po_number.toLowerCase().includes(normalizedQuery) ||
       po.vendor_name.toLowerCase().includes(normalizedQuery);
+
+    const poMatchesItemCode =
+      normalizedSkuQuery.length > 0 &&
+      (po.lines || []).some((line: any) => normalizeSku(line?.sku || "").includes(normalizedSkuQuery));
+
+    const matchesQuery =
+      !normalizedQuery ||
+      poMatchesText ||
+      poMatchesItemCode;
 
     const matchesStatus = statusFilter === "all" || po.status.toLowerCase() === statusFilter;
 
@@ -985,7 +994,7 @@ export default function PurchasingPage() {
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search PO or supplier"
+                  placeholder="Search PO, supplier, or item code"
                   className="w-full sm:w-52 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <select
