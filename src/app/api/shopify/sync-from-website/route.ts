@@ -32,7 +32,7 @@ function clampMargin(margin: number) {
   if (!Number.isFinite(margin)) return 0;
   if (margin >= 0.95) return 0.95;
   if (margin <= -5) return -5;
-  return Number(margin.toFixed(6));
+  return Number(margin.toFixed(10));
 }
 
 async function getMappedRows() {

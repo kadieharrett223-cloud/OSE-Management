@@ -511,8 +511,8 @@ export default function AdminPriceListPage() {
     // 4) Sell price: Final × (1 + Markup)
     const sell_price = cost_with_shipping * (1 + margin);
 
-    // 5) List price: Sell price / 0.80 (20% off list = sell price)
-    const list_price = sell_price / 0.8;
+    // 5) Keep persisted list price when present (for website compare-at syncs), otherwise derive from sell.
+    const list_price = item.list_price && item.list_price > 0 ? item.list_price : sell_price / 0.8;
 
     // 6) Profit: Sell price - Final cost
     const profit = sell_price - cost_with_shipping;
