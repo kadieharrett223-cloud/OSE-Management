@@ -42,7 +42,10 @@ type PricingRow = {
   overhead_cost: number | null;
   zone5_shipping: number | null;
   tariff_exempt: boolean | null;
+  margin: number | null;
 };
+
+type MarginMode = "multiply" | "divide";
 
 function toNumber(value: unknown): number {
   const parsed = Number(value);
@@ -51,7 +54,7 @@ function toNumber(value: unknown): number {
 
 function clampMargin(margin: number) {
   if (!Number.isFinite(margin)) return 0;
-  if (margin >= 0.95) return 0.95;
+  if (margin >= 0.9999999999) return 0.9999999999;
   if (margin <= -5) return -5;
   return Number(margin.toFixed(12));
 }
@@ -61,7 +64,7 @@ async function getMappedRows() {
   const { data, error } = await supabase
     .from("price_list_items")
     .select(
-      "id,item_no,shopify_variant_id,sell_price,list_price,cost_with_shipping,manual_pricing_override,website_product_url,fob_cost,quantity,tariff_105,ocean_frt,importing,indirect_labor,direct_labor,overhead_cost,zone5_shipping,tariff_exempt"
+      "id,item_no,shopify_variant_id,sell_price,list_price,cost_with_shipping,manual_pricing_override,website_product_url,fob_cost,quantity,tariff_105,ocean_frt,importing,indirect_labor,direct_labor,overhead_cost,zone5_shipping,tariff_exempt,margin"
     )
     .eq("is_active", true)
     .not("shopify_variant_id", "is", null);
@@ -112,6 +115,30 @@ function computeFinalCostForUiMath(row: PricingRow, tariffPercent: number) {
 
   const perUnit = (isTariffExempt ? fob : tariff) + ocean + importing;
   return perUnit + zone5 + indirect + direct + overhead;
+}
+
+function detectMarginMode(rows: PricingRow[]): MarginMode {
+  let multiplyScore = 0;
+  let divideScore = 0;
+
+  for (const row of rows) {
+    const cost = toNumber(row.cost_with_shipping);
+    const sell = toNumber(row.sell_price);
+    const margin = Number(row.margin);
+
+    if (cost <= 0 || sell <= 0 || !Number.isFinite(margin)) continue;
+
+    const predictedMultiply = cost * (1 + margin);
+    const predictedDivide = margin < 1 ? cost / (1 - margin) : Number.POSITIVE_INFINITY;
+
+    const multiplyError = Math.abs(predictedMultiply - sell);
+    const divideError = Math.abs(predictedDivide - sell);
+
+    if (multiplyError <= divideError) multiplyScore += 1;
+    else divideScore += 1;
+  }
+
+  return divideScore > multiplyScore ? "divide" : "multiply";
 }
 
 async function fetchVariantPricing(variantId: string) {
@@ -179,6 +206,7 @@ export async function POST() {
     const supabase = getServerSupabaseClient();
     const rows = await getMappedRows();
     const globalTariffPercent = await getGlobalTariffPercent();
+    const marginMode = detectMarginMode(rows);
 
     let updated = 0;
     let skipped = 0;
@@ -194,13 +222,17 @@ export async function POST() {
         continue;
       }
 
-      const finalCost = computeFinalCostForUiMath(row, globalTariffPercent);
+      const finalCost = toNumber(row.cost_with_shipping) || computeFinalCostForUiMath(row, globalTariffPercent);
       if (finalCost <= 0) {
         skipped += 1;
         continue;
       }
 
-      const nextMargin = clampMargin(website.sell / finalCost - 1);
+      const nextMargin = clampMargin(
+        marginMode === "divide"
+          ? 1 - finalCost / website.sell
+          : website.sell / finalCost - 1
+      );
       const updatePayload: Record<string, unknown> = {
         margin: nextMargin,
         updated_at: new Date().toISOString(),
@@ -229,6 +261,7 @@ export async function POST() {
       updated,
       skipped,
       failed,
+      margin_mode: marginMode,
       errors,
     });
   } catch (error: any) {
