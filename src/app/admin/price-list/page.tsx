@@ -1654,16 +1654,7 @@ export default function AdminPriceListPage() {
                             <th className="pl-2 pr-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Item No</th>
                             <th className="px-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap text-xs">Description</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-600 whitespace-nowrap">Supplier</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">FOB Cost</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Qty</th>
-                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Tariff</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Ocean</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Import</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Indirect</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Direct</th>
-                            <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Overhead</th>
-                            <th className="px-1 py-2 text-right font-semibold text-amber-700 whitespace-nowrap">Shipping</th>
-                            <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Cost+Ship</th>
+                            <th className="px-1 py-2 text-left font-semibold text-slate-600 whitespace-nowrap">Costs</th>
                             <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List</th>
@@ -1766,163 +1757,138 @@ export default function AdminPriceListPage() {
                                 )}
                               </td>
 
-                              {/* FOB Cost (INPUT) */}
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.fob_cost !== null && displayItem.fob_cost !== undefined ? displayItem.fob_cost : ""}
-                                    onChange={(e) => updateEditingItem("fob_cost", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
-                                  />
-                                ) : (
-                                  <span className="text-blue-900 font-semibold">${money(item.fob_cost)}</span>
-                                )}
-                              </td>
+                              <td className="px-1 py-1 align-top">
+                                <details className="group rounded border border-slate-200 bg-slate-50 px-2 py-1">
+                                  <summary className="cursor-pointer list-none text-[11px] font-semibold text-slate-700">
+                                    Costs ${money(displayItem.cost_with_shipping)}
+                                  </summary>
+                                  <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
+                                    <div className="text-slate-500">FOB</div>
+                                    <div>
+                                      {isEditing ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={displayItem.fob_cost !== null && displayItem.fob_cost !== undefined ? displayItem.fob_cost : ""}
+                                          onChange={(e) => updateEditingItem("fob_cost", e.target.value === "" ? null : Number(e.target.value))}
+                                          className="w-full rounded border border-blue-400 px-1 py-0.5 text-right text-[11px] font-medium text-slate-700 bg-white"
+                                        />
+                                      ) : (
+                                        <span className="block text-right font-semibold text-blue-900">${money(item.fob_cost)}</span>
+                                      )}
+                                    </div>
 
-                              {/* Quantity (INPUT) */}
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    value={displayItem.quantity !== null && displayItem.quantity !== undefined ? displayItem.quantity : ""}
-                                    onChange={(e) => updateEditingItem("quantity", e.target.value === "" ? null : Number(e.target.value))}
-                                    disabled={displayItem.manual_pricing_override}
-                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums disabled:bg-slate-100 disabled:text-slate-500"
-                                    title={displayItem.manual_pricing_override ? "Disabled when manual override is on" : ""}
-                                  />
-                                ) : (
-                                  <span className="text-blue-900">{item.quantity ?? "—"}</span>
-                                )}
-                              </td>
+                                    <div className="text-slate-500">Qty</div>
+                                    <div>
+                                      {isEditing ? (
+                                        <input
+                                          type="number"
+                                          step="1"
+                                          value={displayItem.quantity !== null && displayItem.quantity !== undefined ? displayItem.quantity : ""}
+                                          onChange={(e) => updateEditingItem("quantity", e.target.value === "" ? null : Number(e.target.value))}
+                                          disabled={displayItem.manual_pricing_override}
+                                          className="w-full rounded border border-blue-400 px-1 py-0.5 text-right text-[11px] font-medium text-slate-700 bg-white disabled:bg-slate-100 disabled:text-slate-500"
+                                          title={displayItem.manual_pricing_override ? "Disabled when manual override is on" : ""}
+                                        />
+                                      ) : (
+                                        <span className="block text-right font-semibold text-blue-900">{item.quantity ?? "—"}</span>
+                                      )}
+                                    </div>
 
-                              {/* Tariff +105% (INPUT/READ-ONLY) */}
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.tariff_105 !== null && displayItem.tariff_105 !== undefined ? displayItem.tariff_105 : ""}
-                                    onChange={(e) => updateEditingItem("tariff_105", e.target.value === "" ? null : Number(e.target.value))}
-                                    disabled={!displayItem.manual_pricing_override}
-                                    className={`w-full rounded px-1.5 py-0.5 text-right text-xs font-medium tabular-nums focus:outline-none ${
-                                      displayItem.manual_pricing_override
-                                        ? "border-2 border-green-500 text-slate-900 bg-green-50 font-semibold focus:ring-2 focus:ring-green-400"
-                                        : "border border-slate-300 text-slate-600 bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                    }`}
-                                    title={displayItem.manual_pricing_override ? "Manual override enabled - edit tariff" : "Enable manual override to edit"}
-                                  />
-                                ) : (
-                                  <span className="text-slate-600 text-xs">${money(displayItem.tariff_105)}</span>
-                                )}
-                              </td>
+                                    <div className="text-slate-500">Tariff</div>
+                                    <div>
+                                      {isEditing ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={displayItem.tariff_105 !== null && displayItem.tariff_105 !== undefined ? displayItem.tariff_105 : ""}
+                                          onChange={(e) => updateEditingItem("tariff_105", e.target.value === "" ? null : Number(e.target.value))}
+                                          disabled={!displayItem.manual_pricing_override}
+                                          className={`w-full rounded px-1 py-0.5 text-right text-[11px] font-medium focus:outline-none ${
+                                            displayItem.manual_pricing_override
+                                              ? "border-2 border-green-500 text-slate-900 bg-green-50 font-semibold focus:ring-2 focus:ring-green-400"
+                                              : "border border-slate-300 text-slate-600 bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                          }`}
+                                          title={displayItem.manual_pricing_override ? "Manual override enabled - edit tariff" : "Enable manual override to edit"}
+                                        />
+                                      ) : (
+                                        <span className="block text-right text-slate-700">${money(displayItem.tariff_105)}</span>
+                                      )}
+                                    </div>
 
-                              {/* Ocean Frt (INPUT/READ-ONLY) */}
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.ocean_frt !== null && displayItem.ocean_frt !== undefined ? displayItem.ocean_frt : ""}
-                                    onChange={(e) => updateEditingItem("ocean_frt", e.target.value === "" ? null : Number(e.target.value))}
-                                    disabled={!displayItem.manual_pricing_override}
-                                    className={`w-full rounded px-1.5 py-0.5 text-right text-xs font-medium tabular-nums focus:outline-none ${
-                                      displayItem.manual_pricing_override
-                                        ? "border-2 border-green-500 text-slate-900 bg-green-50 font-semibold focus:ring-2 focus:ring-green-400"
-                                        : "border border-slate-300 text-slate-600 bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                    }`}
-                                    title={displayItem.manual_pricing_override ? "Manual override enabled - edit ocean" : "Enable manual override to edit"}
-                                  />
-                                ) : (
-                                  <span className="text-blue-900">${money(displayItem.ocean_frt)}</span>
-                                )}
-                              </td>
+                                    <div className="text-slate-500">Ocean</div>
+                                    <div>
+                                      {isEditing ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={displayItem.ocean_frt !== null && displayItem.ocean_frt !== undefined ? displayItem.ocean_frt : ""}
+                                          onChange={(e) => updateEditingItem("ocean_frt", e.target.value === "" ? null : Number(e.target.value))}
+                                          disabled={!displayItem.manual_pricing_override}
+                                          className={`w-full rounded px-1 py-0.5 text-right text-[11px] font-medium focus:outline-none ${
+                                            displayItem.manual_pricing_override
+                                              ? "border-2 border-green-500 text-slate-900 bg-green-50 font-semibold focus:ring-2 focus:ring-green-400"
+                                              : "border border-slate-300 text-slate-600 bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                          }`}
+                                          title={displayItem.manual_pricing_override ? "Manual override enabled - edit ocean" : "Enable manual override to edit"}
+                                        />
+                                      ) : (
+                                        <span className="block text-right text-blue-900">${money(displayItem.ocean_frt)}</span>
+                                      )}
+                                    </div>
 
-                              {/* Importing (INPUT/READ-ONLY) */}
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.importing !== null && displayItem.importing !== undefined ? displayItem.importing : ""}
-                                    onChange={(e) => updateEditingItem("importing", e.target.value === "" ? null : Number(e.target.value))}
-                                    disabled={!displayItem.manual_pricing_override}
-                                    className={`w-full rounded px-1.5 py-0.5 text-right text-xs font-medium tabular-nums focus:outline-none ${
-                                      displayItem.manual_pricing_override
-                                        ? "border-2 border-green-500 text-slate-900 bg-green-50 font-semibold focus:ring-2 focus:ring-green-400"
-                                        : "border border-slate-300 text-slate-600 bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                    }`}
-                                    title={displayItem.manual_pricing_override ? "Manual override enabled - edit import" : "Enable manual override to edit"}
-                                  />
-                                ) : (
-                                  <span className="text-blue-900">${money(displayItem.importing)}</span>
-                                )}
-                              </td>
+                                    <div className="text-slate-500">Import</div>
+                                    <div>
+                                      {isEditing ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={displayItem.importing !== null && displayItem.importing !== undefined ? displayItem.importing : ""}
+                                          onChange={(e) => updateEditingItem("importing", e.target.value === "" ? null : Number(e.target.value))}
+                                          disabled={!displayItem.manual_pricing_override}
+                                          className={`w-full rounded px-1 py-0.5 text-right text-[11px] font-medium focus:outline-none ${
+                                            displayItem.manual_pricing_override
+                                              ? "border-2 border-green-500 text-slate-900 bg-green-50 font-semibold focus:ring-2 focus:ring-green-400"
+                                              : "border border-slate-300 text-slate-600 bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                          }`}
+                                          title={displayItem.manual_pricing_override ? "Manual override enabled - edit import" : "Enable manual override to edit"}
+                                        />
+                                      ) : (
+                                        <span className="block text-right text-blue-900">${money(displayItem.importing)}</span>
+                                      )}
+                                    </div>
 
-                              {/* Zone 5 Shipping (INPUT) - labeled as "Price Delivered" for tariff exempt */}
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.indirect_labor !== null && displayItem.indirect_labor !== undefined ? displayItem.indirect_labor : ""}
-                                    onChange={(e) => updateEditingItem("indirect_labor", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
-                                  />
-                                ) : (
-                                  <span className="text-blue-900">${money(item.indirect_labor)}</span>
-                                )}
-                              </td>
+                                    <div className="text-slate-500">Overhead</div>
+                                    <div>
+                                      {isEditing ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={displayItem.overhead_cost !== null && displayItem.overhead_cost !== undefined ? displayItem.overhead_cost : ""}
+                                          onChange={(e) => updateEditingItem("overhead_cost", e.target.value === "" ? null : Number(e.target.value))}
+                                          className="w-full rounded border border-blue-400 px-1 py-0.5 text-right text-[11px] font-medium text-slate-700 bg-white"
+                                        />
+                                      ) : (
+                                        <span className="block text-right text-blue-900">${money(item.overhead_cost)}</span>
+                                      )}
+                                    </div>
 
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.direct_labor !== null && displayItem.direct_labor !== undefined ? displayItem.direct_labor : ""}
-                                    onChange={(e) => updateEditingItem("direct_labor", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
-                                  />
-                                ) : (
-                                  <span className="text-blue-900">${money(item.direct_labor)}</span>
-                                )}
-                              </td>
-
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.overhead_cost !== null && displayItem.overhead_cost !== undefined ? displayItem.overhead_cost : ""}
-                                    onChange={(e) => updateEditingItem("overhead_cost", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
-                                  />
-                                ) : (
-                                  <span className="text-blue-900">${money(item.overhead_cost)}</span>
-                                )}
-                              </td>
-
-                              {/* Zone 5 Shipping (INPUT) - labeled as "Price Delivered" for tariff exempt */}
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={displayItem.zone5_shipping !== null && displayItem.zone5_shipping !== undefined ? displayItem.zone5_shipping : ""}
-                                    onChange={(e) => updateEditingItem("zone5_shipping", e.target.value === "" ? null : Number(e.target.value))}
-                                    className="w-full rounded border border-amber-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
-                                  />
-                                ) : (
-                                  <span className="font-semibold text-amber-700">${money(item.zone5_shipping)}</span>
-                                )}
-                              </td>
-
-
-                              {/* Cost w/ Shipping (DERIVED) - always visible */}
-                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
-                                <span className="text-slate-600 text-xs font-semibold">${money(displayItem.cost_with_shipping)}</span>
+                                    <div className="text-slate-500">Shipping</div>
+                                    <div>
+                                      {isEditing ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={displayItem.zone5_shipping !== null && displayItem.zone5_shipping !== undefined ? displayItem.zone5_shipping : ""}
+                                          onChange={(e) => updateEditingItem("zone5_shipping", e.target.value === "" ? null : Number(e.target.value))}
+                                          className="w-full rounded border border-amber-400 px-1 py-0.5 text-right text-[11px] font-medium text-slate-700 bg-white"
+                                        />
+                                      ) : (
+                                        <span className="block text-right font-semibold text-amber-700">${money(item.zone5_shipping)}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </details>
                               </td>
 
                               {/* Margin % (INPUT) */}
@@ -2031,7 +1997,7 @@ export default function AdminPriceListPage() {
                           );})}
                           {categoryItems.length === 0 && (
                             <tr>
-                              <td colSpan={20} className="px-6 py-4 text-center text-xs text-slate-600">
+                              <td colSpan={11} className="px-6 py-4 text-center text-xs text-slate-600">
                                 No items in this category
                               </td>
                             </tr>
