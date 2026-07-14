@@ -44,6 +44,8 @@ type PriceListItem = {
   ocean_per_unit?: number | null;
   importing_per_unit?: number | null;
   display_order: number | null;
+  shopify_variant_id?: string | null;
+  website_product_url?: string | null;
 };
 
 type Category = {
@@ -57,6 +59,15 @@ type ShopifySyncPreviewItem = {
   item_no: string;
   base_price: number | null;
   compare_at_price: number | null;
+};
+
+type WebsiteSyncPreviewItem = {
+  id: string;
+  item_no: string;
+  local_sell_price: number;
+  local_list_price: number;
+  website_sell_price: number | null;
+  website_compare_at_price: number | null;
 };
 
 type MockPOLine = {
@@ -239,6 +250,11 @@ export default function AdminPriceListPage() {
   const [isShopifyPreviewLoading, setIsShopifyPreviewLoading] = useState(false);
   const [showShopifyPreviewModal, setShowShopifyPreviewModal] = useState(false);
   const [shopifyPreviewItems, setShopifyPreviewItems] = useState<ShopifySyncPreviewItem[]>([]);
+  const [isWebsiteSyncing, setIsWebsiteSyncing] = useState(false);
+  const [isWebsitePreviewLoading, setIsWebsitePreviewLoading] = useState(false);
+  const [showWebsiteSyncModal, setShowWebsiteSyncModal] = useState(false);
+  const [websiteSyncPreviewItems, setWebsiteSyncPreviewItems] = useState<WebsiteSyncPreviewItem[]>([]);
+  const [isAutoMappingWebsite, setIsAutoMappingWebsite] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printCols, setPrintCols] = useState<Set<PrintColKey>>(new Set(DEFAULT_PRINT_COLS));
   const [showCompareModal, setShowCompareModal] = useState(false);
@@ -431,6 +447,8 @@ export default function AdminPriceListPage() {
           weight_lbs: editingItem.weight_lbs,
           manual_pricing_override: editingItem.manual_pricing_override,
           tariff_exempt: editingItem.tariff_exempt,
+          shopify_variant_id: editingItem.shopify_variant_id || null,
+          website_product_url: editingItem.website_product_url || null,
         })
         .eq("id", editingItem.id);
       
@@ -769,6 +787,74 @@ export default function AdminPriceListPage() {
       setStatus(error instanceof Error ? error.message : "Failed to sync Shopify prices");
     } finally {
       setIsShopifySyncing(false);
+    }
+  };
+
+  const handleAutoMapWebsiteBySku = async () => {
+    setIsAutoMappingWebsite(true);
+    setStatus(null);
+
+    try {
+      const response = await fetch("/api/shopify/auto-map-by-sku", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to auto-map website products by SKU");
+      }
+
+      setStatus(
+        `✓ Website mapping complete. Mapped: ${data.mapped ?? 0}, No match: ${data.skipped_no_match ?? 0}, Ambiguous: ${data.skipped_ambiguous ?? 0}`
+      );
+      await loadData();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed to auto-map website products by SKU");
+    } finally {
+      setIsAutoMappingWebsite(false);
+    }
+  };
+
+  const handleOpenWebsiteSyncPreview = async () => {
+    setIsWebsitePreviewLoading(true);
+    setStatus(null);
+
+    try {
+      const response = await fetch("/api/shopify/sync-from-website", { method: "GET" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to load website price preview");
+      }
+
+      setWebsiteSyncPreviewItems((data?.preview || []) as WebsiteSyncPreviewItem[]);
+      setShowWebsiteSyncModal(true);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed to load website price preview");
+    } finally {
+      setIsWebsitePreviewLoading(false);
+    }
+  };
+
+  const handleConfirmWebsitePull = async () => {
+    setIsWebsiteSyncing(true);
+    setStatus(null);
+
+    try {
+      const response = await fetch("/api/shopify/sync-from-website", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to sync website prices into price list");
+      }
+
+      setStatus(
+        `✓ Website price sync complete. Updated: ${data.updated ?? 0}, Skipped: ${data.skipped ?? 0}, Failed: ${data.failed ?? 0}`
+      );
+      setShowWebsiteSyncModal(false);
+      await loadData();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed to sync website prices into price list");
+    } finally {
+      setIsWebsiteSyncing(false);
     }
   };
 
@@ -1449,6 +1535,30 @@ export default function AdminPriceListPage() {
                   </svg>
                   Add Product
                 </button>
+                <button
+                  onClick={handleAutoMapWebsiteBySku}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  type="button"
+                  disabled={isAutoMappingWebsite}
+                >
+                  {isAutoMappingWebsite ? "Mapping..." : "Auto-Map Website by SKU"}
+                </button>
+                <button
+                  onClick={handleOpenWebsiteSyncPreview}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  type="button"
+                  disabled={isWebsitePreviewLoading}
+                >
+                  {isWebsitePreviewLoading ? "Loading..." : "Match Prices From Website"}
+                </button>
+                <button
+                  onClick={handleOpenShopifyPreview}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  type="button"
+                  disabled={isShopifyPreviewLoading}
+                >
+                  {isShopifyPreviewLoading ? "Loading..." : "Push Prices To Website"}
+                </button>
               </div>
             </header>
 
@@ -1595,18 +1705,50 @@ export default function AdminPriceListPage() {
                               {/* Description (INPUT) */}
                               <td className="px-1 py-1 text-left">
                                 {isEditing ? (
-                                  <input
-                                    type="text"
-                                    value={displayItem.description || ""}
-                                    onChange={(e) => setEditingItem((prev) => prev ? ({ ...prev, description: e.target.value }) : prev)}
-                                    className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-xs font-medium text-slate-700 bg-white"
-                                  />
+                                  <div className="space-y-1">
+                                    <input
+                                      type="text"
+                                      value={displayItem.description || ""}
+                                      onChange={(e) => setEditingItem((prev) => prev ? ({ ...prev, description: e.target.value }) : prev)}
+                                      className="w-full rounded border border-blue-400 px-1.5 py-0.5 text-xs font-medium text-slate-700 bg-white"
+                                      placeholder="Description"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={displayItem.shopify_variant_id || ""}
+                                      onChange={(e) => setEditingItem((prev) => prev ? ({ ...prev, shopify_variant_id: e.target.value || null }) : prev)}
+                                      className="w-full rounded border border-indigo-300 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 bg-white"
+                                      placeholder="Website Variant ID"
+                                    />
+                                    <input
+                                      type="url"
+                                      value={displayItem.website_product_url || ""}
+                                      onChange={(e) => setEditingItem((prev) => prev ? ({ ...prev, website_product_url: e.target.value || null }) : prev)}
+                                      className="w-full rounded border border-indigo-300 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 bg-white"
+                                      placeholder="Website Product URL"
+                                    />
+                                  </div>
                                 ) : (
-                                  <span className="text-slate-700 text-xs">
-                                    {item.description && item.description.length > 20
-                                      ? item.description.slice(0, 20) + "..."
-                                      : item.description || "—"}
-                                  </span>
+                                  <div className="space-y-0.5">
+                                    <span className="block text-slate-700 text-xs">
+                                      {item.description && item.description.length > 20
+                                        ? item.description.slice(0, 20) + "..."
+                                        : item.description || "—"}
+                                    </span>
+                                    {item.website_product_url ? (
+                                      <a
+                                        href={item.website_product_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="block text-[11px] font-medium text-indigo-700 hover:text-indigo-900"
+                                      >
+                                        Website Link
+                                      </a>
+                                    ) : null}
+                                    {item.shopify_variant_id ? (
+                                      <span className="block text-[10px] text-slate-500">Variant: {item.shopify_variant_id}</span>
+                                    ) : null}
+                                  </div>
                                 )}
                               </td>
 
@@ -2173,7 +2315,7 @@ export default function AdminPriceListPage() {
 
                 <div className="col-span-2">
                   <p className="text-xs text-slate-500">
-                    Ocean freight and importing are auto-calculated from quantity (3000 and 2100 per container).
+                    Ocean freight and importing are auto-calculated from quantity (8000 and 2100 per container).
                   </p>
                 </div>
 
@@ -2340,6 +2482,78 @@ export default function AdminPriceListPage() {
                 disabled={isShopifySyncing || shopifyPreviewItems.length === 0}
               >
                 {isShopifySyncing ? "Pushing..." : "Confirm Push to Shopify"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showWebsiteSyncModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Website Price Pull Preview</h2>
+                <p className="text-xs text-slate-600 mt-1">
+                  This updates local Sell Price to website price and local List Price to website compare-at when available.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowWebsiteSyncModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+                type="button"
+                disabled={isWebsiteSyncing}
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
+              {websiteSyncPreviewItems.length === 0 ? (
+                <p className="text-sm text-slate-600">No mapped products found to sync from website.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-slate-600">
+                      <th className="py-2 pr-4">Item No</th>
+                      <th className="py-2 pr-4 text-right">Local Sell</th>
+                      <th className="py-2 pr-4 text-right">Website Sell</th>
+                      <th className="py-2 pr-4 text-right">Local List</th>
+                      <th className="py-2 text-right">Website Compare-at</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {websiteSyncPreviewItems.map((item) => (
+                      <tr key={item.id} className="border-b border-slate-100">
+                        <td className="py-2 pr-4 font-mono text-xs text-slate-800">{item.item_no}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums text-slate-800">${money(item.local_sell_price)}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums text-indigo-700 font-semibold">${money(item.website_sell_price)}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums text-slate-800">${money(item.local_list_price)}</td>
+                        <td className="py-2 text-right tabular-nums text-indigo-700 font-semibold">${money(item.website_compare_at_price)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 rounded-b-2xl">
+              <button
+                onClick={() => setShowWebsiteSyncModal(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                type="button"
+                disabled={isWebsiteSyncing}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmWebsitePull}
+                className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                disabled={isWebsiteSyncing || websiteSyncPreviewItems.length === 0}
+              >
+                {isWebsiteSyncing ? "Syncing..." : "Confirm Pull From Website"}
               </button>
             </div>
           </div>

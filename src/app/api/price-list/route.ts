@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
     const globalTariffPercent = Number(settings?.global_tariff_percent ?? 100);
 
-    const primarySelect = "id, item_no, description, list_price, sell_price, per_unit, cost_with_shipping, zone5_shipping, shipping_included_per_unit, weight_lbs, fob_cost, quantity, tariff_105, ocean_frt, importing, indirect_labor, direct_labor, overhead_cost, manual_pricing_override, tariff_exempt, margin, shopify_variant_id, category_id, price_list_categories(category_name)";
+    const primarySelect = "id, item_no, description, list_price, sell_price, per_unit, cost_with_shipping, zone5_shipping, shipping_included_per_unit, weight_lbs, fob_cost, quantity, tariff_105, ocean_frt, importing, indirect_labor, direct_labor, overhead_cost, manual_pricing_override, tariff_exempt, margin, shopify_variant_id, website_product_url, category_id, price_list_categories(category_name)";
 
     const primaryResult = await supabase
       .from("price_list_items")
@@ -121,6 +121,7 @@ export async function GET(req: NextRequest) {
         manual_pricing_override: item.manual_pricing_override === true,
         tariff_exempt: item.tariff_exempt === true,
         shopify_variant_id: item.shopify_variant_id || null,
+        website_product_url: item.website_product_url || null,
         category_id: item.category_id || null,
         category_name: item.price_list_categories?.category_name || null,
       };
