@@ -200,7 +200,7 @@ async function bufferFromFile(file: File): Promise<ArrayBuffer> {
 
 type PrintColKey =
   | "item_no" | "description" | "supplier" | "fob_cost" | "quantity"
-  | "tariff_105" | "ocean_frt" | "importing" | "indirect_labor" | "direct_labor" | "overhead_cost" | "zone5_shipping"
+  | "tariff_105" | "ocean_frt" | "importing" | "overhead_cost" | "zone5_shipping"
   | "cost_with_shipping" | "margin" | "sell_price" | "list_price"
   | "profit" | "weight_lbs";
 
@@ -213,8 +213,6 @@ const ALL_PRINT_COLUMNS: { key: PrintColKey; label: string; num: boolean }[] = [
   { key: "tariff_105",       label: "Tariff",        num: true  },
   { key: "ocean_frt",        label: "Ocean/Unit",    num: true  },
   { key: "importing",        label: "Import/Unit",   num: true  },
-  { key: "indirect_labor",   label: "Indirect",      num: true  },
-  { key: "direct_labor",     label: "Direct",        num: true  },
   { key: "overhead_cost",    label: "Overhead",      num: true  },
   { key: "zone5_shipping",   label: "Shipping",      num: true  },
   { key: "cost_with_shipping",label: "Cost+Ship",    num: true  },
@@ -901,10 +899,6 @@ export default function AdminPriceListPage() {
           return `<td class="num">$${fmt(item.ocean_frt)}</td>`;
         case "importing":
           return `<td class="num">$${fmt(item.importing)}</td>`;
-        case "indirect_labor":
-          return `<td class="num">$${fmt(item.indirect_labor)}</td>`;
-        case "direct_labor":
-          return `<td class="num">$${fmt(item.direct_labor)}</td>`;
         case "overhead_cost":
           return `<td class="num">$${fmt(item.overhead_cost)}</td>`;
         case "zone5_shipping":
@@ -1033,7 +1027,7 @@ export default function AdminPriceListPage() {
     const headers = [
       "Category","Item No","Description","Supplier",
       "FOB Cost","Qty","Tariff","Ocean/Unit","Import/Unit",
-      "Indirect Labor","Direct Labor","Overhead Cost","Zone5 Shipping","Cost+Ship","Margin %","Sell Price",
+      "Overhead Cost","Zone5 Shipping","Cost+Ship","Margin %","Sell Price",
       "List Price","Profit","Weight (lbs)",
     ];
 
@@ -1051,8 +1045,6 @@ export default function AdminPriceListPage() {
           fmt(item.tariff_105),
           fmt(item.ocean_frt),
           fmt(item.importing),
-          fmt(item.indirect_labor),
-          fmt(item.direct_labor),
           fmt(item.overhead_cost),
           fmt(item.zone5_shipping),
           fmt(item.cost_with_shipping),
