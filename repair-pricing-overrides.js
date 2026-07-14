@@ -83,7 +83,7 @@ async function run() {
       costNoShipping = fob;
     } else {
       const tariff = fob * tariffMultiplier;
-      const ocean = qty > 0 ? 3000 / qty : Number(row.ocean_frt || 0);
+      const ocean = qty > 0 ? 8000 / qty : Number(row.ocean_frt || 0);
       const importing = qty > 0 ? 2100 / qty : Number(row.importing || 0);
       costNoShipping = tariff + ocean + importing;
     }

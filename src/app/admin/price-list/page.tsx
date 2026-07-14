@@ -480,7 +480,7 @@ export default function AdminPriceListPage() {
     } else {
       // Auto-calculate mode: use standard formulas
       tariff_105 = fob_cost * tariffMultiplier;
-      ocean_per_unit = quantity > 0 ? 3000 / quantity : (item.ocean_frt || 0);
+      ocean_per_unit = quantity > 0 ? 8000 / quantity : (item.ocean_frt || 0);
       importing_per_unit = quantity > 0 ? 2100 / quantity : (item.importing || 0);
     }
 
@@ -1215,10 +1215,10 @@ export default function AdminPriceListPage() {
                       <h3 className="font-semibold text-blue-900">Price List Guide</h3>
                       <div className="mt-3 text-sm text-blue-800 space-y-2">
                         <p><span className="font-semibold">Manual inputs:</span> FOB cost, quantity (container capacity), shipping, markup %, optional list price.</p>
-                        <p><span className="font-semibold">Constants:</span> Tariff rate = {globalTariffPercent}%, Ocean freight = 3000 per container, Importing = 2100 per container.</p>
+                        <p><span className="font-semibold">Constants:</span> Tariff rate = {globalTariffPercent}%, Ocean freight = 8000 per container, Importing = 2100 per container.</p>
                         <div className="rounded-xl bg-white/80 p-4 ring-1 ring-blue-200/70 text-xs text-blue-900 space-y-1">
                           <div>Tariff = FOB × (1 + Tariff%/100)</div>
-                          <div>Ocean per unit = 3000 ÷ Quantity</div>
+                          <div>Ocean per unit = 8000 ÷ Quantity</div>
                           <div>Importing per unit = 2100 ÷ Quantity</div>
                           <div>Cost (no shipping) = Tariff + Ocean + Importing</div>
                           <div>Final cost = Cost + Shipping</div>

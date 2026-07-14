@@ -28,7 +28,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 function calculateDerivedFields(item) {
   const fob_cost = item.fob_cost || 0;
   const quantity = item.quantity || 0;
-  const ocean_per_unit = quantity > 0 ? 3000 / quantity : (item.ocean_frt || 0);
+  const ocean_per_unit = quantity > 0 ? 8000 / quantity : (item.ocean_frt || 0);
   const importing_per_unit = quantity > 0 ? 2100 / quantity : (item.importing || 0);
   const zone5_shipping = item.zone5_shipping || 0;
   const multiplier = item.multiplier || 1;

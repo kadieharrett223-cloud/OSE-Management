@@ -22,7 +22,7 @@ function computeFinalCostForTariffChange(row: any, tariffPercent: number) {
   }
 
   const tariff = fobCost * (1 + tariffPercent / 100);
-  const ocean = quantity > 0 ? 3000 / quantity : Number(row?.ocean_frt ?? 0);
+  const ocean = quantity > 0 ? 8000 / quantity : Number(row?.ocean_frt ?? 0);
   const importing = quantity > 0 ? 2100 / quantity : Number(row?.importing ?? 0);
 
   return tariff + ocean + importing + zone5Shipping + indirectLabor + directLabor + overheadCost;

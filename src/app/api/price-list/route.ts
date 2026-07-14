@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
         importingPerUnit = Number(item?.importing || 0);
       } else {
         tariff = fobCost * tariffMultiplier;
-        oceanPerUnit = quantity > 0 ? 3000 / quantity : Number(item?.ocean_frt || 0);
+        oceanPerUnit = quantity > 0 ? 8000 / quantity : Number(item?.ocean_frt || 0);
         importingPerUnit = quantity > 0 ? 2100 / quantity : Number(item?.importing || 0);
       }
 

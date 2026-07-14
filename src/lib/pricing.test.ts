@@ -18,29 +18,29 @@ describe("pricing calculations", () => {
     // tariff = fobCost × (1 + 80%)
     expect(result.tariff).toBe(180);
     
-    // oceanPerUnit = 3000 / quantity
-    expect(result.oceanPerUnit).toBe(30);
+    // oceanPerUnit = 8000 / quantity
+    expect(result.oceanPerUnit).toBe(80);
     
     // importingPerUnit = 2100 / quantity
     expect(result.importingPerUnit).toBe(21);
     
     // costNoShipping = tariff + oceanPerUnit + importingPerUnit
-    expect(result.costNoShipping).toBe(231);
+    expect(result.costNoShipping).toBe(281);
     
     // finalCost = costNoShipping + shipping
-    expect(result.finalCost).toBe(281);
+    expect(result.finalCost).toBe(331);
     
     // sellPrice = finalCost × (1 + margin)
-    expect(result.sellPrice).toBeCloseTo(351.25);
+    expect(result.sellPrice).toBeCloseTo(413.75);
     
     // profit = sellPrice - finalCost
-    expect(result.profit).toBeCloseTo(70.25);
+    expect(result.profit).toBeCloseTo(82.75);
     
     // calculated list price = sellPrice ÷ 0.80
-    expect(result.calculatedListPrice).toBeCloseTo(439.0625);
+    expect(result.calculatedListPrice).toBeCloseTo(517.1875);
     
     // discounted price = appliedListPrice × (1 - discountPercent / 100)
-    expect(result.discountedPrice).toBeCloseTo(351.25);
+    expect(result.discountedPrice).toBeCloseTo(413.75);
   });
 
   it("allows manual list price override", () => {

@@ -83,7 +83,7 @@ export const computePricingRow = (raw: PricingInput): PricingResult => {
 
   // Constants
   const TARIFF_MULTIPLIER = 1 + GLOBAL_TARIFF_PERCENT / 100;
-  const OCEAN_FREIGHT_PER_CONTAINER = 3000;
+  const OCEAN_FREIGHT_PER_CONTAINER = 8000;
   const IMPORTING_PER_CONTAINER = 2100;
 
   // Pricing calculations
