@@ -275,8 +275,6 @@ export default function AdminPriceListPage() {
     quantity: null,
     ocean_frt: null,
     importing: null,
-    indirect_labor: null,
-    direct_labor: null,
     overhead_cost: null,
     zone5_shipping: null,
     margin: 0,
@@ -709,8 +707,6 @@ export default function AdminPriceListPage() {
         quantity: null,
         ocean_frt: null,
         importing: null,
-        indirect_labor: null,
-        direct_labor: null,
         overhead_cost: null,
         zone5_shipping: null,
         margin: 0,
@@ -2287,30 +2283,6 @@ export default function AdminPriceListPage() {
                     onChange={(e) => setNewProduct({ ...newProduct, zone5_shipping: e.target.value ? Number(e.target.value) : null })}
                     placeholder="0.00"
                     className="w-full rounded-lg border border-amber-400 px-3 py-2 text-sm text-slate-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-blue-700 mb-1">Indirect Labor</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={newProduct.indirect_labor ?? ""}
-                    onChange={(e) => setNewProduct({ ...newProduct, indirect_labor: e.target.value ? Number(e.target.value) : null })}
-                    placeholder="0.00"
-                    className="w-full rounded-lg border border-blue-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-blue-700 mb-1">Direct Labor</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={newProduct.direct_labor ?? ""}
-                    onChange={(e) => setNewProduct({ ...newProduct, direct_labor: e.target.value ? Number(e.target.value) : null })}
-                    placeholder="0.00"
-                    className="w-full rounded-lg border border-blue-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
                   />
                 </div>
 
