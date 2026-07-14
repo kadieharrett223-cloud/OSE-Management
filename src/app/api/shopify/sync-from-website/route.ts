@@ -23,6 +23,27 @@ type PreviewRow = {
   website_compare_at_price: number | null;
 };
 
+type PricingRow = {
+  id: string;
+  item_no: string;
+  shopify_variant_id: string | null;
+  sell_price: number | null;
+  list_price: number | null;
+  cost_with_shipping: number | null;
+  manual_pricing_override: boolean | null;
+  website_product_url: string | null;
+  fob_cost: number | null;
+  quantity: number | null;
+  tariff_105: number | null;
+  ocean_frt: number | null;
+  importing: number | null;
+  indirect_labor: number | null;
+  direct_labor: number | null;
+  overhead_cost: number | null;
+  zone5_shipping: number | null;
+  tariff_exempt: boolean | null;
+};
+
 function toNumber(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -40,13 +61,57 @@ async function getMappedRows() {
   const { data, error } = await supabase
     .from("price_list_items")
     .select(
-      "id,item_no,shopify_variant_id,sell_price,list_price,cost_with_shipping,manual_pricing_override,website_product_url"
+      "id,item_no,shopify_variant_id,sell_price,list_price,cost_with_shipping,manual_pricing_override,website_product_url,fob_cost,quantity,tariff_105,ocean_frt,importing,indirect_labor,direct_labor,overhead_cost,zone5_shipping,tariff_exempt"
     )
     .eq("is_active", true)
     .not("shopify_variant_id", "is", null);
 
   if (error) throw error;
-  return data || [];
+  return (data || []) as PricingRow[];
+}
+
+async function getGlobalTariffPercent() {
+  const supabase = getServerSupabaseClient();
+  const { data } = await supabase
+    .from("pricing_settings")
+    .select("global_tariff_percent")
+    .eq("id", "00000000-0000-0000-0000-000000000002")
+    .maybeSingle();
+
+  const value = Number(data?.global_tariff_percent ?? 100);
+  return Number.isFinite(value) ? value : 100;
+}
+
+function computeFinalCostForUiMath(row: PricingRow, tariffPercent: number) {
+  const fob = toNumber(row.fob_cost);
+  const qty = toNumber(row.quantity);
+  const zone5 = toNumber(row.zone5_shipping);
+  const indirect = toNumber(row.indirect_labor);
+  const direct = toNumber(row.direct_labor);
+  const overhead = toNumber(row.overhead_cost);
+  const isTariffExempt = row.tariff_exempt === true;
+  const isManual = row.manual_pricing_override === true;
+
+  let tariff = 0;
+  let ocean = 0;
+  let importing = 0;
+
+  if (isTariffExempt) {
+    tariff = 0;
+    ocean = 0;
+    importing = 0;
+  } else if (isManual) {
+    tariff = toNumber(row.tariff_105);
+    ocean = toNumber(row.ocean_frt);
+    importing = toNumber(row.importing);
+  } else {
+    tariff = fob * (1 + tariffPercent / 100);
+    ocean = qty > 0 ? 8000 / qty : toNumber(row.ocean_frt);
+    importing = qty > 0 ? 2100 / qty : toNumber(row.importing);
+  }
+
+  const perUnit = (isTariffExempt ? fob : tariff) + ocean + importing;
+  return perUnit + zone5 + indirect + direct + overhead;
 }
 
 async function fetchVariantPricing(variantId: string) {
@@ -113,6 +178,7 @@ export async function POST() {
 
     const supabase = getServerSupabaseClient();
     const rows = await getMappedRows();
+    const globalTariffPercent = await getGlobalTariffPercent();
 
     let updated = 0;
     let skipped = 0;
@@ -128,7 +194,7 @@ export async function POST() {
         continue;
       }
 
-      const finalCost = toNumber(row.cost_with_shipping);
+      const finalCost = computeFinalCostForUiMath(row, globalTariffPercent);
       if (finalCost <= 0) {
         skipped += 1;
         continue;
