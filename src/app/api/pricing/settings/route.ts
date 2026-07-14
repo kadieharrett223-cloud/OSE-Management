@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getServerSupabaseClient } from "@/lib/supabase";
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000002";
-const DEFAULT_TARIFF_PERCENT = 100;
+const DEFAULT_TARIFF_PERCENT = 34;
 
 function computeFinalCostForTariffChange(row: any, tariffPercent: number) {
   const supplier = String(row?.supplier ?? "").toUpperCase();

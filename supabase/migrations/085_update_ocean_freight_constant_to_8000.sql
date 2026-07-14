@@ -6,7 +6,7 @@ RETURNS TRIGGER AS $$
 DECLARE
   is_katool BOOLEAN;
   tariff_exempt_row BOOLEAN;
-  tariff_percent NUMERIC(8, 4) := 80;
+  tariff_percent NUMERIC(8, 4) := 34;
   tariff_multiplier NUMERIC(10, 6) := 1.8;
   indirect_labor_value NUMERIC(12, 4) := COALESCE(NEW.indirect_labor, 0);
   direct_labor_value NUMERIC(12, 4) := COALESCE(NEW.direct_labor, 0);
@@ -15,7 +15,7 @@ BEGIN
   is_katool := (UPPER(COALESCE(NEW.supplier, '')) LIKE '%KATOOL%' OR UPPER(COALESCE(NEW.supplier, '')) LIKE '%KATA%');
   tariff_exempt_row := COALESCE(NEW.tariff_exempt, FALSE) OR is_katool;
 
-  SELECT COALESCE(ps.global_tariff_percent, 80)
+  SELECT COALESCE(ps.global_tariff_percent, 34)
   INTO tariff_percent
   FROM pricing_settings ps
   WHERE ps.id = '00000000-0000-0000-0000-000000000002'

@@ -9,26 +9,24 @@
 -- List price = Sell / 0.80 (when list not manually set)
 -- Profit = Sell - Final cost
 
--- Keep current global setting explicit at 80% by default
+-- Create global setting only if missing; do not overwrite an existing saved tariff value.
 INSERT INTO pricing_settings (id, global_tariff_percent, updated_at)
-VALUES ('00000000-0000-0000-0000-000000000002', 80, NOW())
+VALUES ('00000000-0000-0000-0000-000000000002', 34, NOW())
 ON CONFLICT (id)
-DO UPDATE SET
-  global_tariff_percent = EXCLUDED.global_tariff_percent,
-  updated_at = NOW();
+DO NOTHING;
 
 CREATE OR REPLACE FUNCTION compute_price_list_derived_fields()
 RETURNS TRIGGER AS $$
 DECLARE
   is_katool BOOLEAN;
   tariff_exempt_row BOOLEAN;
-  tariff_percent NUMERIC(8, 4) := 80;
+  tariff_percent NUMERIC(8, 4) := 34;
   tariff_multiplier NUMERIC(10, 6) := 1.8;
 BEGIN
   is_katool := (UPPER(COALESCE(NEW.supplier, '')) LIKE '%KATOOL%' OR UPPER(COALESCE(NEW.supplier, '')) LIKE '%KATA%');
   tariff_exempt_row := COALESCE(NEW.tariff_exempt, FALSE) OR is_katool;
 
-  SELECT COALESCE(ps.global_tariff_percent, 80)
+  SELECT COALESCE(ps.global_tariff_percent, 34)
   INTO tariff_percent
   FROM pricing_settings ps
   WHERE ps.id = '00000000-0000-0000-0000-000000000002'
