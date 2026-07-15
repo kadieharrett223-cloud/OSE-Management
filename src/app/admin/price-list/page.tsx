@@ -289,6 +289,11 @@ export default function AdminPriceListPage() {
     return (1 - safeSell / safeList) * 100;
   };
 
+  const getExactPercentOffLabel = (sell: number | null | undefined, list: number | null | undefined) => {
+    const value = getPercentOffFromSell(sell, list);
+    return Number.isFinite(value) ? value.toFixed(2) : "0.00";
+  };
+
   const roundDownToDollar = (value: number) => Math.floor(value);
   const normalizePercentOffStep = (value: number) => {
     if (!Number.isFinite(value)) return 0;
@@ -1882,15 +1887,20 @@ export default function AdminPriceListPage() {
                               {/* Percent Off (EDITABLE) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
-                                  <select
-                                    value={normalizePercentOffStep(getPercentOffFromSell(displayItem.sell_price, displayItem.list_price))}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="95"
+                                    step="0.01"
+                                    value={getExactPercentOffLabel(displayItem.sell_price, displayItem.list_price)}
                                     onChange={(e) => {
-                                      const chosen = normalizePercentOffStep(Number(e.target.value));
+                                      const chosen = Number(e.target.value);
                                       const lockedList = Number(displayItem.list_price || 0);
                                       const cost = Number(displayItem.cost_with_shipping || 0);
                                       if (!Number.isFinite(lockedList) || lockedList <= 0 || !Number.isFinite(cost) || cost <= 0) return;
+                                      if (!Number.isFinite(chosen) || chosen < 0) return;
 
-                                      const desiredSell = roundDownToDollar(lockedList * (1 - chosen / 100));
+                                      const desiredSell = Number((lockedList * (1 - chosen / 100)).toFixed(2));
                                       const rawMargin = desiredSell / cost - 1;
                                       const nextMargin = Math.max(-5, Math.min(0.9999, Number(rawMargin.toFixed(6))));
 
@@ -1907,18 +1917,9 @@ export default function AdminPriceListPage() {
                                       });
                                     }}
                                     className="w-24 rounded border border-emerald-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
-                                  >
-                                    {Array.from({ length: 20 }, (_, index) => {
-                                      const value = index * 5;
-                                      return (
-                                        <option key={value} value={value}>
-                                          {value}%
-                                        </option>
-                                      );
-                                    })}
-                                  </select>
+                                  />
                                 ) : (
-                                  <span className="text-emerald-700 text-xs font-semibold">{normalizePercentOffStep(getPercentOffFromSell(displayItem.sell_price, displayItem.list_price))}%</span>
+                                  <span className="text-emerald-700 text-xs font-semibold">{getExactPercentOffLabel(displayItem.sell_price, displayItem.list_price)}%</span>
                                 )}
                               </td>
 
