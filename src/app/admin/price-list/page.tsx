@@ -290,6 +290,11 @@ export default function AdminPriceListPage() {
   };
 
   const roundDownToDollar = (value: number) => Math.floor(value);
+  const normalizePercentOffStep = (value: number) => {
+    if (!Number.isFinite(value)) return 0;
+    const snapped = Math.round(value / 5) * 5;
+    return Math.max(0, Math.min(95, snapped));
+  };
 
   useEffect(() => {
     loadData();
@@ -1877,22 +1882,28 @@ export default function AdminPriceListPage() {
                               {/* Percent Off (EDITABLE) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 {isEditing ? (
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    value={getPercentOffFromSell(displayItem.sell_price, displayItem.list_price).toFixed(2)}
+                                  <select
+                                    value={normalizePercentOffStep(getPercentOffFromSell(displayItem.sell_price, displayItem.list_price))}
                                     onChange={(e) => {
-                                      const entered = Number(e.target.value);
+                                      const chosen = normalizePercentOffStep(Number(e.target.value));
                                       const sell = Number(displayItem.sell_price || 0);
-                                      const safeDiscount = Number.isFinite(entered) ? Math.max(-100, Math.min(99.99, entered)) : 0;
-                                      const divisor = 1 - safeDiscount / 100;
+                                      const divisor = 1 - chosen / 100;
                                       const nextList = divisor > 0 ? roundDownToDollar(sell / divisor) : sell;
                                       setEditingItem((prev) => prev ? ({ ...prev, list_price: nextList }) : prev);
                                     }}
-                                    className="w-20 rounded border border-emerald-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
-                                  />
+                                    className="w-24 rounded border border-emerald-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                  >
+                                    {Array.from({ length: 20 }, (_, index) => {
+                                      const value = index * 5;
+                                      return (
+                                        <option key={value} value={value}>
+                                          {value}%
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
                                 ) : (
-                                  <span className="text-emerald-700 text-xs font-semibold">{getPercentOffFromSell(displayItem.sell_price, displayItem.list_price).toFixed(2)}%</span>
+                                  <span className="text-emerald-700 text-xs font-semibold">{normalizePercentOffStep(getPercentOffFromSell(displayItem.sell_price, displayItem.list_price))}%</span>
                                 )}
                               </td>
 
