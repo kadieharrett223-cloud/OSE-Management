@@ -388,8 +388,10 @@ export default function AdminPriceListPage() {
       
       setItems(flatItems);
       setStatus(null);
+      return flatItems as PriceListItem[];
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Failed to load data");
+      return [] as PriceListItem[];
     } finally {
       setIsLoading(false);
     }
@@ -834,7 +836,13 @@ export default function AdminPriceListPage() {
         `✓ Website price sync complete. Updated: ${data.updated ?? 0}, Skipped: ${data.skipped ?? 0}, Failed: ${data.failed ?? 0}`
       );
       setShowWebsiteSyncModal(false);
-      await loadData();
+      const refreshedItems = await loadData();
+      if (editingId) {
+        const refreshedEditingItem = refreshedItems.find((item) => item.id === editingId);
+        if (refreshedEditingItem) {
+          setEditingItem(refreshedEditingItem);
+        }
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Failed to sync website prices into price list");
     } finally {
