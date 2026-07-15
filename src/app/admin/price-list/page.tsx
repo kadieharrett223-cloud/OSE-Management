@@ -1896,10 +1896,10 @@ export default function AdminPriceListPage() {
 
                                       setEditingItem((prev) => {
                                         if (!prev) return prev;
-                                        const withDerived = computeDerivedFields({ ...prev, margin: nextMargin });
-                                        const nextProfit = desiredSell - Number(withDerived.cost_with_shipping || 0);
+                                        const nextProfit = desiredSell - Number(prev.cost_with_shipping || 0);
                                         return {
-                                          ...withDerived,
+                                          ...prev,
+                                          margin: nextMargin,
                                           list_price: lockedList,
                                           sell_price: desiredSell,
                                           profit: nextProfit,
