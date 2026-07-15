@@ -233,7 +233,6 @@ export default function AdminPriceListPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<PriceListItem | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [discountPercentage, setDiscountPercentage] = useState<number>(20); // Default 20% off list
   const [globalTariffPercent, setGlobalTariffPercent] = useState<number>(100);
   const [globalTariffInput, setGlobalTariffInput] = useState<string>("100");
   const [isSavingTariff, setIsSavingTariff] = useState(false);
@@ -281,32 +280,19 @@ export default function AdminPriceListPage() {
     tariff_exempt: false,
   });
 
-  // Save discount to localStorage when changed
-  const updateDiscount = (value: number) => {
-    setDiscountPercentage(value);
-    localStorage.setItem("priceListDiscount", value.toString());
+  const showAllGroups = selectedGroups.length === 0;
+
+  const getPercentOffFromSell = (sell: number | null | undefined, list: number | null | undefined) => {
+    const safeSell = Number(sell || 0);
+    const safeList = Number(list || 0);
+    if (!Number.isFinite(safeSell) || !Number.isFinite(safeList) || safeList <= 0) return 0;
+    return (1 - safeSell / safeList) * 100;
   };
 
-  const categoryNameById = new Map(categories.map((cat) => [cat.id, cat.category_name]));
-  const applyDiscountToAll = selectedGroups.length === 0;
-
-  const getDiscountForCategoryId = (categoryId: string | null) => {
-    if (applyDiscountToAll) return discountPercentage;
-    const name = categoryId ? categoryNameById.get(categoryId) : undefined;
-    if (!name) return 0;
-    return selectedGroups.includes(name) ? discountPercentage : 0;
-  };
+  const roundDownToDollar = (value: number) => Math.floor(value);
 
   useEffect(() => {
     loadData();
-    // Load discount from localStorage on mount
-    const saved = localStorage.getItem("priceListDiscount");
-    if (saved) {
-      setDiscountPercentage(Number(saved));
-    } else {
-      setDiscountPercentage(20);
-      localStorage.setItem("priceListDiscount", "20");
-    }
   }, []);
 
   useEffect(() => {
@@ -340,15 +326,13 @@ export default function AdminPriceListPage() {
     };
   }, [isSavingTariff]);
 
-  // Recompute items when discount percentage or global tariff changes
+  // Recompute items when global tariff changes.
   useEffect(() => {
     if (items.length > 0) {
-      const recomputedItems = items.map((item) =>
-        computeDerivedFields(item, getDiscountForCategoryId(item.category_id))
-      );
+      const recomputedItems = items.map((item) => computeDerivedFields(item));
       setItems(recomputedItems);
     }
-  }, [discountPercentage, globalTariffPercent]);
+  }, [globalTariffPercent]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -462,7 +446,7 @@ export default function AdminPriceListPage() {
   };
 
   // Client-side calculation follows DB formulas and global tariff setting.
-  const computeDerivedFields = (item: PriceListItem, discountOverride?: number): PriceListItem => {
+  const computeDerivedFields = (item: PriceListItem): PriceListItem => {
     const fob_cost = item.fob_cost || 0;
     const quantity = item.quantity || 0;
     const zone5_shipping = item.zone5_shipping || 0;
@@ -513,10 +497,7 @@ export default function AdminPriceListPage() {
     // 6) Profit: Sell price - Final cost
     const profit = sell_price - cost_with_shipping;
 
-    const appliedDiscount = discountOverride ?? discountPercentage;
-
-    // 7) Final customer price after discount
-    const rounded_sale_price = list_price * (1 - (appliedDiscount || 0) / 100);
+    const rounded_sale_price = sell_price;
 
     // Preserve legacy fields for compatibility.
     const rounded_normal_price = rounded_sale_price;
@@ -586,8 +567,7 @@ export default function AdminPriceListPage() {
   const updateEditingItem = (field: keyof PriceListItem, value: string | number | null) => {
     if (!editingItem) return;
     const updated = { ...editingItem, [field]: value === null || value === "" ? null : Number(value) } as PriceListItem;
-    const discount = getDiscountForCategoryId(updated.category_id);
-    const withDerived = computeDerivedFields(updated, discount);
+    const withDerived = computeDerivedFields(updated);
     setEditingItem(withDerived);
   };
 
@@ -863,11 +843,11 @@ export default function AdminPriceListPage() {
 
     // Build filtered items grouped by category using current UI filters
     const filteredCategories = [...categories]
-      .filter((cat) => applyDiscountToAll || selectedGroups.includes(cat.category_name))
+      .filter((cat) => showAllGroups || selectedGroups.includes(cat.category_name))
       .map((cat) => {
         const catItems = filteredItems
           .filter((item) => item.category_id === cat.id)
-          .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
+          .map((item) => computeDerivedFields(item))
           .sort((a, b) => Number(a.sell_price || 0) - Number(b.sell_price || 0));
         return { category: cat, items: catItems };
       })
@@ -971,7 +951,7 @@ export default function AdminPriceListPage() {
   <div class="report-header">
     <div>
       <h1>Price List Cost Report</h1>
-      <div style="font-size:8pt;color:#475569;margin-top:4px;">Tariff Rate: ${globalTariffPercent}% &nbsp;|&nbsp; Discount: ${discountPercentage}% off list</div>
+      <div style="font-size:8pt;color:#475569;margin-top:4px;">Tariff Rate: ${globalTariffPercent}%</div>
       ${searchQuery.trim() ? `<div style="font-size:8pt;color:#475569;margin-top:2px;">Search filter: ${searchQuery.trim()}</div>` : ""}
     </div>
     <div class="meta">
@@ -1004,7 +984,7 @@ export default function AdminPriceListPage() {
       .map((cat) => {
         const catItems = items
           .filter((item) => item.category_id === cat.id)
-          .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
+          .map((item) => computeDerivedFields(item))
           .sort((a, b) => Number(a.sell_price || 0) - Number(b.sell_price || 0));
         return { category: cat, items: catItems };
       })
@@ -1078,7 +1058,7 @@ export default function AdminPriceListPage() {
   });
 
   const comparableItems = items
-    .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
+    .map((item) => computeDerivedFields(item))
     .sort((a, b) => a.item_no.localeCompare(b.item_no));
 
   const comparableItemsById = new Map(comparableItems.map((item) => [item.id, item]));
@@ -1164,11 +1144,11 @@ export default function AdminPriceListPage() {
 
   // Group items by category, apply calculations, sort items by sell price within each group
   const itemsByCategory = [...categories]
-    .filter((cat) => applyDiscountToAll || selectedGroups.includes(cat.category_name))
+    .filter((cat) => showAllGroups || selectedGroups.includes(cat.category_name))
     .map((cat) => {
       const derivedItems = filteredItems
         .filter((item) => item.category_id === cat.id)
-        .map((item) => computeDerivedFields(item, getDiscountForCategoryId(item.category_id)))
+        .map((item) => computeDerivedFields(item))
         .sort((a, b) => {
           // Sort by sell price within each category (lowest to highest)
           const priceA = Number(a.sell_price || 0);
@@ -1300,7 +1280,7 @@ export default function AdminPriceListPage() {
                           <div>List price = Sell price ÷ 0.80 (always 20% off list)</div>
                           <div>Profit = Sell price − Final cost</div>
                         </div>
-                        <p className="text-xs text-blue-700">Discount field sets the % off list price (default 20%).</p>
+                        <p className="text-xs text-blue-700">Set per-row % Off directly in the table.</p>
                       </div>
                     </div>
                   </div>
@@ -1331,7 +1311,6 @@ export default function AdminPriceListPage() {
                     </button>
                   )}
                   
-                  {/* Discount Percentage Control */}
                   <div className="flex items-center gap-2 ml-auto">
                     <label className="text-sm font-semibold text-slate-700 whitespace-nowrap">
                       Tariff:
@@ -1355,19 +1334,6 @@ export default function AdminPriceListPage() {
                       {isSavingTariff ? "Saving..." : "Save Tariff"}
                     </button>
 
-                    <label className="text-sm font-semibold text-slate-700 whitespace-nowrap">
-                      Discount:
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={discountPercentage}
-                      onChange={(e) => updateDiscount(Number(e.target.value))}
-                      className="w-16 rounded-lg border border-emerald-300 bg-white px-2 py-1.5 text-sm text-slate-900 text-right font-semibold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none"
-                    />
-                    <span className="text-sm font-semibold text-emerald-700">% off</span>
                   </div>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">
@@ -1384,7 +1350,7 @@ export default function AdminPriceListPage() {
                     <span className="text-[10px] text-slate-500">{showGroupFilters ? "▲" : "▼"}</span>
                   </button>
                   {selectedGroups.length > 0 && (
-                    <span className="ml-2 text-xs text-slate-500">Discount applies only to selected groups.</span>
+                    <span className="ml-2 text-xs text-slate-500">Showing selected groups only.</span>
                   )}
 
                   {showGroupFilters && (
@@ -1646,6 +1612,7 @@ export default function AdminPriceListPage() {
                             <th className="px-1 py-2 text-right font-semibold text-blue-600 whitespace-nowrap">Margin</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">Sell</th>
                             <th className="px-1 py-2 text-right font-semibold text-slate-500 whitespace-nowrap">List</th>
+                            <th className="px-1 py-2 text-right font-semibold text-emerald-700 whitespace-nowrap">% Off</th>
                             <th className="px-1 py-2 text-right font-semibold text-emerald-700 whitespace-nowrap">Profit</th>
                             <th className="px-1 py-2 text-right font-semibold text-orange-600 whitespace-nowrap text-xs">Weight</th>
                             <th className="px-1 py-2 text-center font-semibold text-slate-600 whitespace-nowrap sticky right-0 bg-slate-50 z-10">Action</th>
@@ -1907,6 +1874,28 @@ export default function AdminPriceListPage() {
                                 <span className="text-slate-600 text-xs">${money(displayItem.list_price)}</span>
                               </td>
 
+                              {/* Percent Off (EDITABLE) */}
+                              <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={getPercentOffFromSell(displayItem.sell_price, displayItem.list_price).toFixed(2)}
+                                    onChange={(e) => {
+                                      const entered = Number(e.target.value);
+                                      const sell = Number(displayItem.sell_price || 0);
+                                      const safeDiscount = Number.isFinite(entered) ? Math.max(-100, Math.min(99.99, entered)) : 0;
+                                      const divisor = 1 - safeDiscount / 100;
+                                      const nextList = divisor > 0 ? roundDownToDollar(sell / divisor) : sell;
+                                      setEditingItem((prev) => prev ? ({ ...prev, list_price: nextList }) : prev);
+                                    }}
+                                    className="w-20 rounded border border-emerald-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
+                                  />
+                                ) : (
+                                  <span className="text-emerald-700 text-xs font-semibold">{getPercentOffFromSell(displayItem.sell_price, displayItem.list_price).toFixed(2)}%</span>
+                                )}
+                              </td>
+
                               {/* Profit (DERIVED) */}
                               <td className="px-1 py-1 text-right tabular-nums whitespace-nowrap">
                                 <span className="text-emerald-700 text-xs font-bold">${money(displayItem.profit)}</span>
@@ -1985,7 +1974,7 @@ export default function AdminPriceListPage() {
                           );})}
                           {categoryItems.length === 0 && (
                             <tr>
-                              <td colSpan={11} className="px-6 py-4 text-center text-xs text-slate-600">
+                              <td colSpan={12} className="px-6 py-4 text-center text-xs text-slate-600">
                                 No items in this category
                               </td>
                             </tr>
@@ -2038,8 +2027,7 @@ export default function AdminPriceListPage() {
                                   setEditingItem((prev) => {
                                     if (!prev) return prev;
                                     const updated = { ...prev, margin };
-                                    const discount = getDiscountForCategoryId(updated.category_id);
-                                    return computeDerivedFields(updated, discount);
+                                    return computeDerivedFields(updated);
                                   });
                                   // Show success feedback
                                   setStatus(`✓ Margin updated to ${(margin * 100).toFixed(2)}% (Sell: $${sellPrice.toFixed(2)})`);
