@@ -35,31 +35,31 @@ const updates = [
   },
   {
     item_no: '2PBP-10',
-    description: 'Silver Series 2-post base plate lift, 10,000 lb capacity, open carriage dual-point lock release, secondary lock, 110" posts, 2-stage arms, 2-stage adjustable foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 110V 60Hz 2.2kW power unit packaged inside the bundle in an accessible area.'
+    description: 'Silver Series 2-post base plate lift, 10,000 lb capacity, open carriage dual-point lock release, secondary lock, 110" posts, 2-stage arms, 2-stage adjustable foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 220V 60Hz 3hp power unit packaged inside the bundle in an accessible area.'
   },
   {
     item_no: '2PBPXW-10',
-    description: 'Gold Series 2-post base plate lift, 10,000 lb capacity, open carriage design with single lock release and secondary lock, 110" H x 137" W overall dimensions, 3-stage arms, 3-stage adjustable foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 110V 60Hz 2.2kW power unit packaged inside the bundle in an accessible area.'
+    description: 'Gold Series 2-post base plate lift, 10,000 lb capacity, open carriage design with single lock release and secondary lock, 110" H x 137" W overall dimensions, 3-stage arms, 3-stage adjustable foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 220V 60Hz 3hp power unit packaged inside the bundle in an accessible area.'
   },
   {
     item_no: '2PCFXL-10',
-    description: 'Gold Series 2-post clear floor lift, 10,000 lb capacity, 153" H x 135" W, chain-drive system, open carriage, single lock release, secondary lock, 3-stage arms, 3-stage foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 110V 60Hz 2.2kW power unit packaged inside the bundle in an accessible area.'
+    description: 'Gold Series 2-post clear floor lift, 10,000 lb capacity, 153" H x 135" W, chain-drive system, open carriage, single lock release, secondary lock, 3-stage arms, 3-stage foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 220V 60Hz 3hp power unit packaged inside the bundle in an accessible area.'
   },
   {
     item_no: '2PDDA-10',
-    description: 'Gold Series 2-post clear floor symmetric/asymmetric lift, 10,000 lb capacity, 153" H x 145" W, direct-drive open carriage design with single lock release and secondary lock. Features 3-stage arms, 3-stage foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 110V 60Hz 2.2kW power unit packaged inside the bundle in an accessible area.'
+    description: 'Gold Series 2-post clear floor symmetric/asymmetric lift, 10,000 lb capacity, 153" H x 145" W, direct-drive open carriage design with single lock release and secondary lock. Features 3-stage arms, 3-stage foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 220V 60Hz 3hp power unit packaged inside the bundle in an accessible area.'
   },
   {
     item_no: '2PBP-12',
-    description: 'Gold Series 2-post base plate lift, 12,000 lb capacity, 115" H x 153" W, open carriage design with single lock release and secondary lock. Includes 3-stage arms, 3-stage adjustable foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 110V 60Hz 2.2kW power unit packaged inside the bundle in an accessible area.'
+    description: 'Gold Series 2-post base plate lift, 12,000 lb capacity, 115" H x 153" W, open carriage design with single lock release and secondary lock. Includes 3-stage arms, 3-stage adjustable foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 220V 60Hz 3hp power unit packaged inside the bundle in an accessible area.'
   },
   {
     item_no: '2PCFHD-12',
-    description: 'Gold Series 2-post clear floor car lift, 12,000 lb capacity, 174" x 156", open carriage design with single lock release and secondary lock. Features 3-stage arms, 3-stage foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 110V 60Hz 2.2kW power unit packaged inside the bundle in an accessible area.'
+    description: 'Gold Series 2-post clear floor car lift, 12,000 lb capacity, 174" x 156", open carriage design with single lock release and secondary lock. Features 3-stage arms, 3-stage foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 220V 60Hz 3hp power unit packaged inside the bundle in an accessible area.'
   },
   {
     item_no: '2PCFHD-15',
-    description: 'Gold Series 2-post clear floor maintenance lift, 15,000 lb capacity, 190" W overall height, 168.5" overall width, chain-drive system, open carriage, 3-stage arms, 3-stage adjustable foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 110V 60Hz 2.2kW power unit packaged inside the bundle in an accessible area.'
+    description: 'Gold Series 2-post clear floor maintenance lift, 15,000 lb capacity, 190" W overall height, 168.5" overall width, chain-drive system, open carriage, 3-stage arms, 3-stage adjustable foot pads, and 3.5" truck adapter set. All pulleys, cables, and hoses are factory installed. Includes 220V 60Hz 3hp power unit packaged inside the bundle in an accessible area.'
   },
   {
     item_no: '4PC-6',
