@@ -1886,14 +1886,25 @@ export default function AdminPriceListPage() {
                                     value={normalizePercentOffStep(getPercentOffFromSell(displayItem.sell_price, displayItem.list_price))}
                                     onChange={(e) => {
                                       const chosen = normalizePercentOffStep(Number(e.target.value));
-                                      const list = Number(displayItem.list_price || 0);
+                                      const lockedList = Number(displayItem.list_price || 0);
                                       const cost = Number(displayItem.cost_with_shipping || 0);
-                                      if (!Number.isFinite(list) || list <= 0 || !Number.isFinite(cost) || cost <= 0) return;
+                                      if (!Number.isFinite(lockedList) || lockedList <= 0 || !Number.isFinite(cost) || cost <= 0) return;
 
-                                      const desiredSell = roundDownToDollar(list * (1 - chosen / 100));
+                                      const desiredSell = roundDownToDollar(lockedList * (1 - chosen / 100));
                                       const rawMargin = desiredSell / cost - 1;
                                       const nextMargin = Math.max(-5, Math.min(0.9999, Number(rawMargin.toFixed(6))));
-                                      updateEditingItem("margin", nextMargin);
+
+                                      setEditingItem((prev) => {
+                                        if (!prev) return prev;
+                                        const withDerived = computeDerivedFields({ ...prev, margin: nextMargin });
+                                        const nextProfit = desiredSell - Number(withDerived.cost_with_shipping || 0);
+                                        return {
+                                          ...withDerived,
+                                          list_price: lockedList,
+                                          sell_price: desiredSell,
+                                          profit: nextProfit,
+                                        };
+                                      });
                                     }}
                                     className="w-24 rounded border border-emerald-400 px-1.5 py-0.5 text-right text-xs font-medium text-slate-700 bg-white tabular-nums"
                                   >
