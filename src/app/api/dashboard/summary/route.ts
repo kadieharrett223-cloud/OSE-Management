@@ -28,15 +28,81 @@ export async function GET() {
       currentYear,
       currentMonth,
     } = getBusinessDateContext(now, BUSINESS_TIME_ZONE);
+    const todayUtc = new Date(`${today}T00:00:00Z`);
+    const yesterdayUtc = new Date(todayUtc);
+    yesterdayUtc.setUTCDate(yesterdayUtc.getUTCDate() - 1);
+    const yesterday = yesterdayUtc.toISOString().slice(0, 10);
 
     const payQ = (s: string, e: string) =>
       `SELECT * FROM Payment WHERE TxnDate >= '${s}' AND TxnDate <= '${e}' ORDERBY TxnDate DESC MAXRESULTS 1000`;
     const billQ = (s: string, e: string) =>
       `SELECT * FROM BillPayment WHERE TxnDate >= '${s}' AND TxnDate <= '${e}' ORDERBY TxnDate DESC MAXRESULTS 1000`;
+    const buildCustomerPayments = (payments: any[], paidInvoices: any[], fallbackDate: string) => {
+      const itemizedCustomerPayments: any[] = [];
+      const paidByInvoiceId = new Map<string, boolean>();
+
+      paidInvoices.forEach((inv: any) => {
+        const total = Number(inv.TotalAmt) || 0;
+        if (total <= 0) return;
+        paidByInvoiceId.set(String(inv.Id || ""), true);
+        itemizedCustomerPayments.push({
+          id: `inv-${inv.Id}`,
+          customerName: inv.CustomerRef?.name || inv.CustomerRef?.value || "Unknown",
+          appliedAmount: total,
+          totalAmount: total,
+          txnDate: inv.TxnDate || fallbackDate,
+        });
+      });
+
+      payments.forEach((payment: any) => {
+        const total = Number(payment.TotalAmt) || 0;
+        const unapplied = Number(payment.UnappliedAmt) || 0;
+        const applied = Math.max(total - unapplied, 0);
+        if (applied <= 0) return;
+
+        let linkedAmount = 0;
+        (Array.isArray(payment.Line) ? payment.Line : []).forEach((line: any) => {
+          const lineAmount = Number(line.Amount) || 0;
+          const invoiceLinks = (Array.isArray(line.LinkedTxn) ? line.LinkedTxn : []).filter(
+            (txn: any) => txn.TxnType === "Invoice" && txn.TxnId
+          );
+          if (!invoiceLinks.length) return;
+
+          linkedAmount += lineAmount;
+          invoiceLinks.forEach((txn: any) => {
+            const invoiceId = String(txn.TxnId || "");
+            if (!invoiceId || paidByInvoiceId.has(invoiceId)) return;
+            paidByInvoiceId.set(invoiceId, true);
+            itemizedCustomerPayments.push({
+              id: `pay-link-${payment.Id}-${invoiceId}`,
+              customerName: payment.CustomerRef?.name || payment.CustomerRef?.value || "Unknown",
+              appliedAmount: lineAmount,
+              totalAmount: lineAmount,
+              txnDate: payment.TxnDate || fallbackDate,
+            });
+          });
+        });
+
+        const unlinked = Math.max(applied - linkedAmount, 0);
+        if (unlinked > 0) {
+          itemizedCustomerPayments.push({
+            id: `pay-${payment.Id || Math.random().toString(36).slice(2)}`,
+            customerName: payment.CustomerRef?.name || payment.CustomerRef?.value || "Unknown",
+            appliedAmount: unlinked,
+            totalAmount: total,
+            txnDate: payment.TxnDate || fallbackDate,
+          });
+        }
+      });
+
+      itemizedCustomerPayments.sort((a, b) => b.appliedAmount - a.appliedAmount);
+      return itemizedCustomerPayments;
+    };
 
     // All QBO queries fire truly in parallel (no serial queue)
     const [
       rPayToday,
+      rPayYesterday,
       rPayWeek,
       rPayMonth,
       rPayLastMonth,
@@ -45,8 +111,10 @@ export async function GET() {
       rBillToday,
       rUnpaid,
       rPaidInvToday,
+      rPaidInvYesterday,
     ] = await Promise.allSettled([
       qbo(payQ(today, today), userId),
+      qbo(payQ(yesterday, yesterday), userId),
       qbo(payQ(weekStart, today), userId),
       qbo(payQ(monthStart, today), userId),
       qbo(payQ(lastMonthStart, lastMonthEnd), userId),
@@ -55,17 +123,19 @@ export async function GET() {
       qbo(billQ(today, today), userId),
       qbo(`SELECT * FROM Invoice WHERE Balance > '0' ORDERBY TxnDate DESC MAXRESULTS 1000`, userId),
       qbo(`SELECT * FROM Invoice WHERE Balance = '0' AND TxnDate >= '${today}' AND TxnDate <= '${today}' ORDERBY TxnDate DESC MAXRESULTS 500`, userId),
+      qbo(`SELECT * FROM Invoice WHERE Balance = '0' AND TxnDate >= '${yesterday}' AND TxnDate <= '${yesterday}' ORDERBY TxnDate DESC MAXRESULTS 500`, userId),
     ]);
 
     // Log failures for visibility
-    const labels = ["payToday","payWeek","payMonth","payLastMonth","payLastMonthTrend","billMonth","billToday","unpaid","paidInvToday"];
-    [rPayToday,rPayWeek,rPayMonth,rPayLastMonth,rPayLastMonthTrend,rBillMonth,rBillToday,rUnpaid,rPaidInvToday].forEach((r, i) => {
+    const labels = ["payToday","payYesterday","payWeek","payMonth","payLastMonth","payLastMonthTrend","billMonth","billToday","unpaid","paidInvToday","paidInvYesterday"];
+    [rPayToday,rPayYesterday,rPayWeek,rPayMonth,rPayLastMonth,rPayLastMonthTrend,rBillMonth,rBillToday,rUnpaid,rPaidInvToday,rPaidInvYesterday].forEach((r, i) => {
       if (r.status === "rejected") console.error(`[dashboard/summary] ${labels[i]} failed:`, r.reason?.message || r.reason);
     });
 
     const val = <T>(r: PromiseSettledResult<T>) => r.status === "fulfilled" ? r.value : ({ QueryResponse: {} } as any);
 
     const paymentsToday: any[] = val(rPayToday)?.QueryResponse?.Payment || [];
+  const paymentsYesterday: any[] = val(rPayYesterday)?.QueryResponse?.Payment || [];
     const paymentsWeek: any[] = val(rPayWeek)?.QueryResponse?.Payment || [];
     const paymentsMonth: any[] = val(rPayMonth)?.QueryResponse?.Payment || [];
     const paymentsLastMonth: any[] = val(rPayLastMonth)?.QueryResponse?.Payment || [];
@@ -74,6 +144,7 @@ export async function GET() {
     const billPaymentsToday: any[] = val(rBillToday)?.QueryResponse?.BillPayment || [];
     const unpaidInvoices: any[] = val(rUnpaid)?.QueryResponse?.Invoice || [];
     const paidInvoicesToday: any[] = val(rPaidInvToday)?.QueryResponse?.Invoice || [];
+  const paidInvoicesYesterday: any[] = val(rPaidInvYesterday)?.QueryResponse?.Invoice || [];
 
     const sumApplied = (pmts: any[]) =>
       pmts.reduce((s: number, p: any) => s + Math.max((Number(p.TotalAmt)||0) - (Number(p.UnappliedAmt)||0), 0), 0);
@@ -147,40 +218,8 @@ export async function GET() {
       return { id: inv.Id, docNumber: inv.DocNumber, customerName: inv.CustomerRef?.name || "Unknown", totalAmt: total, balance, txnDate: inv.TxnDate, status: balance <= 0 ? "Paid" : "Open" };
     });
 
-    // Customer payments today: combine paid invoices + payment records
-    const itemizedCustomerPayments: any[] = [];
-    const paidByInvoiceId = new Map<string, boolean>();
-
-    paidInvoicesToday.forEach((inv: any) => {
-      const total = Number(inv.TotalAmt) || 0;
-      if (total <= 0) return;
-      paidByInvoiceId.set(String(inv.Id || ""), true);
-      itemizedCustomerPayments.push({ id: `inv-${inv.Id}`, customerName: inv.CustomerRef?.name || inv.CustomerRef?.value || "Unknown", appliedAmount: total, totalAmount: total, txnDate: inv.TxnDate || today });
-    });
-
-    paymentsToday.forEach((payment: any) => {
-      const total = Number(payment.TotalAmt) || 0;
-      const unapplied = Number(payment.UnappliedAmt) || 0;
-      const applied = Math.max(total - unapplied, 0);
-      if (applied <= 0) return;
-      let linkedAmount = 0;
-      (Array.isArray(payment.Line) ? payment.Line : []).forEach((line: any) => {
-        const lineAmount = Number(line.Amount) || 0;
-        const invoiceLinks = (Array.isArray(line.LinkedTxn) ? line.LinkedTxn : []).filter((txn: any) => txn.TxnType === "Invoice" && txn.TxnId);
-        if (!invoiceLinks.length) return;
-        linkedAmount += lineAmount;
-        invoiceLinks.forEach((txn: any) => {
-          const invoiceId = String(txn.TxnId || "");
-          if (!invoiceId || paidByInvoiceId.has(invoiceId)) return;
-          paidByInvoiceId.set(invoiceId, true);
-          itemizedCustomerPayments.push({ id: `pay-link-${payment.Id}-${invoiceId}`, customerName: payment.CustomerRef?.name || payment.CustomerRef?.value || "Unknown", appliedAmount: lineAmount, totalAmount: lineAmount, txnDate: payment.TxnDate || today });
-        });
-      });
-      const unlinked = Math.max(applied - linkedAmount, 0);
-      if (unlinked > 0) itemizedCustomerPayments.push({ id: `pay-${payment.Id||Math.random().toString(36).slice(2)}`, customerName: payment.CustomerRef?.name || payment.CustomerRef?.value || "Unknown", appliedAmount: unlinked, totalAmount: total, txnDate: payment.TxnDate || today });
-    });
-
-    itemizedCustomerPayments.sort((a, b) => b.appliedAmount - a.appliedAmount);
+    const itemizedCustomerPayments = buildCustomerPayments(paymentsToday, paidInvoicesToday, today);
+    const itemizedCustomerPaymentsYesterday = buildCustomerPayments(paymentsYesterday, paidInvoicesYesterday, yesterday);
 
     // Purchase orders
     let recentPurchases: any[] = [];
@@ -209,9 +248,12 @@ export async function GET() {
       recentInvoices,
       paymentsTotal: itemizedCustomerPayments.reduce((s: number, r: any) => s + (Number(r.appliedAmount)||0), 0),
       customerPaymentsToday: itemizedCustomerPayments,
+      paymentsYesterdayTotal: itemizedCustomerPaymentsYesterday.reduce((s: number, r: any) => s + (Number(r.appliedAmount)||0), 0),
+      customerPaymentsYesterday: itemizedCustomerPaymentsYesterday,
       recentPurchases,
       businessTimeZone: BUSINESS_TIME_ZONE,
       businessDate: today,
+      previousBusinessDate: yesterday,
     });
   } catch (error: any) {
     console.error("[dashboard/summary] fatal:", error);

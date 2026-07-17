@@ -120,6 +120,7 @@ type PrintableReportType = "estimates" | "invoices";
 type EstimateReportStatus = "all" | "accepted" | "open" | "converted";
 type InvoiceReportStatus = "all" | "open" | "paid";
 type ReportTimeline = "ytd" | "last-year" | "last-3-months" | "this-month" | "last-month" | "this-week" | "last-week";
+type CustomerPaymentsPeriod = "today" | "yesterday";
 
 const mockReps = [
   {
@@ -273,8 +274,12 @@ export default function Dashboard() {
   const [loadingPartialPaidInvoices, setLoadingPartialPaidInvoices] = useState(true);
   const [paymentsTotal, setPaymentsTotal] = useState<number>(0);
   const [customerPaymentsToday, setCustomerPaymentsToday] = useState<CustomerPayment[]>([]);
+  const [paymentsYesterdayTotal, setPaymentsYesterdayTotal] = useState<number>(0);
+  const [customerPaymentsYesterday, setCustomerPaymentsYesterday] = useState<CustomerPayment[]>([]);
   const [loadingCustomerPayments, setLoadingCustomerPayments] = useState(true);
+  const [customerPaymentsPeriod, setCustomerPaymentsPeriod] = useState<CustomerPaymentsPeriod>("today");
   const [showCustomerPaymentsModal, setShowCustomerPaymentsModal] = useState(false);
+  const [showCustomerPaymentsYesterdayModal, setShowCustomerPaymentsYesterdayModal] = useState(false);
   const [vendorPaymentsTotal, setVendorPaymentsTotal] = useState<number>(0);
   const [vendorPaymentsToday, setVendorPaymentsToday] = useState<VendorPaymentSummary[]>([]);
   const [loadingVendorPayments, setLoadingVendorPayments] = useState(true);
@@ -330,6 +335,25 @@ export default function Dashboard() {
   const animatedSalesWeekTotal = useCountUp(salesWeekTotal);
   const animatedProfitThisMonth = useCountUp(profitThisMonth);
   const animatedTotalExpenses = useCountUp(totalExpenses);
+  const customerPaymentsHeading = customerPaymentsPeriod === "today" ? "Customer Payments Today" : "Customer Payments Yesterday";
+  const customerPaymentsSubheading =
+    customerPaymentsPeriod === "today"
+      ? "Payments received in QuickBooks today"
+      : "Payments received in QuickBooks yesterday";
+  const customerPaymentsActiveTotal = customerPaymentsPeriod === "today" ? paymentsTotal : paymentsYesterdayTotal;
+  const customerPaymentsActiveRows = customerPaymentsPeriod === "today" ? customerPaymentsToday : customerPaymentsYesterday;
+  const customerPaymentsEmptyMessage =
+    customerPaymentsPeriod === "today"
+      ? "No payments recorded in QuickBooks today"
+      : "No payments recorded in QuickBooks yesterday";
+  const openActiveCustomerPaymentsModal = () => {
+    if (customerPaymentsPeriod === "today") {
+      setShowCustomerPaymentsModal(true);
+      return;
+    }
+
+    setShowCustomerPaymentsYesterdayModal(true);
+  };
 
   const getLocalDateYmd = () => {
     const now = new Date();
@@ -380,6 +404,8 @@ export default function Dashboard() {
         setRecentInvoices(data.recentInvoices ?? []);
         setPaymentsTotal(data.paymentsTotal ?? 0);
         setCustomerPaymentsToday(data.customerPaymentsToday ?? []);
+        setPaymentsYesterdayTotal(data.paymentsYesterdayTotal ?? 0);
+        setCustomerPaymentsYesterday(data.customerPaymentsYesterday ?? []);
         setRecentPurchases(data.recentPurchases ?? []);
         setQboSyncStatus("ok");
       } catch (err) {
@@ -711,25 +737,49 @@ export default function Dashboard() {
               <div className="bg-white border border-slate-200 rounded-lg">
                 <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
-                    <p className="mt-0.5 text-sm text-slate-600">
-                      Payments received in QuickBooks today
-                    </p>
+                    <h2 className="text-lg font-semibold text-slate-900">{customerPaymentsHeading}</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">{customerPaymentsSubheading}</p>
                     {!loadingCustomerPayments && (
                       <p className="mt-1 text-lg font-bold text-emerald-700">
-                        ${money(paymentsTotal)}
+                        ${money(customerPaymentsActiveTotal)}
                       </p>
                     )}
                   </div>
-                  {customerPaymentsToday.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCustomerPaymentsModal(true)}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                    >
-                      View all
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setCustomerPaymentsPeriod("today")}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                          customerPaymentsPeriod === "today"
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Today
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomerPaymentsPeriod("yesterday")}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                          customerPaymentsPeriod === "yesterday"
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Yesterday
+                      </button>
+                    </div>
+                    {customerPaymentsActiveRows.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={openActiveCustomerPaymentsModal}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                      >
+                        View all
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -743,12 +793,12 @@ export default function Dashboard() {
                     <tbody className="divide-y divide-slate-50">
                       {loadingCustomerPayments ? (
                         <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
-                      ) : customerPaymentsToday.length === 0 ? (
+                      ) : customerPaymentsActiveRows.length === 0 ? (
                         <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">
-                          No payments recorded in QuickBooks today
+                          {customerPaymentsEmptyMessage}
                         </td></tr>
                       ) : (
-                        customerPaymentsToday.slice(0, 8).map((p) => (
+                        customerPaymentsActiveRows.slice(0, 8).map((p) => (
                           <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-5 py-3 text-sm font-medium text-slate-900">{p.customerName}</td>
                             <td className="px-5 py-3 text-sm text-slate-600">{p.txnDate}</td>
@@ -958,7 +1008,7 @@ export default function Dashboard() {
             </div>
 
             {/* Quick Tables */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6">
               <div className="bg-white border border-slate-200 rounded-lg">
                 <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
                   <div>
@@ -1032,72 +1082,6 @@ export default function Dashboard() {
                           </div>
                           <p className="mt-2 text-sm text-slate-600">{inv.customerName}</p>
                           <p className="mt-1 text-sm font-semibold text-slate-900">${money(inv.balance)}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-lg">
-                <div className="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Customer Payments Today</h2>
-                    <p className="mt-0.5 text-sm text-slate-600">Payments received and invoices paid today</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">
-                      Total: ${money(paymentsTotal)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowCustomerPaymentsModal(true)}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                  >
-                    View all â†’
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full hidden sm:table">
-                    <thead className="bg-slate-50 border-b border-slate-100">
-                      <tr>
-                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
-                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Applied</th>
-                        <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Total Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {loadingCustomerPayments ? (
-                        <tr>
-                          <td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td>
-                        </tr>
-                      ) : customerPaymentsToday.length === 0 ? (
-                        <tr>
-                          <td colSpan={3} className="px-5 py-6 text-center text-slate-500">No customer payments received today</td>
-                        </tr>
-                      ) : (
-                        customerPaymentsToday.slice(0, 5).map((payment) => (
-                          <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-5 py-3 font-medium text-slate-900">{payment.customerName}</td>
-                            <td className="px-5 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
-                            <td className="px-5 py-3 text-right text-sm text-slate-600">${money(payment.totalAmount)}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                  <div className="sm:hidden px-4 py-4 space-y-3">
-                    {loadingCustomerPayments ? (
-                      <div className="text-sm text-slate-500">Loading...</div>
-                    ) : customerPaymentsToday.length === 0 ? (
-                      <div className="text-sm text-slate-500">No customer payments received today</div>
-                    ) : (
-                      customerPaymentsToday.slice(0, 5).map((payment) => (
-                        <div key={payment.id} className="rounded-lg border border-slate-200 bg-white p-4 hover:shadow-sm transition-shadow">
-                          <p className="text-sm font-semibold text-slate-900">{payment.customerName}</p>
-                          <div className="mt-2 flex items-center justify-between text-sm">
-                            <span className="text-emerald-700 font-semibold">${money(payment.appliedAmount)}</span>
-                            <span className="text-slate-500">${money(payment.totalAmount)}</span>
-                          </div>
                         </div>
                       ))
                     )}
@@ -1409,6 +1393,52 @@ export default function Dashboard() {
                           </tr>
                         ) : (
                           customerPaymentsToday.map((payment) => (
+                            <tr key={payment.id} className="hover:bg-slate-50">
+                              <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
+                              <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
+                              <td className="px-6 py-3 text-right text-slate-600">${money(payment.totalAmount)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showCustomerPaymentsYesterdayModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+                <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">All Customer Payments Yesterday</h2>
+                      <p className="mt-0.5 text-sm text-slate-600">Total received/paid: ${money(paymentsYesterdayTotal)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomerPaymentsYesterdayModal(false)}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="max-h-[70vh] overflow-y-auto">
+                    <table className="w-full">
+                      <thead className="border-b border-slate-200 bg-slate-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
+                          <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Applied</th>
+                          <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {customerPaymentsYesterday.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No customer payments received yesterday</td>
+                          </tr>
+                        ) : (
+                          customerPaymentsYesterday.map((payment) => (
                             <tr key={payment.id} className="hover:bg-slate-50">
                               <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
                               <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
