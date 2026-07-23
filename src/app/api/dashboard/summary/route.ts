@@ -37,6 +37,17 @@ export async function GET() {
       `SELECT * FROM Payment WHERE TxnDate >= '${s}' AND TxnDate <= '${e}' ORDERBY TxnDate DESC MAXRESULTS 1000`;
     const billQ = (s: string, e: string) =>
       `SELECT * FROM BillPayment WHERE TxnDate >= '${s}' AND TxnDate <= '${e}' ORDERBY TxnDate DESC MAXRESULTS 1000`;
+    const normalizePaymentMethod = (payment: any) => {
+      const methodName = String(payment?.PaymentMethodRef?.name || payment?.PaymentMethodRef?.value || "").trim();
+      if (methodName) return methodName;
+
+      if (payment?.CreditCardPayment || payment?.ProcessPayment) return "Charged Online";
+
+      const privateNote = String(payment?.PrivateNote || "").toLowerCase();
+      if (privateNote.includes("shopify")) return "Shopify";
+
+      return "Unknown";
+    };
     const buildCustomerPayments = (payments: any[], paidInvoices: any[], fallbackDate: string) => {
       const itemizedCustomerPayments: any[] = [];
       const paidByInvoiceId = new Map<string, boolean>();
@@ -51,6 +62,7 @@ export async function GET() {
           appliedAmount: total,
           totalAmount: total,
           txnDate: inv.TxnDate || fallbackDate,
+          paymentMethod: "Invoice Payment",
         });
       });
 
@@ -79,6 +91,7 @@ export async function GET() {
               appliedAmount: lineAmount,
               totalAmount: lineAmount,
               txnDate: payment.TxnDate || fallbackDate,
+              paymentMethod: normalizePaymentMethod(payment),
             });
           });
         });
@@ -91,6 +104,7 @@ export async function GET() {
             appliedAmount: unlinked,
             totalAmount: total,
             txnDate: payment.TxnDate || fallbackDate,
+            paymentMethod: normalizePaymentMethod(payment),
           });
         }
       });

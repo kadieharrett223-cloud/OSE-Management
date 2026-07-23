@@ -75,6 +75,7 @@ interface CustomerPayment {
   appliedAmount: number;
   totalAmount: number;
   txnDate: string;
+  paymentMethod: string;
 }
 
 interface IncomingDeposit {
@@ -787,14 +788,15 @@ export default function Dashboard() {
                       <tr>
                         <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Customer</th>
                         <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Date</th>
+                        <th className="px-5 py-3 text-left text-xs font-medium uppercase text-slate-500">Paid Via</th>
                         <th className="px-5 py-3 text-right text-xs font-medium uppercase text-slate-500">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {loadingCustomerPayments ? (
-                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
+                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
                       ) : customerPaymentsActiveRows.length === 0 ? (
-                        <tr><td colSpan={3} className="px-5 py-6 text-center text-slate-500">
+                        <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">
                           {customerPaymentsEmptyMessage}
                         </td></tr>
                       ) : (
@@ -802,6 +804,7 @@ export default function Dashboard() {
                           <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-5 py-3 text-sm font-medium text-slate-900">{p.customerName}</td>
                             <td className="px-5 py-3 text-sm text-slate-600">{p.txnDate}</td>
+                            <td className="px-5 py-3 text-sm text-slate-600">{p.paymentMethod || "-"}</td>
                             <td className="px-5 py-3 text-right text-sm font-semibold text-emerald-700">
                               ${money(p.appliedAmount)}
                             </td>
@@ -1382,6 +1385,7 @@ export default function Dashboard() {
                       <thead className="border-b border-slate-200 bg-slate-50">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Paid Via</th>
                           <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Applied</th>
                           <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total Amount</th>
                         </tr>
@@ -1395,6 +1399,7 @@ export default function Dashboard() {
                           customerPaymentsToday.map((payment) => (
                             <tr key={payment.id} className="hover:bg-slate-50">
                               <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
+                              <td className="px-6 py-3 text-slate-600">{payment.paymentMethod || "-"}</td>
                               <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
                               <td className="px-6 py-3 text-right text-slate-600">${money(payment.totalAmount)}</td>
                             </tr>
@@ -1428,6 +1433,7 @@ export default function Dashboard() {
                       <thead className="border-b border-slate-200 bg-slate-50">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Paid Via</th>
                           <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Applied</th>
                           <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total Amount</th>
                         </tr>
@@ -1441,6 +1447,7 @@ export default function Dashboard() {
                           customerPaymentsYesterday.map((payment) => (
                             <tr key={payment.id} className="hover:bg-slate-50">
                               <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
+                              <td className="px-6 py-3 text-slate-600">{payment.paymentMethod || "-"}</td>
                               <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
                               <td className="px-6 py-3 text-right text-slate-600">${money(payment.totalAmount)}</td>
                             </tr>
