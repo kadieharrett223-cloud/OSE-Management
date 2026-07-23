@@ -4,8 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
 type StatusValue = "REQUESTED" | "ORDERED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
-type FittingPrintRange = "THIS_WEEK" | "LAST_WEEK" | "THIS_MONTH";
-type ListViewFilter = "FITTINGS" | "UNORDERED" | "MISSING_TRACKING" | "PRIORITY" | "ALL";
+type ListViewFilter = "UNORDERED" | "MISSING_TRACKING" | "PRIORITY" | "ALL";
 
 type ReplacementPart = {
   id: string;
@@ -38,6 +37,7 @@ type InvoiceSummary = {
   salesRep: string | null;
   customer: string | null;
   shippingAddress: string | null;
+  billingAddress: string | null;
   total: number;
   balance: number;
   paid: boolean;
@@ -76,63 +76,6 @@ const STATUS_META: Record<StatusValue, { symbol: string; chipClass: string }> = 
 
 const money = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
-
-const FITTING_PRINT_RANGE_OPTIONS: Array<{ value: FittingPrintRange; label: string }> = [
-  { value: "THIS_WEEK", label: "This Week" },
-  { value: "LAST_WEEK", label: "Last Week" },
-  { value: "THIS_MONTH", label: "This Month" },
-];
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function toStartOfDay(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
-}
-
-function toEndOfDay(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 23, 59, 59, 999);
-}
-
-function getFittingRangeBounds(range: FittingPrintRange) {
-  const now = new Date();
-
-  if (range === "THIS_MONTH") {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    return { start, end };
-  }
-
-  const thisWeekStart = toStartOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()));
-  if (range === "LAST_WEEK") {
-    const start = new Date(thisWeekStart);
-    start.setDate(start.getDate() - 7);
-    const end = toEndOfDay(new Date(thisWeekStart.getFullYear(), thisWeekStart.getMonth(), thisWeekStart.getDate() - 1));
-    return { start, end };
-  }
-
-  const end = toEndOfDay(new Date(thisWeekStart.getFullYear(), thisWeekStart.getMonth(), thisWeekStart.getDate() + 6));
-  return { start: thisWeekStart, end };
-}
-
-function isDateInRange(dateValue: string | null, range: FittingPrintRange) {
-  if (!dateValue) return false;
-
-  const targetDate = new Date(dateValue);
-  if (Number.isNaN(targetDate.getTime())) return false;
-  const { start, end } = getFittingRangeBounds(range);
-  return targetDate >= start && targetDate <= end;
-}
-
-function getRangeLabel(range: FittingPrintRange) {
-  return FITTING_PRINT_RANGE_OPTIONS.find((option) => option.value === range)?.label || "This Week";
-}
 
 function buildTrackingKey(item: {
   tracking_number: string | null;
@@ -179,7 +122,6 @@ export default function ReplacementPartsPage() {
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
   const [trackingAutoSaving, setTrackingAutoSaving] = useState(false);
   const [trackingRefreshing, setTrackingRefreshing] = useState(false);
-  const [fittingPrintRange, setFittingPrintRange] = useState<FittingPrintRange>("THIS_WEEK");
   const [listViewFilter, setListViewFilter] = useState<ListViewFilter>("ALL");
   const trackingSyncKeyRef = useRef<string>("");
 
@@ -187,7 +129,6 @@ export default function ReplacementPartsPage() {
     () =>
       parts.filter((part) => {
         if (listViewFilter === "ALL") return true;
-        if (listViewFilter === "FITTINGS") return part.fitting;
         if (listViewFilter === "UNORDERED") return !hasEbayOrderNumber(part);
         if (listViewFilter === "MISSING_TRACKING") return hasMissingTracking(part);
         if (listViewFilter === "PRIORITY") return hasPriorityNote(part);
@@ -199,10 +140,6 @@ export default function ReplacementPartsPage() {
   const selectedPart = useMemo(
     () => filteredParts.find((part) => part.id === selectedId) || null,
     [filteredParts, selectedId]
-  );
-  const fittingPartsForPrint = useMemo(
-    () => parts.filter((part) => part.fitting && isDateInRange(part.shipped_at, fittingPrintRange)),
-    [parts, fittingPrintRange]
   );
 
   useEffect(() => {
@@ -364,86 +301,6 @@ export default function ReplacementPartsPage() {
     }
   }
 
-  function printFittingReport() {
-    if (fittingPartsForPrint.length === 0) {
-      alert(`No fitting replacement parts found for ${getRangeLabel(fittingPrintRange).toLowerCase()}.`);
-      return;
-    }
-
-    const rowsHtml = fittingPartsForPrint
-      .map(
-        (part) => `
-          <tr>
-            <td>${escapeHtml(part.qbo_invoice_number || "-")}</td>
-            <td>${escapeHtml(part.customer_name || "-")}</td>
-            <td>${escapeHtml(STATUS_OPTIONS.find((s) => s.value === part.status)?.label || part.status)}</td>
-            <td>${escapeHtml(part.ebay_order_number || "-")}</td>
-          </tr>
-        `
-      )
-      .join("");
-
-    const printWindow = window.open("about:blank", "_blank", "width=1100,height=900");
-    if (!printWindow) {
-      alert("Unable to open print preview. Please allow pop-ups and try again.");
-      return;
-    }
-
-    const generatedAt = new Date().toLocaleString();
-    const title = `Fitting Replacement Parts - ${getRangeLabel(fittingPrintRange)}`;
-
-    try {
-      printWindow.document.open();
-      printWindow.document.write(`
-        <!doctype html>
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <title>${escapeHtml(title)}</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
-              h1 { margin: 0 0 8px 0; font-size: 22px; }
-              p { margin: 0 0 12px 0; color: #334155; }
-              table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-              th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; text-align: left; }
-              th { background: #f1f5f9; }
-              .meta { display: flex; gap: 16px; flex-wrap: wrap; }
-              .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-weight: 700; }
-              @media print { body { margin: 12mm; } }
-            </style>
-          </head>
-          <body>
-            <h1>${escapeHtml(title)}</h1>
-            <div class="meta">
-              <p><strong>Generated:</strong> ${escapeHtml(generatedAt)}</p>
-              <p><strong>Total Fitting Replacements:</strong> <span class="badge">${fittingPartsForPrint.length}</span></p>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Invoice</th>
-                  <th>Customer QuickBooks Name</th>
-                  <th>Status</th>
-                  <th>eBay Order Number</th>
-                </tr>
-              </thead>
-              <tbody>${rowsHtml}</tbody>
-            </table>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-
-      window.setTimeout(() => {
-        printWindow.print();
-      }, 200);
-    } catch {
-      printWindow.close();
-      alert("Failed to render print preview. Please try again.");
-    }
-  }
-
   async function saveTrackingLive(current: ReplacementPartDetails, options?: { silent?: boolean; refreshOnly?: boolean }) {
     if (!current) return;
 
@@ -548,51 +405,13 @@ export default function ReplacementPartsPage() {
                   <h1 className="text-2xl font-bold text-slate-900">Replacement Parts</h1>
                   <p className="text-sm text-slate-600">Track replacement parts by invoice, update tracking, and monitor delivery progress.</p>
                 </div>
-                <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 md:max-w-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">Fitting report</p>
-                  <p className="mt-1 text-xs text-slate-600">Print only replacement parts marked as fitting.</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <select
-                      value={fittingPrintRange}
-                      onChange={(e) => setFittingPrintRange(e.target.value as FittingPrintRange)}
-                      className="flex-1 rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
-                    >
-                      {FITTING_PRINT_RANGE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={printFittingReport}
-                      className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
-                    >
-                      Print
-                    </button>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-600">
-                    {fittingPartsForPrint.length} fitting replacement{fittingPartsForPrint.length === 1 ? "" : "s"} in {getRangeLabel(fittingPrintRange).toLowerCase()}.
-                  </p>
-                </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-5 xl:gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
               <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
                 <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                  <div className="grid grid-cols-2 gap-1 sm:grid-cols-5">
-                    <button
-                      type="button"
-                      onClick={() => setListViewFilter("FITTINGS")}
-                      className={`rounded-md px-3 py-2 text-sm font-semibold transition ${
-                        listViewFilter === "FITTINGS"
-                          ? "bg-red-600 text-white shadow-sm"
-                          : "bg-white text-slate-700 hover:bg-slate-100"
-                      } whitespace-nowrap`}
-                    >
-                      Fittings
-                    </button>
+                  <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
                     <button
                       type="button"
                       onClick={() => setListViewFilter("PRIORITY")}
@@ -703,13 +522,11 @@ export default function ReplacementPartsPage() {
                     <p className="text-sm text-slate-500">Loading...</p>
                   ) : filteredParts.length === 0 ? (
                     <p className="text-sm text-slate-500">
-                      {listViewFilter === "FITTINGS"
-                        ? "No fitting replacement records yet."
-                        : listViewFilter === "UNORDERED"
+                      {listViewFilter === "UNORDERED"
                           ? "No unordered replacement records yet."
                           : listViewFilter === "MISSING_TRACKING"
                             ? "No replacement records are missing tracking."
-                        : listViewFilter === "PRIORITY"
+                            : listViewFilter === "PRIORITY"
                           ? "No priority replacement records yet."
                           : "No replacement records yet."}
                     </p>
@@ -735,14 +552,6 @@ export default function ReplacementPartsPage() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex min-w-0 items-center gap-2">
-                            {part.fitting ? (
-                              <span
-                                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white"
-                                title="Fitting replacement"
-                              >
-                                !
-                              </span>
-                            ) : null}
                             <span
                               className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold ${STATUS_META[part.status].chipClass}`}
                               title={STATUS_OPTIONS.find((s) => s.value === part.status)?.label || part.status}
@@ -803,7 +612,7 @@ export default function ReplacementPartsPage() {
                       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-slate-700">
                         <p className="mb-3 text-sm font-semibold text-slate-900">QuickBooks Invoice</p>
                         <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm text-slate-700 md:grid-cols-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             <p>
                               <span className="font-medium text-slate-900">Invoice:</span> {details.invoiceSummary.docNumber || "-"}
                             </p>
@@ -813,10 +622,16 @@ export default function ReplacementPartsPage() {
                             <p>
                               <span className="font-medium text-slate-900">Sales rep:</span> {details.invoiceSummary.salesRep || "-"}
                             </p>
-                            <p>
-                              <span className="font-medium text-slate-900">Shipping address:</span>{" "}
-                              <span className="whitespace-pre-wrap">{details.invoiceSummary.shippingAddress || "-"}</span>
-                            </p>
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shipping address</p>
+                                <p className="mt-2 whitespace-pre-wrap text-slate-700">{details.invoiceSummary.shippingAddress || "-"}</p>
+                              </div>
+                              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Billing address</p>
+                                <p className="mt-2 whitespace-pre-wrap text-slate-700">{details.invoiceSummary.billingAddress || "-"}</p>
+                              </div>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-white/70 p-3">
                             <div>
@@ -903,24 +718,6 @@ export default function ReplacementPartsPage() {
                           placeholder="e.g. 12-34567-89012"
                           className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900"
                         />
-                      </label>
-                      <label className="text-sm text-slate-700">
-                        <span className="mb-1 block font-medium">Replacement Type</span>
-                        <div className="flex items-center gap-2 rounded border border-slate-300 bg-white px-2 py-2">
-                          <input
-                            id="fitting-replacement"
-                            type="checkbox"
-                            checked={details.fitting}
-                            onChange={(e) => setDetails({ ...details, fitting: e.target.checked })}
-                            className="h-4 w-4"
-                          />
-                          <label htmlFor="fitting-replacement" className="text-sm text-slate-900">
-                            Mark as fitting replacement
-                          </label>
-                        </div>
-                        <span className="mt-1 block text-xs text-slate-500">
-                          Fitting replacements show a red ! marker in the list.
-                        </span>
                       </label>
                       <label className="text-sm text-slate-700">
                         <span className="mb-1 block font-medium">Email Sent</span>

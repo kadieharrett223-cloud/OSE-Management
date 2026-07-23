@@ -58,6 +58,32 @@ function getShippingAddress(invoice: any): string | null {
   return lines.length > 0 ? lines.join("\n") : null;
 }
 
+function getBillingAddress(invoice: any): string | null {
+  const billAddr = invoice?.BillAddr;
+  if (!billAddr || typeof billAddr !== "object") return null;
+
+  const lines = [
+    billAddr.Line1,
+    billAddr.Line2,
+    billAddr.Line3,
+    billAddr.Line4,
+    billAddr.Line5,
+  ]
+    .map((line: any) => String(line || "").trim())
+    .filter(Boolean);
+
+  const city = String(billAddr.City || "").trim();
+  const state = String(billAddr.CountrySubDivisionCode || "").trim();
+  const postalCode = String(billAddr.PostalCode || "").trim();
+  const country = String(billAddr.Country || "").trim();
+
+  const cityStatePostal = [city, state, postalCode].filter(Boolean).join(", ");
+  if (cityStatePostal) lines.push(cityStatePostal);
+  if (country) lines.push(country);
+
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
 function buildTrackingUrl(trackingNumberInput: string | null | undefined): string | null {
   const trackingNumber = String(trackingNumberInput || "").trim();
   if (!trackingNumber) return null;
@@ -91,6 +117,7 @@ function mapInvoiceSummary(invoice: any) {
     salesRep: getSalesRep(invoice),
     customer: invoice?.CustomerRef?.name || null,
     shippingAddress: getShippingAddress(invoice),
+    billingAddress: getBillingAddress(invoice),
     lineItems,
   };
 }
