@@ -356,6 +356,90 @@ export default function Dashboard() {
     setShowCustomerPaymentsYesterdayModal(true);
   };
 
+  const handlePrintCustomerPayments = (period: CustomerPaymentsPeriod) => {
+    const rows = period === "today" ? customerPaymentsToday : customerPaymentsYesterday;
+    if (rows.length === 0) {
+      alert(period === "today" ? "No customer payments received today to print." : "No customer payments received yesterday to print.");
+      return;
+    }
+
+    const title = period === "today" ? "Customer Payments Today" : "Customer Payments Yesterday";
+    const total = period === "today" ? paymentsTotal : paymentsYesterdayTotal;
+    const generatedAt = new Date().toLocaleString();
+    const rowsHtml = rows
+      .map(
+        (payment) => `
+          <tr>
+            <td>${payment.customerName || "-"}</td>
+            <td>${payment.paymentMethod || "-"}</td>
+            <td style="text-align:right;">${money(payment.appliedAmount)}</td>
+            <td style="text-align:right;">${money(payment.totalAmount)}</td>
+            <td>${payment.txnDate || "-"}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const printWindow = window.open("about:blank", "_blank", "width=1100,height=900");
+    if (!printWindow) {
+      alert("Unable to open print preview. Please allow pop-ups and try again.");
+      return;
+    }
+
+    try {
+      printWindow.document.open();
+      printWindow.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>${title}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
+              h1 { margin: 0 0 8px 0; font-size: 22px; }
+              p { margin: 0 0 12px 0; color: #334155; }
+              table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+              th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 12px; text-align: left; }
+              th { background: #f1f5f9; }
+              .meta { display: flex; gap: 16px; flex-wrap: wrap; }
+              .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-weight: 700; }
+              @media print { body { margin: 12mm; } }
+            </style>
+          </head>
+          <body>
+            <h1>${title}</h1>
+            <div class="meta">
+              <p><strong>Generated:</strong> ${generatedAt}</p>
+              <p><strong>Total:</strong> <span class="badge">${money(total)}</span></p>
+              <p><strong>Rows:</strong> <span class="badge">${rows.length}</span></p>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Paid Via</th>
+                  <th style="text-align:right;">Applied</th>
+                  <th style="text-align:right;">Total Amount</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+
+      window.setTimeout(() => {
+        printWindow.print();
+      }, 200);
+    } catch {
+      printWindow.close();
+      alert("Failed to render print preview. Please try again.");
+    }
+  };
+
   const getLocalDateYmd = () => {
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -1372,13 +1456,22 @@ export default function Dashboard() {
                       <h2 className="text-lg font-semibold text-slate-900">All Customer Payments Today</h2>
                       <p className="mt-0.5 text-sm text-slate-600">Total received/paid: ${money(paymentsTotal)}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowCustomerPaymentsModal(false)}
-                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      Close
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintCustomerPayments("today")}
+                        className="rounded-lg border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors"
+                      >
+                        Print Report
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomerPaymentsModal(false)}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
                   </div>
                   <div className="max-h-[70vh] overflow-y-auto">
                     <table className="w-full">
@@ -1420,13 +1513,22 @@ export default function Dashboard() {
                       <h2 className="text-lg font-semibold text-slate-900">All Customer Payments Yesterday</h2>
                       <p className="mt-0.5 text-sm text-slate-600">Total received/paid: ${money(paymentsYesterdayTotal)}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowCustomerPaymentsYesterdayModal(false)}
-                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      Close
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintCustomerPayments("yesterday")}
+                        className="rounded-lg border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors"
+                      >
+                        Print Report
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomerPaymentsYesterdayModal(false)}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
                   </div>
                   <div className="max-h-[70vh] overflow-y-auto">
                     <table className="w-full">
