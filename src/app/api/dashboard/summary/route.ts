@@ -37,9 +37,17 @@ export async function GET() {
       `SELECT * FROM Payment WHERE TxnDate >= '${s}' AND TxnDate <= '${e}' ORDERBY TxnDate DESC MAXRESULTS 1000`;
     const billQ = (s: string, e: string) =>
       `SELECT * FROM BillPayment WHERE TxnDate >= '${s}' AND TxnDate <= '${e}' ORDERBY TxnDate DESC MAXRESULTS 1000`;
-    const normalizePaymentMethod = (payment: any) => {
-      const methodName = String(payment?.PaymentMethodRef?.name || payment?.PaymentMethodRef?.value || "").trim();
+    const paymentMethodQuery = "SELECT Id, Name FROM PaymentMethod MAXRESULTS 1000";
+    const normalizePaymentMethod = (payment: any, paymentMethodNameById: Map<string, string>) => {
+      const methodName = String(payment?.PaymentMethodRef?.name || "").trim();
       if (methodName) return methodName;
+
+      const methodId = String(payment?.PaymentMethodRef?.value || "").trim();
+      if (methodId && paymentMethodNameById.has(methodId)) {
+        return paymentMethodNameById.get(methodId) || methodId;
+      }
+
+      if (methodId) return methodId;
 
       if (payment?.CreditCardPayment || payment?.ProcessPayment) return "Charged Online";
 
@@ -48,7 +56,12 @@ export async function GET() {
 
       return "Unknown";
     };
-    const buildCustomerPayments = (payments: any[], paidInvoices: any[], fallbackDate: string) => {
+    const buildCustomerPayments = (
+      payments: any[],
+      paidInvoices: any[],
+      fallbackDate: string,
+      paymentMethodNameById: Map<string, string>
+    ) => {
       const itemizedCustomerPayments: any[] = [];
       const coveredInvoiceIds = new Set<string>();
 
@@ -77,7 +90,7 @@ export async function GET() {
               appliedAmount: lineAmount,
               totalAmount: lineAmount,
               txnDate: payment.TxnDate || fallbackDate,
-              paymentMethod: normalizePaymentMethod(payment),
+              paymentMethod: normalizePaymentMethod(payment, paymentMethodNameById),
             });
           });
         });
@@ -90,7 +103,7 @@ export async function GET() {
             appliedAmount: unlinked,
             totalAmount: total,
             txnDate: payment.TxnDate || fallbackDate,
-            paymentMethod: normalizePaymentMethod(payment),
+            paymentMethod: normalizePaymentMethod(payment, paymentMethodNameById),
           });
         }
       });
@@ -124,6 +137,7 @@ export async function GET() {
       rPayMonth,
       rPayLastMonth,
       rPayLastMonthTrend,
+      rPaymentMethods,
       rBillMonth,
       rBillToday,
       rUnpaid,
@@ -136,6 +150,7 @@ export async function GET() {
       qbo(payQ(monthStart, today), userId),
       qbo(payQ(lastMonthStart, lastMonthEnd), userId),
       qbo(payQ(lastMonthStart, lastMonthCompareEnd), userId),
+      qbo(paymentMethodQuery, userId),
       qbo(billQ(monthStart, today), userId),
       qbo(billQ(today, today), userId),
       qbo(`SELECT * FROM Invoice WHERE Balance > '0' ORDERBY TxnDate DESC MAXRESULTS 1000`, userId),
@@ -144,8 +159,8 @@ export async function GET() {
     ]);
 
     // Log failures for visibility
-    const labels = ["payToday","payYesterday","payWeek","payMonth","payLastMonth","payLastMonthTrend","billMonth","billToday","unpaid","paidInvToday","paidInvYesterday"];
-    [rPayToday,rPayYesterday,rPayWeek,rPayMonth,rPayLastMonth,rPayLastMonthTrend,rBillMonth,rBillToday,rUnpaid,rPaidInvToday,rPaidInvYesterday].forEach((r, i) => {
+    const labels = ["payToday","payYesterday","payWeek","payMonth","payLastMonth","payLastMonthTrend","paymentMethods","billMonth","billToday","unpaid","paidInvToday","paidInvYesterday"];
+    [rPayToday,rPayYesterday,rPayWeek,rPayMonth,rPayLastMonth,rPayLastMonthTrend,rPaymentMethods,rBillMonth,rBillToday,rUnpaid,rPaidInvToday,rPaidInvYesterday].forEach((r, i) => {
       if (r.status === "rejected") console.error(`[dashboard/summary] ${labels[i]} failed:`, r.reason?.message || r.reason);
     });
 
@@ -157,11 +172,18 @@ export async function GET() {
     const paymentsMonth: any[] = val(rPayMonth)?.QueryResponse?.Payment || [];
     const paymentsLastMonth: any[] = val(rPayLastMonth)?.QueryResponse?.Payment || [];
     const paymentsLastMonthTrend: any[] = val(rPayLastMonthTrend)?.QueryResponse?.Payment || [];
+    const paymentMethods: any[] = val(rPaymentMethods)?.QueryResponse?.PaymentMethod || [];
     const billPaymentsMonth: any[] = val(rBillMonth)?.QueryResponse?.BillPayment || [];
     const billPaymentsToday: any[] = val(rBillToday)?.QueryResponse?.BillPayment || [];
     const unpaidInvoices: any[] = val(rUnpaid)?.QueryResponse?.Invoice || [];
     const paidInvoicesToday: any[] = val(rPaidInvToday)?.QueryResponse?.Invoice || [];
   const paidInvoicesYesterday: any[] = val(rPaidInvYesterday)?.QueryResponse?.Invoice || [];
+
+    const paymentMethodNameById = new Map<string, string>(
+      paymentMethods
+        .map((method: any) => [String(method?.Id || ""), String(method?.Name || "").trim()] as const)
+        .filter(([id, name]) => Boolean(id) && Boolean(name))
+    );
 
     const sumApplied = (pmts: any[]) =>
       pmts.reduce((s: number, p: any) => s + Math.max((Number(p.TotalAmt)||0) - (Number(p.UnappliedAmt)||0), 0), 0);
@@ -235,8 +257,8 @@ export async function GET() {
       return { id: inv.Id, docNumber: inv.DocNumber, customerName: inv.CustomerRef?.name || "Unknown", totalAmt: total, balance, txnDate: inv.TxnDate, status: balance <= 0 ? "Paid" : "Open" };
     });
 
-    const itemizedCustomerPayments = buildCustomerPayments(paymentsToday, paidInvoicesToday, today);
-    const itemizedCustomerPaymentsYesterday = buildCustomerPayments(paymentsYesterday, paidInvoicesYesterday, yesterday);
+    const itemizedCustomerPayments = buildCustomerPayments(paymentsToday, paidInvoicesToday, today, paymentMethodNameById);
+    const itemizedCustomerPaymentsYesterday = buildCustomerPayments(paymentsYesterday, paidInvoicesYesterday, yesterday, paymentMethodNameById);
 
     // Purchase orders
     let recentPurchases: any[] = [];
