@@ -50,21 +50,7 @@ export async function GET() {
     };
     const buildCustomerPayments = (payments: any[], paidInvoices: any[], fallbackDate: string) => {
       const itemizedCustomerPayments: any[] = [];
-      const paidByInvoiceId = new Map<string, boolean>();
-
-      paidInvoices.forEach((inv: any) => {
-        const total = Number(inv.TotalAmt) || 0;
-        if (total <= 0) return;
-        paidByInvoiceId.set(String(inv.Id || ""), true);
-        itemizedCustomerPayments.push({
-          id: `inv-${inv.Id}`,
-          customerName: inv.CustomerRef?.name || inv.CustomerRef?.value || "Unknown",
-          appliedAmount: total,
-          totalAmount: total,
-          txnDate: inv.TxnDate || fallbackDate,
-          paymentMethod: "Invoice Payment",
-        });
-      });
+      const coveredInvoiceIds = new Set<string>();
 
       payments.forEach((payment: any) => {
         const total = Number(payment.TotalAmt) || 0;
@@ -83,8 +69,8 @@ export async function GET() {
           linkedAmount += lineAmount;
           invoiceLinks.forEach((txn: any) => {
             const invoiceId = String(txn.TxnId || "");
-            if (!invoiceId || paidByInvoiceId.has(invoiceId)) return;
-            paidByInvoiceId.set(invoiceId, true);
+            if (!invoiceId || coveredInvoiceIds.has(invoiceId)) return;
+            coveredInvoiceIds.add(invoiceId);
             itemizedCustomerPayments.push({
               id: `pay-link-${payment.Id}-${invoiceId}`,
               customerName: payment.CustomerRef?.name || payment.CustomerRef?.value || "Unknown",
@@ -107,6 +93,23 @@ export async function GET() {
             paymentMethod: normalizePaymentMethod(payment),
           });
         }
+      });
+
+      paidInvoices.forEach((inv: any) => {
+        const total = Number(inv.TotalAmt) || 0;
+        if (total <= 0) return;
+
+        const invoiceId = String(inv.Id || "");
+        if (invoiceId && coveredInvoiceIds.has(invoiceId)) return;
+
+        itemizedCustomerPayments.push({
+          id: `inv-${inv.Id}`,
+          customerName: inv.CustomerRef?.name || inv.CustomerRef?.value || "Unknown",
+          appliedAmount: total,
+          totalAmount: total,
+          txnDate: inv.TxnDate || fallbackDate,
+          paymentMethod: "Invoice Payment",
+        });
       });
 
       itemizedCustomerPayments.sort((a, b) => b.appliedAmount - a.appliedAmount);
