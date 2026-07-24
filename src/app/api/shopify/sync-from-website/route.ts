@@ -57,8 +57,6 @@ type PricingRow = {
   margin: number | null;
 };
 
-type MarginMode = "multiply" | "divide";
-
 function toNumber(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -129,33 +127,9 @@ function computeFinalCostForUiMath(row: PricingRow, tariffPercent: number) {
   return perUnit + zone5 + indirect + direct + overhead;
 }
 
-function detectMarginMode(rows: PricingRow[]): MarginMode {
-  let multiplyScore = 0;
-  let divideScore = 0;
-
-  for (const row of rows) {
-    const cost = toNumber(row.cost_with_shipping);
-    const sell = toNumber(row.sell_price);
-    const margin = Number(row.margin);
-
-    if (cost <= 0 || sell <= 0 || !Number.isFinite(margin)) continue;
-
-    const predictedMultiply = cost * (1 + margin);
-    const predictedDivide = margin < 1 ? cost / (1 - margin) : Number.POSITIVE_INFINITY;
-
-    const multiplyError = Math.abs(predictedMultiply - sell);
-    const divideError = Math.abs(predictedDivide - sell);
-
-    if (multiplyError <= divideError) multiplyScore += 1;
-    else divideScore += 1;
-  }
-
-  return divideScore > multiplyScore ? "divide" : "multiply";
-}
-
 function isNotFoundError(error: unknown) {
   const message = String((error as any)?.message || "");
-  return message.includes("Shopify API error 404");
+  return message.includes("Shopify API error 404") || message.includes("Not Found");
 }
 
 async function fetchVariantPricing(variantId: string, productId?: string | null) {
@@ -258,7 +232,6 @@ export async function POST() {
     const supabase = getServerSupabaseClient();
     const rows = await getMappedRows();
     const globalTariffPercent = await getGlobalTariffPercent();
-    const marginMode = detectMarginMode(rows);
 
     let updated = 0;
     let skipped = 0;
@@ -280,11 +253,9 @@ export async function POST() {
         continue;
       }
 
-      const nextMargin = clampMargin(
-        marginMode === "divide"
-          ? 1 - finalCost / website.sell
-          : website.sell / finalCost - 1
-      );
+      // Keep website pull math aligned with the price-list UI and computeDerivedFields:
+      // Sell = Final Cost * (1 + Margin)  =>  Margin = (Sell / Final Cost) - 1
+      const nextMargin = clampMargin(website.sell / finalCost - 1);
       const updatePayload: Record<string, unknown> = {
         margin: nextMargin,
         updated_at: new Date().toISOString(),
@@ -313,7 +284,7 @@ export async function POST() {
       updated,
       skipped,
       failed,
-      margin_mode: marginMode,
+      margin_mode: "multiply",
       errors,
     });
   } catch (error: any) {
