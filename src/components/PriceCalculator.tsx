@@ -59,15 +59,6 @@ export function PriceCalculator({
       }
 
       const marginDecimal = marginPercent / 100;
-      if (marginDecimal >= 0.95) {
-        return {
-          sellPrice: null,
-          margin: null,
-          listPrice: null,
-          profit: null,
-          error: "Margin must be less than 95%",
-        };
-      }
 
       // Sell = Final × (1 + Markup)
       const sellPrice = finalCost * (1 + marginDecimal);
@@ -96,15 +87,6 @@ export function PriceCalculator({
 
       // Markup = (Sell - Final) / Final
       const margin = (sellPrice - finalCost) / finalCost;
-      if (margin >= 0.95) {
-        return {
-          sellPrice: null,
-          margin: null,
-          listPrice: null,
-          profit: null,
-          error: "Margin exceeds 95% – adjust sell price down",
-        };
-      }
 
       const listPrice = sellPrice / 0.8;
       const profit = sellPrice - finalCost;
