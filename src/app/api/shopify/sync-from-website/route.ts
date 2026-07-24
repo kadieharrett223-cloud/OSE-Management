@@ -14,6 +14,17 @@ type ShopifyVariantPayload = {
   };
 };
 
+type ShopifyProductPayload = {
+  product?: {
+    id?: number;
+    variants?: Array<{
+      id?: number;
+      price?: string;
+      compare_at_price?: string | null;
+    }>;
+  };
+};
+
 type PreviewRow = {
   id: string;
   item_no: string;
@@ -26,6 +37,7 @@ type PreviewRow = {
 type PricingRow = {
   id: string;
   item_no: string;
+  shopify_product_id: string | null;
   shopify_variant_id: string | null;
   sell_price: number | null;
   list_price: number | null;
@@ -64,7 +76,7 @@ async function getMappedRows() {
   const { data, error } = await supabase
     .from("price_list_items")
     .select(
-      "id,item_no,shopify_variant_id,sell_price,list_price,cost_with_shipping,manual_pricing_override,website_product_url,fob_cost,quantity,tariff_105,ocean_frt,importing,indirect_labor,direct_labor,overhead_cost,zone5_shipping,tariff_exempt,margin"
+      "id,item_no,shopify_product_id,shopify_variant_id,sell_price,list_price,cost_with_shipping,manual_pricing_override,website_product_url,fob_cost,quantity,tariff_105,ocean_frt,importing,indirect_labor,direct_labor,overhead_cost,zone5_shipping,tariff_exempt,margin"
     )
     .eq("is_active", true)
     .not("shopify_variant_id", "is", null);
@@ -141,14 +153,54 @@ function detectMarginMode(rows: PricingRow[]): MarginMode {
   return divideScore > multiplyScore ? "divide" : "multiply";
 }
 
-async function fetchVariantPricing(variantId: string) {
+function isNotFoundError(error: unknown) {
+  const message = String((error as any)?.message || "");
+  return message.includes("Shopify API error 404");
+}
+
+async function fetchVariantPricing(variantId: string, productId?: string | null) {
   const parsed = Number.parseInt(variantId, 10);
   if (Number.isNaN(parsed)) {
     return { sell: null, compareAt: null };
   }
 
-  const payload = await shopifyApiFetch<ShopifyVariantPayload>(`/variants/${parsed}.json`);
-  const variant = payload?.variant;
+  let variant: ShopifyVariantPayload["variant"] | null = null;
+
+  try {
+    const payload = await shopifyApiFetch<ShopifyVariantPayload>(`/variants/${parsed}.json`);
+    variant = payload?.variant || null;
+  } catch (error) {
+    if (!isNotFoundError(error)) throw error;
+
+    if (productId) {
+      const productParsed = Number.parseInt(String(productId), 10);
+      if (!Number.isNaN(productParsed)) {
+        try {
+          const payload = await shopifyApiFetch<ShopifyVariantPayload>(`/products/${productParsed}/variants/${parsed}.json`);
+          variant = payload?.variant || null;
+        } catch (fallbackError) {
+          if (!isNotFoundError(fallbackError)) throw fallbackError;
+        }
+      }
+    }
+
+    // Legacy fallback: some old mappings may have a product ID in shopify_variant_id.
+    if (!variant) {
+      try {
+        const payload = await shopifyApiFetch<ShopifyProductPayload>(`/products/${parsed}.json`);
+        const firstVariant = payload?.product?.variants?.[0];
+        variant = firstVariant
+          ? {
+              id: firstVariant.id,
+              price: firstVariant.price,
+              compare_at_price: firstVariant.compare_at_price,
+            }
+          : null;
+      } catch (productFallbackError) {
+        if (!isNotFoundError(productFallbackError)) throw productFallbackError;
+      }
+    }
+  }
 
   if (!variant) return { sell: null, compareAt: null };
 
@@ -175,7 +227,7 @@ export async function GET() {
     const preview: PreviewRow[] = [];
     for (const row of rows) {
       const variantId = String(row.shopify_variant_id || "");
-      const website = await fetchVariantPricing(variantId);
+      const website = await fetchVariantPricing(variantId, row.shopify_product_id);
 
       preview.push({
         id: String(row.id),
@@ -215,7 +267,7 @@ export async function POST() {
 
     for (const row of rows) {
       const variantId = String(row.shopify_variant_id || "");
-      const website = await fetchVariantPricing(variantId);
+      const website = await fetchVariantPricing(variantId, row.shopify_product_id);
 
       if (!website.sell || website.sell <= 0) {
         skipped += 1;
