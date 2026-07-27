@@ -7,10 +7,11 @@
 - Data source: `src/app/api/dashboard/summary/route.ts`
 - External dependency: QuickBooks Query API `Payment` and `Invoice`
 
-The dashboard shows two customer payment datasets:
+The dashboard shows two summary datasets and one on-demand dataset:
 
 - `Customer Payments Today`: merged from QBO `Payment` records received today plus fully paid invoices dated today.
 - `Customer Payments Yesterday`: merged from the same two QBO sources for the previous business date.
+- `Customer Payments (Selected Date)`: fetched on demand from `src/app/api/qbo/payment/query/route.ts` with `startDate` and `endDate` set to the same date (`YYYY-MM-DD`) so the full selected calendar day is returned.
 
 Both sections use the same merge rules so totals stay consistent across the KPI card, payment tables, and the `View all` modal:
 
@@ -19,7 +20,13 @@ Both sections use the same merge rules so totals stay consistent across the KPI 
 - Linked invoice amounts from payment lines are deduped by invoice id.
 - Remaining unlinked applied amounts are still shown as customer payments.
 
-The top customer payments card on the dashboard includes a local `Today` / `Yesterday` toggle. That toggle does not make another API request; it switches between the already-fetched `customerPaymentsToday` and `customerPaymentsYesterday` arrays from the dashboard summary payload. The lower duplicate yesterday table was removed so this top card is now the single dashboard entry point for both payment-day views.
+The top customer payments card on the dashboard includes three filter options:
+
+- `Today`
+- `Yesterday`
+- `Select Date`
+
+`Today` and `Yesterday` switch between the already-fetched `customerPaymentsToday` and `customerPaymentsYesterday` arrays from the dashboard summary payload. `Select Date` shows a date picker and makes a dedicated API request for the chosen day, then displays those full-day payment results in the same table and `View all` modal.
 
 ## Risk
 

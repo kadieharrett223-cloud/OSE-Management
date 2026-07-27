@@ -121,7 +121,7 @@ type PrintableReportType = "estimates" | "invoices";
 type EstimateReportStatus = "all" | "accepted" | "open" | "converted";
 type InvoiceReportStatus = "all" | "open" | "paid";
 type ReportTimeline = "ytd" | "last-year" | "last-3-months" | "this-month" | "last-month" | "this-week" | "last-week";
-type CustomerPaymentsPeriod = "today" | "yesterday";
+type CustomerPaymentsPeriod = "today" | "yesterday" | "selected";
 
 const mockReps = [
   {
@@ -277,10 +277,13 @@ export default function Dashboard() {
   const [customerPaymentsToday, setCustomerPaymentsToday] = useState<CustomerPayment[]>([]);
   const [paymentsYesterdayTotal, setPaymentsYesterdayTotal] = useState<number>(0);
   const [customerPaymentsYesterday, setCustomerPaymentsYesterday] = useState<CustomerPayment[]>([]);
+  const [selectedPaymentsDate, setSelectedPaymentsDate] = useState<string>(() => toYmdLocal(new Date()));
+  const [selectedDatePaymentsTotal, setSelectedDatePaymentsTotal] = useState<number>(0);
+  const [customerPaymentsSelectedDate, setCustomerPaymentsSelectedDate] = useState<CustomerPayment[]>([]);
+  const [loadingSelectedDatePayments, setLoadingSelectedDatePayments] = useState(false);
   const [loadingCustomerPayments, setLoadingCustomerPayments] = useState(true);
   const [customerPaymentsPeriod, setCustomerPaymentsPeriod] = useState<CustomerPaymentsPeriod>("today");
   const [showCustomerPaymentsModal, setShowCustomerPaymentsModal] = useState(false);
-  const [showCustomerPaymentsYesterdayModal, setShowCustomerPaymentsYesterdayModal] = useState(false);
   const [vendorPaymentsTotal, setVendorPaymentsTotal] = useState<number>(0);
   const [vendorPaymentsToday, setVendorPaymentsToday] = useState<VendorPaymentSummary[]>([]);
   const [loadingVendorPayments, setLoadingVendorPayments] = useState(true);
@@ -336,35 +339,61 @@ export default function Dashboard() {
   const animatedSalesWeekTotal = useCountUp(salesWeekTotal);
   const animatedProfitThisMonth = useCountUp(profitThisMonth);
   const animatedTotalExpenses = useCountUp(totalExpenses);
-  const customerPaymentsHeading = customerPaymentsPeriod === "today" ? "Customer Payments Today" : "Customer Payments Yesterday";
+  const selectedPaymentsDateLabel = selectedPaymentsDate
+    ? new Date(`${selectedPaymentsDate}T00:00:00`).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "selected date";
+  const customerPaymentsHeading =
+    customerPaymentsPeriod === "today"
+      ? "Customer Payments Today"
+      : customerPaymentsPeriod === "yesterday"
+        ? "Customer Payments Yesterday"
+        : `Customer Payments (${selectedPaymentsDateLabel})`;
   const customerPaymentsSubheading =
     customerPaymentsPeriod === "today"
       ? "Payments received in QuickBooks today"
-      : "Payments received in QuickBooks yesterday";
-  const customerPaymentsActiveTotal = customerPaymentsPeriod === "today" ? paymentsTotal : paymentsYesterdayTotal;
-  const customerPaymentsActiveRows = customerPaymentsPeriod === "today" ? customerPaymentsToday : customerPaymentsYesterday;
+      : customerPaymentsPeriod === "yesterday"
+        ? "Payments received in QuickBooks yesterday"
+        : "Payments received in QuickBooks on selected date";
+  const customerPaymentsActiveTotal =
+    customerPaymentsPeriod === "today"
+      ? paymentsTotal
+      : customerPaymentsPeriod === "yesterday"
+        ? paymentsYesterdayTotal
+        : selectedDatePaymentsTotal;
+  const customerPaymentsActiveRows =
+    customerPaymentsPeriod === "today"
+      ? customerPaymentsToday
+      : customerPaymentsPeriod === "yesterday"
+        ? customerPaymentsYesterday
+        : customerPaymentsSelectedDate;
   const customerPaymentsEmptyMessage =
     customerPaymentsPeriod === "today"
       ? "No payments recorded in QuickBooks today"
-      : "No payments recorded in QuickBooks yesterday";
-  const openActiveCustomerPaymentsModal = () => {
-    if (customerPaymentsPeriod === "today") {
-      setShowCustomerPaymentsModal(true);
-      return;
-    }
+      : customerPaymentsPeriod === "yesterday"
+        ? "No payments recorded in QuickBooks yesterday"
+        : `No payments recorded in QuickBooks on ${selectedPaymentsDateLabel}`;
+  const loadingCustomerPaymentsActive = customerPaymentsPeriod === "selected" ? loadingSelectedDatePayments : loadingCustomerPayments;
+  const openActiveCustomerPaymentsModal = () => setShowCustomerPaymentsModal(true);
 
-    setShowCustomerPaymentsYesterdayModal(true);
-  };
-
-  const handlePrintCustomerPayments = (period: CustomerPaymentsPeriod) => {
-    const rows = period === "today" ? customerPaymentsToday : customerPaymentsYesterday;
+  const handlePrintCustomerPayments = () => {
+    const rows = customerPaymentsActiveRows;
     if (rows.length === 0) {
-      alert(period === "today" ? "No customer payments received today to print." : "No customer payments received yesterday to print.");
+      if (customerPaymentsPeriod === "today") {
+        alert("No customer payments received today to print.");
+      } else if (customerPaymentsPeriod === "yesterday") {
+        alert("No customer payments received yesterday to print.");
+      } else {
+        alert(`No customer payments received on ${selectedPaymentsDateLabel} to print.`);
+      }
       return;
     }
 
-    const title = period === "today" ? "Customer Payments Today" : "Customer Payments Yesterday";
-    const total = period === "today" ? paymentsTotal : paymentsYesterdayTotal;
+    const title = customerPaymentsHeading;
+    const total = customerPaymentsActiveTotal;
     const generatedAt = new Date().toLocaleString();
     const rowsHtml = rows
       .map(
@@ -438,14 +467,6 @@ export default function Dashboard() {
       printWindow.close();
       alert("Failed to render print preview. Please try again.");
     }
-  };
-
-  const getLocalDateYmd = () => {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
   };
 
   // Single consolidated dashboard fetch — replaces all individual QBO useEffects
@@ -524,6 +545,74 @@ export default function Dashboard() {
       clearTimeout(midnightRefresh);
     };
   }, []);
+
+  useEffect(() => {
+    if (customerPaymentsPeriod !== "selected") return;
+    if (!selectedPaymentsDate) {
+      setCustomerPaymentsSelectedDate([]);
+      setSelectedDatePaymentsTotal(0);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchSelectedDatePayments = async () => {
+      setLoadingSelectedDatePayments(true);
+      try {
+        const params = new URLSearchParams({
+          startDate: selectedPaymentsDate,
+          endDate: selectedPaymentsDate,
+          _: String(Date.now()),
+        });
+        const res = await fetch(`/api/qbo/payment/query?${params.toString()}`);
+        if (!res.ok) throw new Error("Failed to fetch selected-date payments");
+
+        const data = await res.json();
+        const rows: CustomerPayment[] = (data.payments || [])
+          .map((payment: any) => {
+            const totalAmount = Number(payment.TotalAmt) || 0;
+            const unappliedAmount = Number(payment.UnappliedAmt) || 0;
+            const appliedAmount = Math.max(totalAmount - unappliedAmount, 0);
+            const paymentMethod =
+              String(payment?.PaymentMethodRef?.name || "").trim() ||
+              String(payment?.PaymentMethodRef?.value || "").trim() ||
+              (payment?.CreditCardPayment || payment?.ProcessPayment ? "Charged Online" : "Unknown");
+
+            return {
+              id: `selected-${payment.Id || Math.random().toString(36).slice(2)}`,
+              customerName: payment.CustomerRef?.name || payment.CustomerRef?.value || "Unknown",
+              appliedAmount,
+              totalAmount,
+              txnDate: payment.TxnDate || selectedPaymentsDate,
+              paymentMethod,
+            };
+          })
+          .filter((payment: CustomerPayment) => payment.appliedAmount > 0)
+          .sort((a: CustomerPayment, b: CustomerPayment) => b.appliedAmount - a.appliedAmount);
+
+        const computedTotal = rows.reduce((sum: number, payment: CustomerPayment) => sum + payment.appliedAmount, 0);
+
+        if (isMounted) {
+          setCustomerPaymentsSelectedDate(rows);
+          setSelectedDatePaymentsTotal(Number(data.totalApplied ?? computedTotal ?? 0));
+        }
+      } catch (error) {
+        console.error("Failed to fetch selected date payments:", error);
+        if (isMounted) {
+          setCustomerPaymentsSelectedDate([]);
+          setSelectedDatePaymentsTotal(0);
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingSelectedDatePayments(false);
+        }
+      }
+    };
+
+    fetchSelectedDatePayments();
+    return () => {
+      isMounted = false;
+    };
+  }, [customerPaymentsPeriod, selectedPaymentsDate]);
 
   // Derived display values (depend on state set by summary fetch)
   const fallbackSales = qboSales !== null ? qboSales : mockReps.reduce((sum, rep) => sum + rep.sales, 0);
@@ -854,7 +943,31 @@ export default function Dashboard() {
                       >
                         Yesterday
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomerPaymentsPeriod("selected")}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                          customerPaymentsPeriod === "selected"
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Select Date
+                      </button>
                     </div>
+                    {customerPaymentsPeriod === "selected" && (
+                      <input
+                        type="date"
+                        value={selectedPaymentsDate}
+                        onChange={(event) => {
+                          setSelectedPaymentsDate(event.target.value);
+                          setCustomerPaymentsPeriod("selected");
+                        }}
+                        required
+                        className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700"
+                        aria-label="Select payments date"
+                      />
+                    )}
                     {customerPaymentsActiveRows.length > 0 && (
                       <button
                         type="button"
@@ -877,7 +990,7 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {loadingCustomerPayments ? (
+                      {loadingCustomerPaymentsActive ? (
                         <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">Loading...</td></tr>
                       ) : customerPaymentsActiveRows.length === 0 ? (
                         <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-500">
@@ -1453,13 +1566,13 @@ export default function Dashboard() {
                 <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg">
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div>
-                      <h2 className="text-lg font-semibold text-slate-900">All Customer Payments Today</h2>
-                      <p className="mt-0.5 text-sm text-slate-600">Total received/paid: ${money(paymentsTotal)}</p>
+                      <h2 className="text-lg font-semibold text-slate-900">All {customerPaymentsHeading}</h2>
+                      <p className="mt-0.5 text-sm text-slate-600">Total received/paid: ${money(customerPaymentsActiveTotal)}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => handlePrintCustomerPayments("today")}
+                        onClick={handlePrintCustomerPayments}
                         className="rounded-lg border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors"
                       >
                         Print Report
@@ -1484,69 +1597,12 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {customerPaymentsToday.length === 0 ? (
+                        {customerPaymentsActiveRows.length === 0 ? (
                           <tr>
-                            <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No customer payments received today</td>
+                            <td colSpan={4} className="px-6 py-6 text-center text-slate-500">{customerPaymentsEmptyMessage}</td>
                           </tr>
                         ) : (
-                          customerPaymentsToday.map((payment) => (
-                            <tr key={payment.id} className="hover:bg-slate-50">
-                              <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
-                              <td className="px-6 py-3 text-slate-600">{payment.paymentMethod || "-"}</td>
-                              <td className="px-6 py-3 text-right font-semibold text-emerald-700">${money(payment.appliedAmount)}</td>
-                              <td className="px-6 py-3 text-right text-slate-600">${money(payment.totalAmount)}</td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {showCustomerPaymentsYesterdayModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-                <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg">
-                  <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                    <div>
-                      <h2 className="text-lg font-semibold text-slate-900">All Customer Payments Yesterday</h2>
-                      <p className="mt-0.5 text-sm text-slate-600">Total received/paid: ${money(paymentsYesterdayTotal)}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handlePrintCustomerPayments("yesterday")}
-                        className="rounded-lg border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 transition-colors"
-                      >
-                        Print Report
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowCustomerPaymentsYesterdayModal(false)}
-                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                  <div className="max-h-[70vh] overflow-y-auto">
-                    <table className="w-full">
-                      <thead className="border-b border-slate-200 bg-slate-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Customer</th>
-                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Paid Via</th>
-                          <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Applied</th>
-                          <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {customerPaymentsYesterday.length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="px-6 py-6 text-center text-slate-500">No customer payments received yesterday</td>
-                          </tr>
-                        ) : (
-                          customerPaymentsYesterday.map((payment) => (
+                          customerPaymentsActiveRows.map((payment) => (
                             <tr key={payment.id} className="hover:bg-slate-50">
                               <td className="px-6 py-3 font-medium text-slate-900">{payment.customerName}</td>
                               <td className="px-6 py-3 text-slate-600">{payment.paymentMethod || "-"}</td>
