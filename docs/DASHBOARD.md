@@ -17,8 +17,10 @@ Both sections use the same merge rules so totals stay consistent across the KPI 
 
 - Applied amount is `TotalAmt - UnappliedAmt` for payment records.
 - Fully paid invoices are included once.
-- Linked invoice amounts from payment lines are deduped by invoice id.
+- Linked invoice amounts from payment lines are itemized per payment event, even when multiple payments apply to the same invoice.
 - Remaining unlinked applied amounts are still shown as customer payments.
+
+To avoid double counting, invoice fallback rows are skipped only when the invoice already appeared in linked payment rows.
 
 The top customer payments card on the dashboard includes three filter options:
 

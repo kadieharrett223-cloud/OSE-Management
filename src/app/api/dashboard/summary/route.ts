@@ -63,7 +63,7 @@ export async function GET() {
       paymentMethodNameById: Map<string, string>
     ) => {
       const itemizedCustomerPayments: any[] = [];
-      const coveredInvoiceIds = new Set<string>();
+      const invoicesCoveredByPaymentLinks = new Set<string>();
 
       payments.forEach((payment: any) => {
         const total = Number(payment.TotalAmt) || 0;
@@ -72,7 +72,7 @@ export async function GET() {
         if (applied <= 0) return;
 
         let linkedAmount = 0;
-        (Array.isArray(payment.Line) ? payment.Line : []).forEach((line: any) => {
+        (Array.isArray(payment.Line) ? payment.Line : []).forEach((line: any, lineIndex: number) => {
           const lineAmount = Number(line.Amount) || 0;
           const invoiceLinks = (Array.isArray(line.LinkedTxn) ? line.LinkedTxn : []).filter(
             (txn: any) => txn.TxnType === "Invoice" && txn.TxnId
@@ -80,12 +80,12 @@ export async function GET() {
           if (!invoiceLinks.length) return;
 
           linkedAmount += lineAmount;
-          invoiceLinks.forEach((txn: any) => {
+          invoiceLinks.forEach((txn: any, linkIndex: number) => {
             const invoiceId = String(txn.TxnId || "");
-            if (!invoiceId || coveredInvoiceIds.has(invoiceId)) return;
-            coveredInvoiceIds.add(invoiceId);
+            if (!invoiceId) return;
+            invoicesCoveredByPaymentLinks.add(invoiceId);
             itemizedCustomerPayments.push({
-              id: `pay-link-${payment.Id}-${invoiceId}`,
+              id: `pay-link-${payment.Id}-${invoiceId}-${lineIndex}-${linkIndex}`,
               customerName: payment.CustomerRef?.name || payment.CustomerRef?.value || "Unknown",
               appliedAmount: lineAmount,
               totalAmount: lineAmount,
@@ -113,7 +113,7 @@ export async function GET() {
         if (total <= 0) return;
 
         const invoiceId = String(inv.Id || "");
-        if (invoiceId && coveredInvoiceIds.has(invoiceId)) return;
+        if (invoiceId && invoicesCoveredByPaymentLinks.has(invoiceId)) return;
 
         itemizedCustomerPayments.push({
           id: `inv-${inv.Id}`,
