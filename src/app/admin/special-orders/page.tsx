@@ -40,6 +40,7 @@ type InvoiceSummary = {
   salesRep: string | null;
   customer: string | null;
   shippingAddress: string | null;
+  billingAddress: string | null;
   total: number;
   balance: number;
   paid: boolean;
@@ -104,6 +105,7 @@ export default function SpecialOrdersPage() {
   const [noteEntry, setNoteEntry] = useState("");
   const [invoiceCandidates, setInvoiceCandidates] = useState<InvoiceCandidate[]>([]);
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
+  const [showFullInvoice, setShowFullInvoice] = useState(false);
 
   const selectedOrder = useMemo(() => orders.find((o) => o.id === selectedId) || null, [orders, selectedId]);
 
@@ -114,8 +116,10 @@ export default function SpecialOrdersPage() {
   useEffect(() => {
     if (!selectedId) {
       setDetails(null);
+      setShowFullInvoice(false);
       return;
     }
+    setShowFullInvoice(false);
     loadDetails(selectedId);
   }, [selectedId]);
 
@@ -288,7 +292,8 @@ export default function SpecialOrdersPage() {
           <div><div class="label">Status</div><div class="value">${escapeHtml(STATUS_OPTIONS.find((o) => o.value === details.status)?.label || details.status)}</div></div>
           <div><div class="label">Container</div><div class="value">${escapeHtml(details.container_name || "-")}</div></div>
           <div><div class="label">Sales Rep</div><div class="value">${escapeHtml(details.invoiceSummary?.salesRep || "-")}</div></div>
-          <div style="grid-column: 1 / span 2;"><div class="label">Shipping Address</div><div class="value multiline">${escapeHtml(details.invoiceSummary?.shippingAddress || "-")}</div></div>
+          <div><div class="label">Billing Address</div><div class="value multiline">${escapeHtml(details.invoiceSummary?.billingAddress || "-")}</div></div>
+          <div><div class="label">Shipping Address</div><div class="value multiline">${escapeHtml(details.invoiceSummary?.shippingAddress || "-")}</div></div>
         </div>
 
         <div class="section">
@@ -523,55 +528,78 @@ export default function SpecialOrdersPage() {
                   <div className="space-y-5">
                     {details.invoiceSummary && (
                       <div className="rounded border border-slate-200 bg-slate-50 p-4 text-slate-700">
-                        <p className="mb-3 text-sm font-semibold text-slate-900">QuickBooks Invoice</p>
-                        <div className="space-y-1 text-sm text-slate-700">
-                          <p>
-                            <span className="font-medium text-slate-900">Invoice:</span> {details.invoiceSummary.docNumber || "-"}
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Customer:</span> {details.invoiceSummary.customer || "-"}
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Sales rep:</span> {details.invoiceSummary.salesRep || "-"}
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Shipping address:</span>{" "}
-                            <span className="whitespace-pre-wrap">{details.invoiceSummary.shippingAddress || "-"}</span>
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Status:</span>{" "}
-                            {details.invoiceSummary.paid ? (
-                              <span className="text-emerald-700">Paid off</span>
-                            ) : (
-                              <span className="text-amber-700">Not paid</span>
-                            )}
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Total:</span> {money(details.invoiceSummary.total)}
-                          </p>
-                          <p>
-                            <span className="font-medium text-slate-900">Balance:</span> {money(details.invoiceSummary.balance)}
-                          </p>
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-slate-900">QuickBooks Invoice</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowFullInvoice((prev) => !prev)}
+                            className="rounded-md border border-emerald-300 bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900 hover:bg-emerald-200"
+                          >
+                            {showFullInvoice ? "Hide Full Invoice" : "View Full Invoice"}
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm text-slate-700 md:grid-cols-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+                          <div className="space-y-3">
+                            <p>
+                              <span className="font-medium text-slate-900">Invoice:</span> {details.invoiceSummary.docNumber || "-"}
+                            </p>
+                            <p>
+                              <span className="font-medium text-slate-900">Customer:</span> {details.invoiceSummary.customer || "-"}
+                            </p>
+                            <p>
+                              <span className="font-medium text-slate-900">Sales rep:</span> {details.invoiceSummary.salesRep || "-"}
+                            </p>
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Billing address</p>
+                                <p className="mt-2 whitespace-pre-wrap text-slate-700">{details.invoiceSummary.billingAddress || "-"}</p>
+                              </div>
+                              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shipping address</p>
+                                <p className="mt-2 whitespace-pre-wrap text-slate-700">{details.invoiceSummary.shippingAddress || "-"}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-white/70 p-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+                              <p className={`mt-1 font-medium ${details.invoiceSummary.paid ? "text-emerald-700" : "text-amber-700"}`}>
+                                {details.invoiceSummary.paid ? "Paid off" : "Not paid"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Balance</p>
+                              <p className="mt-1 font-medium text-slate-900">{money(details.invoiceSummary.balance)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+                              <p className="mt-1 font-medium text-slate-900">{money(details.invoiceSummary.total)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Due Date</p>
+                              <p className="mt-1 font-medium text-slate-900">{details.invoiceSummary.dueDate || "-"}</p>
+                            </div>
+                          </div>
                         </div>
 
-                        {details.invoiceSummary.lineItems.length > 0 && (
-                          <div className="mt-3 overflow-x-auto">
+                        {showFullInvoice && details.invoiceSummary.lineItems.length > 0 && (
+                          <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
                             <table className="min-w-full text-xs text-slate-700">
-                              <thead>
-                                <tr className="border-b border-slate-300 text-left text-slate-900">
-                                  <th className="px-2 py-1">Description</th>
-                                  <th className="px-2 py-1 text-right">Qty</th>
-                                  <th className="px-2 py-1 text-right">Unit</th>
-                                  <th className="px-2 py-1 text-right">Amount</th>
+                              <thead className="bg-slate-100/80">
+                                <tr className="border-b border-slate-200 text-left text-slate-900">
+                                  <th className="px-3 py-2">Description</th>
+                                  <th className="px-3 py-2 text-right">Qty</th>
+                                  <th className="px-3 py-2 text-right">Unit</th>
+                                  <th className="px-3 py-2 text-right">Amount</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {details.invoiceSummary.lineItems.map((line, idx) => (
-                                  <tr key={`${line.description}-${idx}`} className="border-b border-slate-100">
-                                    <td className="px-2 py-1">{line.description}</td>
-                                    <td className="px-2 py-1 text-right">{line.quantity}</td>
-                                    <td className="px-2 py-1 text-right">{money(line.unitPrice)}</td>
-                                    <td className="px-2 py-1 text-right">{money(line.amount)}</td>
+                                  <tr key={`${line.description}-${idx}`} className="border-b border-slate-100 align-top last:border-b-0">
+                                    <td className="px-3 py-2 leading-5">{line.description}</td>
+                                    <td className="px-3 py-2 text-right">{line.quantity}</td>
+                                    <td className="px-3 py-2 text-right">{money(line.unitPrice)}</td>
+                                    <td className="px-3 py-2 text-right">{money(line.amount)}</td>
                                   </tr>
                                 ))}
                               </tbody>

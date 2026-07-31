@@ -29,30 +29,38 @@ function formatNoteTimestamp(date: Date) {
   return `${iso.slice(0, 16).replace("T", " ")} UTC`;
 }
 
-function getShippingAddress(invoice: any): string | null {
-  const shipAddr = invoice?.ShipAddr;
-  if (!shipAddr || typeof shipAddr !== "object") return null;
+function buildAddress(address: any): string | null {
+  if (!address || typeof address !== "object") return null;
 
   const lines = [
-    shipAddr.Line1,
-    shipAddr.Line2,
-    shipAddr.Line3,
-    shipAddr.Line4,
-    shipAddr.Line5,
+    address.Line1,
+    address.Line2,
+    address.Line3,
+    address.Line4,
+    address.Line5,
   ]
     .map((line: any) => String(line || "").trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((line) => !/^\s*(phone|email)\s*[:\-]/i.test(line));
 
-  const city = String(shipAddr.City || "").trim();
-  const state = String(shipAddr.CountrySubDivisionCode || "").trim();
-  const postalCode = String(shipAddr.PostalCode || "").trim();
-  const country = String(shipAddr.Country || "").trim();
+  const city = String(address.City || "").trim();
+  const state = String(address.CountrySubDivisionCode || "").trim();
+  const postalCode = String(address.PostalCode || "").trim();
+  const country = String(address.Country || "").trim();
 
   const cityStatePostal = [city, state, postalCode].filter(Boolean).join(", ");
   if (cityStatePostal) lines.push(cityStatePostal);
   if (country) lines.push(country);
 
   return lines.length > 0 ? lines.join("\n") : null;
+}
+
+function getShippingAddress(invoice: any): string | null {
+  return buildAddress(invoice?.ShipAddr);
+}
+
+function getBillingAddress(invoice: any): string | null {
+  return buildAddress(invoice?.BillAddr);
 }
 
 function mapInvoiceSummary(invoice: any) {
@@ -81,6 +89,7 @@ function mapInvoiceSummary(invoice: any) {
     salesRep: getSalesRep(invoice),
     customer: invoice?.CustomerRef?.name || null,
     shippingAddress: getShippingAddress(invoice),
+    billingAddress: getBillingAddress(invoice),
     lineItems,
   };
 }

@@ -120,6 +120,7 @@ export default function ReplacementPartsPage() {
   const [noteEntry, setNoteEntry] = useState("");
   const [invoiceCandidates, setInvoiceCandidates] = useState<InvoiceCandidate[]>([]);
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
+  const [showFullInvoice, setShowFullInvoice] = useState(false);
   const [trackingAutoSaving, setTrackingAutoSaving] = useState(false);
   const [trackingRefreshing, setTrackingRefreshing] = useState(false);
   const [listViewFilter, setListViewFilter] = useState<ListViewFilter>("ALL");
@@ -149,8 +150,10 @@ export default function ReplacementPartsPage() {
   useEffect(() => {
     if (!selectedId) {
       setDetails(null);
+      setShowFullInvoice(false);
       return;
     }
+    setShowFullInvoice(false);
     loadDetails(selectedId);
   }, [selectedId]);
 
@@ -610,7 +613,16 @@ export default function ReplacementPartsPage() {
                   <div className="space-y-5">
                     {details.invoiceSummary && (
                       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-slate-700">
-                        <p className="mb-3 text-sm font-semibold text-slate-900">QuickBooks Invoice</p>
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-slate-900">QuickBooks Invoice</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowFullInvoice((prev) => !prev)}
+                            className="rounded-md border border-emerald-300 bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900 hover:bg-emerald-200"
+                          >
+                            {showFullInvoice ? "Hide Full Invoice" : "View Full Invoice"}
+                          </button>
+                        </div>
                         <div className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm text-slate-700 md:grid-cols-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
                           <div className="space-y-3">
                             <p>
@@ -624,12 +636,12 @@ export default function ReplacementPartsPage() {
                             </p>
                             <div className="grid gap-3 md:grid-cols-2">
                               <div className="rounded-lg border border-slate-200 bg-white p-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shipping address</p>
-                                <p className="mt-2 whitespace-pre-wrap text-slate-700">{details.invoiceSummary.shippingAddress || "-"}</p>
-                              </div>
-                              <div className="rounded-lg border border-slate-200 bg-white p-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Billing address</p>
                                 <p className="mt-2 whitespace-pre-wrap text-slate-700">{details.invoiceSummary.billingAddress || "-"}</p>
+                              </div>
+                              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shipping address</p>
+                                <p className="mt-2 whitespace-pre-wrap text-slate-700">{details.invoiceSummary.shippingAddress || "-"}</p>
                               </div>
                             </div>
                           </div>
@@ -655,7 +667,7 @@ export default function ReplacementPartsPage() {
                           </div>
                         </div>
 
-                        {details.invoiceSummary.lineItems.length > 0 && (
+                        {showFullInvoice && details.invoiceSummary.lineItems.length > 0 && (
                           <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
                             <table className="min-w-full text-xs text-slate-700">
                               <thead className="bg-slate-100/80">
