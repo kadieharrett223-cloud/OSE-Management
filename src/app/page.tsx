@@ -402,6 +402,7 @@ export default function Dashboard() {
   const isCardChargePayment = (method: string) => {
     const normalized = String(method || "").toLowerCase();
     return (
+      normalized.includes("quickbooks payments") ||
       normalized.includes("visa") ||
       normalized.includes("mastercard") ||
       normalized.includes("master card") ||
