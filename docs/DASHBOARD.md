@@ -34,10 +34,10 @@ The top customer payments card on the dashboard includes three filter options:
 
 When the `Print Report` button is used from the customer payments modal on `src/app/page.tsx`, the print preview now includes:
 
-- `Charge New Card (Ran Through QuickBooks)` (first section): sourced from QuickBooks Payments charges (`src/app/api/qbo/pending-charges/route.ts`) for the report date.
-- `Record Payment (Recorded in QuickBooks)` (second section): sourced from active dashboard payment rows (`today`, `yesterday`, or `selected date`) and includes `Invoice #` as a print-only column.
+- `Charge New Card (Ran Through QuickBooks)` (first section): sourced from active dashboard payment rows where `Paid Via` indicates a card charge (for example Visa, American Express, Credit Card labels).
+- `Record Payment (Recorded in QuickBooks)` (second section): all remaining rows (including Shopify-style recorded payments) and includes `Invoice #` as a print-only column.
 
-The card-runs section now requests `src/app/api/qbo/pending-charges/route.ts` with an explicit `date=YYYY-MM-DD` so `Yesterday` and `Selected Date` reports pull card runs for that same report date (not only today).
+This keeps the report to the two QuickBooks invoice payment actions only: card charge vs record payment.
 
 Screen tables are unchanged; this two-option split only affects the generated print document.
 

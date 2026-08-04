@@ -394,6 +394,27 @@ export default function Dashboard() {
     return Array.from(invoiceIds).join(", ");
   };
 
+  const isShopifyRecordedPayment = (method: string) => {
+    const normalized = String(method || "").toLowerCase();
+    return normalized.includes("shopify") || normalized.includes("shop pay");
+  };
+
+  const isCardChargePayment = (method: string) => {
+    const normalized = String(method || "").toLowerCase();
+    return (
+      normalized.includes("visa") ||
+      normalized.includes("mastercard") ||
+      normalized.includes("master card") ||
+      normalized.includes("american express") ||
+      normalized.includes("amex") ||
+      normalized.includes("discover") ||
+      normalized.includes("credit card") ||
+      normalized.includes("debit card") ||
+      normalized.includes("charged online") ||
+      normalized.includes("quickbooks payments-credit card")
+    );
+  };
+
   const handlePrintCustomerPayments = async () => {
     const rows = customerPaymentsActiveRows;
     if (rows.length === 0) {
@@ -410,59 +431,27 @@ export default function Dashboard() {
     const title = customerPaymentsHeading;
     const total = customerPaymentsActiveTotal;
     const generatedAt = new Date().toLocaleString();
-    const todayYmd = toYmdLocal(new Date());
-    const fallbackReportDate =
-      customerPaymentsPeriod === "selected"
-        ? selectedPaymentsDate
-        : customerPaymentsPeriod === "yesterday"
-          ? toYmdLocal(new Date(Date.now() - 24 * 60 * 60 * 1000))
-          : todayYmd;
-    const reportDate = String(rows.find((row) => row.txnDate)?.txnDate || fallbackReportDate || "").trim();
+    const chargeNewCardRows = rows.filter((payment) => isCardChargePayment(payment.paymentMethod) && !isShopifyRecordedPayment(payment.paymentMethod));
+    const recordPaymentRows = rows.filter((payment) => !isCardChargePayment(payment.paymentMethod) || isShopifyRecordedPayment(payment.paymentMethod));
+    const chargeNewCardTotal = chargeNewCardRows.reduce((sum, row) => sum + (Number(row.appliedAmount) || 0), 0);
+    const recordPaymentTotal = recordPaymentRows.reduce((sum, row) => sum + (Number(row.appliedAmount) || 0), 0);
 
-    let cardsRanRows: IncomingDeposit[] = [];
-    if (reportDate) {
-      try {
-        const params = new URLSearchParams({ date: reportDate, _: String(Date.now()) });
-        const res = await fetch(`/api/qbo/pending-charges?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          cardsRanRows = (data?.charges || []).map((c: any) => ({
-            id: c.id,
-            created: c.created,
-            status: c.status,
-            amount: Number(c.amount || 0),
-            currency: c.currency || "USD",
-            cardName: c.card?.name || "",
-            cardLast4: c.card?.last4 || "",
-            cardType: c.card?.cardType || "",
-          }));
-        }
-      } catch (error) {
-        console.error("Failed to fetch card runs for print:", error);
-      }
-    }
-
-    if (cardsRanRows.length === 0 && reportDate === todayYmd && incomingDeposits.length > 0) {
-      cardsRanRows = incomingDeposits;
-    }
-
-    const cardsRanTotal = cardsRanRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
-
-    const cardsRanRowsHtml = cardsRanRows
+    const chargeNewCardRowsHtml = chargeNewCardRows
       .map(
-        (card) => `
+        (payment) => `
           <tr>
-            <td>${card.cardName || "-"}</td>
-            <td>${card.created || "-"}</td>
-            <td>${card.cardType || "-"}${card.cardLast4 ? ` ••••${card.cardLast4}` : ""}</td>
-            <td>${card.status || "-"}</td>
-            <td style="text-align:right;">${money(card.amount)}</td>
+            <td>${payment.customerName || "-"}</td>
+            <td>${payment.invoiceNumber || "-"}</td>
+            <td>${payment.paymentMethod || "-"}</td>
+            <td style="text-align:right;">${money(payment.appliedAmount)}</td>
+            <td style="text-align:right;">${money(payment.totalAmount)}</td>
+            <td>${payment.txnDate || "-"}</td>
           </tr>
         `
       )
       .join("");
 
-    const rowsHtml = rows
+    const rowsHtml = recordPaymentRows
       .map(
         (payment) => `
           <tr>
@@ -511,26 +500,27 @@ export default function Dashboard() {
             <div class="meta">
               <p><strong>Generated:</strong> ${generatedAt}</p>
               <p><strong>Overall Sales Recorded:</strong> <span class="badge">${money(total)}</span></p>
-              <p><strong>Charge New Card (Ran in QB):</strong> <span class="badge">${money(cardsRanTotal)}</span></p>
-              <p><strong>Record Payment (e.g. Shopify):</strong> <span class="badge">${money(total)}</span></p>
+              <p><strong>Charge New Card (Ran in QB):</strong> <span class="badge">${money(chargeNewCardTotal)}</span></p>
+              <p><strong>Record Payment:</strong> <span class="badge">${money(recordPaymentTotal)}</span></p>
             </div>
             <section class="section">
               <h2>Charge New Card (Ran Through QuickBooks)</h2>
-              <p>Actual card charges processed in QuickBooks Payments for this report date.</p>
+              <p>Card-charged invoice payments (Visa, Amex, Credit Card, etc.).</p>
               <table>
                 <thead>
                   <tr>
-                    <th>Cardholder</th>
-                    <th>Processed</th>
-                    <th>Card</th>
-                    <th>Status</th>
-                    <th style="text-align:right;">Amount</th>
+                    <th>Customer</th>
+                    <th>Invoice #</th>
+                    <th>Paid Via</th>
+                    <th style="text-align:right;">Applied</th>
+                    <th style="text-align:right;">Total Amount</th>
+                    <th>Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${cardsRanRows.length > 0
-                    ? cardsRanRowsHtml
-                    : `<tr><td colspan="5">No QuickBooks card runs available for this print period.</td></tr>`}
+                  ${chargeNewCardRows.length > 0
+                    ? chargeNewCardRowsHtml
+                    : `<tr><td colspan="6">No card-charge payments recorded for this print period.</td></tr>`}
                 </tbody>
               </table>
             </section>
