@@ -34,20 +34,12 @@ The top customer payments card on the dashboard includes three filter options:
 
 When the `Print Report` button is used from the customer payments modal on `src/app/page.tsx`, the print preview now includes:
 
-- `Cards Ran Through QuickBooks` (first section): sourced from `incomingDeposits` (QuickBooks Payments charges feed loaded from `src/app/api/qbo/pending-charges/route.ts`).
-- `Recorded Customer Payments` (second section): sourced from the active dashboard payment rows (`today`, `yesterday`, or `selected date`) and now includes `Invoice #` as a print-only column.
+- `Charge New Card (Ran Through QuickBooks)` (first section): sourced from QuickBooks Payments charges (`src/app/api/qbo/pending-charges/route.ts`) for the report date.
+- `Record Payment (Recorded in QuickBooks)` (second section): sourced from active dashboard payment rows (`today`, `yesterday`, or `selected date`) and includes `Invoice #` as a print-only column.
 
 The card-runs section now requests `src/app/api/qbo/pending-charges/route.ts` with an explicit `date=YYYY-MM-DD` so `Yesterday` and `Selected Date` reports pull card runs for that same report date (not only today).
 
-The print report also provides a payout-timing split for recorded payments:
-
-- `Overall Recorded Sales`: all recorded customer payment rows for the period.
-- `To Be Paid Out Later`: subset where payment method indicates delayed payout channels (currently Shopify / Shop Pay labels).
-- `Direct/Other Recorded`: recorded rows not tagged as delayed payout.
-
-This makes it easier to compare immediate card runs against sales that will settle later.
-
-Screen tables are unchanged; this split only affects the generated print document.
+Screen tables are unchanged; this two-option split only affects the generated print document.
 
 ## Risk
 
