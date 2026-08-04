@@ -30,6 +30,15 @@ The top customer payments card on the dashboard includes three filter options:
 
 `Today` and `Yesterday` switch between the already-fetched `customerPaymentsToday` and `customerPaymentsYesterday` arrays from the dashboard summary payload. `Select Date` shows a date picker and makes a dedicated API request for the chosen day, then displays those full-day payment results in the same table and `View all` modal.
 
+### Print report behavior
+
+When the `Print Report` button is used from the customer payments modal on `src/app/page.tsx`, the print preview now includes:
+
+- `Cards Ran Through QuickBooks` (first section): sourced from `incomingDeposits` (QuickBooks Payments charges feed loaded from `src/app/api/qbo/pending-charges/route.ts`).
+- `Recorded Customer Payments` (second section): sourced from the active dashboard payment rows (`today`, `yesterday`, or `selected date`) and now includes `Invoice #` as a print-only column.
+
+Screen tables are unchanged; this split only affects the generated print document.
+
 ## Risk
 
 Low risk. This is a read-only dashboard change that extends the existing summary payload and does not write to QuickBooks, Supabase, or Prisma.

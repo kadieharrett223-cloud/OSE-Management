@@ -76,6 +76,7 @@ interface CustomerPayment {
   totalAmount: number;
   txnDate: string;
   paymentMethod: string;
+  invoiceNumber?: string;
 }
 
 interface IncomingDeposit {
@@ -379,6 +380,20 @@ export default function Dashboard() {
   const loadingCustomerPaymentsActive = customerPaymentsPeriod === "selected" ? loadingSelectedDatePayments : loadingCustomerPayments;
   const openActiveCustomerPaymentsModal = () => setShowCustomerPaymentsModal(true);
 
+  const extractLinkedInvoiceNumber = (payment: any) => {
+    const invoiceIds = new Set<string>();
+    (Array.isArray(payment?.Line) ? payment.Line : []).forEach((line: any) => {
+      (Array.isArray(line?.LinkedTxn) ? line.LinkedTxn : []).forEach((txn: any) => {
+        if (txn?.TxnType === "Invoice" && txn?.TxnId) {
+          invoiceIds.add(String(txn.TxnId));
+        }
+      });
+    });
+
+    if (invoiceIds.size === 0) return "-";
+    return Array.from(invoiceIds).join(", ");
+  };
+
   const handlePrintCustomerPayments = () => {
     const rows = customerPaymentsActiveRows;
     if (rows.length === 0) {
@@ -395,11 +410,33 @@ export default function Dashboard() {
     const title = customerPaymentsHeading;
     const total = customerPaymentsActiveTotal;
     const generatedAt = new Date().toLocaleString();
+    const cardsRanRows =
+      customerPaymentsPeriod === "today" ||
+      (customerPaymentsPeriod === "selected" && selectedPaymentsDate === toYmdLocal(new Date()))
+        ? incomingDeposits
+        : [];
+    const cardsRanTotal = cardsRanRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+
+    const cardsRanRowsHtml = cardsRanRows
+      .map(
+        (card) => `
+          <tr>
+            <td>${card.cardName || "-"}</td>
+            <td>${card.created || "-"}</td>
+            <td>${card.cardType || "-"}${card.cardLast4 ? ` ••••${card.cardLast4}` : ""}</td>
+            <td>${card.status || "-"}</td>
+            <td style="text-align:right;">${money(card.amount)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
     const rowsHtml = rows
       .map(
         (payment) => `
           <tr>
             <td>${payment.customerName || "-"}</td>
+            <td>${payment.invoiceNumber || "-"}</td>
             <td>${payment.paymentMethod || "-"}</td>
             <td style="text-align:right;">${money(payment.appliedAmount)}</td>
             <td style="text-align:right;">${money(payment.totalAmount)}</td>
@@ -432,6 +469,9 @@ export default function Dashboard() {
               th { background: #f1f5f9; }
               .meta { display: flex; gap: 16px; flex-wrap: wrap; }
               .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-weight: 700; }
+              .section { margin-top: 20px; border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; }
+              .section h2 { margin: 0; font-size: 16px; }
+              .section p { margin: 6px 0 0 0; font-size: 12px; color: #475569; }
               @media print { body { margin: 12mm; } }
             </style>
           </head>
@@ -439,21 +479,48 @@ export default function Dashboard() {
             <h1>${title}</h1>
             <div class="meta">
               <p><strong>Generated:</strong> ${generatedAt}</p>
-              <p><strong>Total:</strong> <span class="badge">${money(total)}</span></p>
-              <p><strong>Rows:</strong> <span class="badge">${rows.length}</span></p>
+              <p><strong>Recorded Total:</strong> <span class="badge">${money(total)}</span></p>
+              <p><strong>Recorded Rows:</strong> <span class="badge">${rows.length}</span></p>
+              <p><strong>Cards Ran Total:</strong> <span class="badge">${money(cardsRanTotal)}</span></p>
+              <p><strong>Cards Ran Rows:</strong> <span class="badge">${cardsRanRows.length}</span></p>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Paid Via</th>
-                  <th style="text-align:right;">Applied</th>
-                  <th style="text-align:right;">Total Amount</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>${rowsHtml}</tbody>
-            </table>
+            <section class="section">
+              <h2>Cards Ran Through QuickBooks</h2>
+              <p>Actual card charges processed in QuickBooks Payments for this print period.</p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cardholder</th>
+                    <th>Processed</th>
+                    <th>Card</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${cardsRanRows.length > 0
+                    ? cardsRanRowsHtml
+                    : `<tr><td colspan="5">No QuickBooks card runs available for this print period.</td></tr>`}
+                </tbody>
+              </table>
+            </section>
+            <section class="section">
+              <h2>Recorded Customer Payments</h2>
+              <p>Payments recorded in dashboard accounting records.</p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Invoice #</th>
+                    <th>Paid Via</th>
+                    <th style="text-align:right;">Applied</th>
+                    <th style="text-align:right;">Total Amount</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+              </table>
+            </section>
           </body>
         </html>
       `);
@@ -584,6 +651,7 @@ export default function Dashboard() {
               totalAmount,
               txnDate: payment.TxnDate || selectedPaymentsDate,
               paymentMethod,
+              invoiceNumber: extractLinkedInvoiceNumber(payment),
             };
           })
           .filter((payment: CustomerPayment) => payment.appliedAmount > 0)

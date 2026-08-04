@@ -64,6 +64,11 @@ export async function GET() {
     ) => {
       const itemizedCustomerPayments: any[] = [];
       const invoicesCoveredByPaymentLinks = new Set<string>();
+      const invoiceDocNumberById = new Map<string, string>(
+        paidInvoices
+          .map((inv: any) => [String(inv?.Id || ""), String(inv?.DocNumber || "").trim()] as const)
+          .filter(([id, docNumber]) => Boolean(id) && Boolean(docNumber))
+      );
 
       payments.forEach((payment: any) => {
         const total = Number(payment.TotalAmt) || 0;
@@ -84,6 +89,10 @@ export async function GET() {
             const invoiceId = String(txn.TxnId || "");
             if (!invoiceId) return;
             invoicesCoveredByPaymentLinks.add(invoiceId);
+            const invoiceDocNumber =
+              String(txn?.DocNumber || "").trim() ||
+              invoiceDocNumberById.get(invoiceId) ||
+              invoiceId;
             itemizedCustomerPayments.push({
               id: `pay-link-${payment.Id}-${invoiceId}-${lineIndex}-${linkIndex}`,
               customerName: payment.CustomerRef?.name || payment.CustomerRef?.value || "Unknown",
@@ -91,6 +100,7 @@ export async function GET() {
               totalAmount: lineAmount,
               txnDate: payment.TxnDate || fallbackDate,
               paymentMethod: normalizePaymentMethod(payment, paymentMethodNameById),
+              invoiceNumber: invoiceDocNumber,
             });
           });
         });
@@ -104,6 +114,7 @@ export async function GET() {
             totalAmount: total,
             txnDate: payment.TxnDate || fallbackDate,
             paymentMethod: normalizePaymentMethod(payment, paymentMethodNameById),
+            invoiceNumber: "-",
           });
         }
       });
@@ -122,6 +133,7 @@ export async function GET() {
           totalAmount: total,
           txnDate: inv.TxnDate || fallbackDate,
           paymentMethod: "Invoice Payment",
+          invoiceNumber: String(inv.DocNumber || inv.Id || "-").trim() || "-",
         });
       });
 
