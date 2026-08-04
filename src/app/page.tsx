@@ -394,6 +394,11 @@ export default function Dashboard() {
     return Array.from(invoiceIds).join(", ");
   };
 
+  const isDelayedPayoutMethod = (method: string) => {
+    const normalized = String(method || "").toLowerCase();
+    return normalized.includes("shopify") || normalized.includes("shop pay");
+  };
+
   const handlePrintCustomerPayments = async () => {
     const rows = customerPaymentsActiveRows;
     if (rows.length === 0) {
@@ -447,6 +452,10 @@ export default function Dashboard() {
     }
 
     const cardsRanTotal = cardsRanRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+    const delayedPayoutRows = rows.filter((payment) => isDelayedPayoutMethod(payment.paymentMethod));
+    const directRecordedRows = rows.filter((payment) => !isDelayedPayoutMethod(payment.paymentMethod));
+    const delayedPayoutTotal = delayedPayoutRows.reduce((sum, row) => sum + (Number(row.appliedAmount) || 0), 0);
+    const directRecordedTotal = directRecordedRows.reduce((sum, row) => sum + (Number(row.appliedAmount) || 0), 0);
 
     const cardsRanRowsHtml = cardsRanRows
       .map(
@@ -457,6 +466,20 @@ export default function Dashboard() {
             <td>${card.cardType || "-"}${card.cardLast4 ? ` ••••${card.cardLast4}` : ""}</td>
             <td>${card.status || "-"}</td>
             <td style="text-align:right;">${money(card.amount)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const delayedPayoutRowsHtml = delayedPayoutRows
+      .map(
+        (payment) => `
+          <tr>
+            <td>${payment.customerName || "-"}</td>
+            <td>${payment.invoiceNumber || "-"}</td>
+            <td>${payment.paymentMethod || "-"}</td>
+            <td style="text-align:right;">${money(payment.appliedAmount)}</td>
+            <td>${payment.txnDate || "-"}</td>
           </tr>
         `
       )
@@ -510,10 +533,12 @@ export default function Dashboard() {
             <h1>${title}</h1>
             <div class="meta">
               <p><strong>Generated:</strong> ${generatedAt}</p>
-              <p><strong>Recorded Total:</strong> <span class="badge">${money(total)}</span></p>
+              <p><strong>Overall Recorded Sales:</strong> <span class="badge">${money(total)}</span></p>
               <p><strong>Recorded Rows:</strong> <span class="badge">${rows.length}</span></p>
-              <p><strong>Cards Ran Total:</strong> <span class="badge">${money(cardsRanTotal)}</span></p>
+              <p><strong>Cards Ran (Instant):</strong> <span class="badge">${money(cardsRanTotal)}</span></p>
               <p><strong>Cards Ran Rows:</strong> <span class="badge">${cardsRanRows.length}</span></p>
+              <p><strong>To Be Paid Out Later:</strong> <span class="badge">${money(delayedPayoutTotal)}</span></p>
+              <p><strong>Direct/Other Recorded:</strong> <span class="badge">${money(directRecordedTotal)}</span></p>
             </div>
             <section class="section">
               <h2>Cards Ran Through QuickBooks</h2>
@@ -536,8 +561,28 @@ export default function Dashboard() {
               </table>
             </section>
             <section class="section">
-              <h2>Recorded Customer Payments</h2>
-              <p>Payments recorded in dashboard accounting records.</p>
+              <h2>Recorded Payments Pending Payout (Shopify, etc.)</h2>
+              <p>Recorded sales that are paid through channels with delayed payout timing.</p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Invoice #</th>
+                    <th>Paid Via</th>
+                    <th style="text-align:right;">Applied</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${delayedPayoutRows.length > 0
+                    ? delayedPayoutRowsHtml
+                    : `<tr><td colspan="5">No delayed-payout payments recorded for this print period.</td></tr>`}
+                </tbody>
+              </table>
+            </section>
+            <section class="section">
+              <h2>Recorded Customer Payments (All)</h2>
+              <p>Complete accounting-side recorded payment list for this report period.</p>
               <table>
                 <thead>
                   <tr>
@@ -673,7 +718,11 @@ export default function Dashboard() {
             const paymentMethod =
               String(payment?.PaymentMethodRef?.name || "").trim() ||
               String(payment?.PaymentMethodRef?.value || "").trim() ||
-              (payment?.CreditCardPayment || payment?.ProcessPayment ? "Charged Online" : "Unknown");
+              (payment?.CreditCardPayment || payment?.ProcessPayment
+                ? "Charged Online"
+                : String(payment?.PrivateNote || "").toLowerCase().includes("shopify")
+                  ? "Shopify"
+                  : "Unknown");
 
             return {
               id: `selected-${payment.Id || Math.random().toString(36).slice(2)}`,
