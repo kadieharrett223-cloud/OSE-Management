@@ -394,7 +394,7 @@ export default function Dashboard() {
     return Array.from(invoiceIds).join(", ");
   };
 
-  const handlePrintCustomerPayments = () => {
+  const handlePrintCustomerPayments = async () => {
     const rows = customerPaymentsActiveRows;
     if (rows.length === 0) {
       if (customerPaymentsPeriod === "today") {
@@ -410,11 +410,42 @@ export default function Dashboard() {
     const title = customerPaymentsHeading;
     const total = customerPaymentsActiveTotal;
     const generatedAt = new Date().toLocaleString();
-    const cardsRanRows =
-      customerPaymentsPeriod === "today" ||
-      (customerPaymentsPeriod === "selected" && selectedPaymentsDate === toYmdLocal(new Date()))
-        ? incomingDeposits
-        : [];
+    const todayYmd = toYmdLocal(new Date());
+    const fallbackReportDate =
+      customerPaymentsPeriod === "selected"
+        ? selectedPaymentsDate
+        : customerPaymentsPeriod === "yesterday"
+          ? toYmdLocal(new Date(Date.now() - 24 * 60 * 60 * 1000))
+          : todayYmd;
+    const reportDate = String(rows.find((row) => row.txnDate)?.txnDate || fallbackReportDate || "").trim();
+
+    let cardsRanRows: IncomingDeposit[] = [];
+    if (reportDate) {
+      try {
+        const params = new URLSearchParams({ date: reportDate, _: String(Date.now()) });
+        const res = await fetch(`/api/qbo/pending-charges?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          cardsRanRows = (data?.charges || []).map((c: any) => ({
+            id: c.id,
+            created: c.created,
+            status: c.status,
+            amount: Number(c.amount || 0),
+            currency: c.currency || "USD",
+            cardName: c.card?.name || "",
+            cardLast4: c.card?.last4 || "",
+            cardType: c.card?.cardType || "",
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch card runs for print:", error);
+      }
+    }
+
+    if (cardsRanRows.length === 0 && reportDate === todayYmd && incomingDeposits.length > 0) {
+      cardsRanRows = incomingDeposits;
+    }
+
     const cardsRanTotal = cardsRanRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
 
     const cardsRanRowsHtml = cardsRanRows

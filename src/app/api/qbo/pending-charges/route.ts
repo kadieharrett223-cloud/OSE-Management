@@ -86,6 +86,8 @@ export async function GET(req: NextRequest) {
     const { accessToken, realmId } = await ensureAccessToken(userId || undefined);
     const searchParams = req.nextUrl.searchParams;
     const todayOnly = searchParams.get("today") === "true";
+    const requestedDate = String(searchParams.get("date") || "").trim();
+    const hasRequestedDate = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate);
 
     // The QBO Payments API requires Company-Id header in addition to Bearer token.
     // Pull latest charges and do robust filtering server-side; upstream filters vary by account/API version.
@@ -127,6 +129,7 @@ export async function GET(req: NextRequest) {
       : data?.charges ?? data?.Charges ?? data?.data ?? data?.items ?? data?.results ?? [];
 
     const localTodayYmd = toYmdInTimeZone(new Date(), BUSINESS_TIME_ZONE);
+    const targetDateYmd = hasRequestedDate ? requestedDate : todayOnly ? localTodayYmd : null;
 
     const charges: PendingCharge[] = raw
       .map((c: any) => ({
@@ -152,9 +155,9 @@ export async function GET(req: NextRequest) {
         disburseDate: c.disburseDate || c.DisburseDate || undefined,
       }))
       .filter((c) => {
-        if (todayOnly) {
+        if (targetDateYmd) {
           const createdDate = toDate(c.created);
-          if (!createdDate || toYmdInTimeZone(createdDate, BUSINESS_TIME_ZONE) !== localTodayYmd) return false;
+          if (!createdDate || toYmdInTimeZone(createdDate, BUSINESS_TIME_ZONE) !== targetDateYmd) return false;
           const status = (c.status || "").toUpperCase();
           return !["DECLINED", "FAILED", "VOIDED", "CANCELLED", "CANCELED"].includes(status);
         }
@@ -164,9 +167,9 @@ export async function GET(req: NextRequest) {
 
     let finalCharges = charges;
 
-    if (todayOnly && finalCharges.length === 0) {
+    if (targetDateYmd && finalCharges.length === 0) {
       try {
-        finalCharges = await fetchQboIntuitPaymentSalesReceipts(userId || undefined, localTodayYmd);
+        finalCharges = await fetchQboIntuitPaymentSalesReceipts(userId || undefined, targetDateYmd);
       } catch (fallbackError) {
         console.error("QBO IntuitPayment fallback failed", fallbackError);
       }
@@ -180,6 +183,7 @@ export async function GET(req: NextRequest) {
       totalPending,
       totalAmount: totalPending,
       count: finalCharges.length,
+      reportDate: targetDateYmd,
     });
   } catch (error: any) {
     if (error instanceof QboApiError) {

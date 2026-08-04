@@ -37,6 +37,8 @@ When the `Print Report` button is used from the customer payments modal on `src/
 - `Cards Ran Through QuickBooks` (first section): sourced from `incomingDeposits` (QuickBooks Payments charges feed loaded from `src/app/api/qbo/pending-charges/route.ts`).
 - `Recorded Customer Payments` (second section): sourced from the active dashboard payment rows (`today`, `yesterday`, or `selected date`) and now includes `Invoice #` as a print-only column.
 
+The card-runs section now requests `src/app/api/qbo/pending-charges/route.ts` with an explicit `date=YYYY-MM-DD` so `Yesterday` and `Selected Date` reports pull card runs for that same report date (not only today).
+
 Screen tables are unchanged; this split only affects the generated print document.
 
 ## Risk
