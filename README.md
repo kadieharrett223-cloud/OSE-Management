@@ -71,6 +71,7 @@ Next.js App Router app that reproduces the Excel pricing workbook and scaffolds 
 - Outputs are formatted to two decimals; export retains raw numbers
 - Rep names aliased automatically (e.g., "WL" and "Wholesale Lifts" treated as same rep)
 - Shipping deduction uses fuzzy matching (Levenshtein distance <= 2) if exact SKU match fails
+- Purchasing page search supports PO number, supplier, SKU/item code (for example `4PXL-10`), and PO line description so incoming stock can be located quickly.
 
 ### Free mobile notifications (no paid provider)
 - Set `MOBILE_NOTIFICATION_SMS_TO` in your env as comma-separated carrier gateway addresses.

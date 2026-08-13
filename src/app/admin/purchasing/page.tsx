@@ -740,8 +740,23 @@ export default function PurchasingPage() {
       po.vendor_name.toLowerCase().includes(normalizedQuery);
 
     const poMatchesItemCode =
-      normalizedSkuQuery.length > 0 &&
-      (po.lines || []).some((line: any) => normalizeSku(line?.sku || "").includes(normalizedSkuQuery));
+      normalizedQuery.length > 0 &&
+      (po.lines || []).some((line: any) => {
+        const lineSku = String(line?.sku || line?.item_no || "");
+        const lineDescription = String(line?.description || "");
+        const normalizedLineSku = normalizeSku(lineSku);
+        const normalizedLineDescription = lineDescription.toLowerCase();
+        const normalizedLineDescriptionSku = normalizeSku(lineDescription);
+
+        const matchesSkuLikeTerm =
+          normalizedSkuQuery.length > 0 &&
+          (normalizedLineSku.includes(normalizedSkuQuery) ||
+            normalizedLineDescriptionSku.includes(normalizedSkuQuery));
+
+        const matchesDescriptionText = normalizedLineDescription.includes(normalizedQuery);
+
+        return matchesSkuLikeTerm || matchesDescriptionText;
+      });
 
     const matchesQuery =
       !normalizedQuery ||
@@ -994,7 +1009,7 @@ export default function PurchasingPage() {
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search PO, supplier, or item code"
+                  placeholder="Search PO #, supplier, SKU, or line description"
                   className="w-full sm:w-52 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <select
@@ -1700,6 +1715,7 @@ export default function PurchasingPage() {
                       <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">PO #</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Supplier</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Expected</th>
                       <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total</th>
                       <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Balance Due</th>
                       <th className="px-6 py-3 text-center text-xs font-semibold uppercase text-slate-500">Status</th>
@@ -1713,6 +1729,7 @@ export default function PurchasingPage() {
                           <td className="px-6 py-4"><div className="h-3 w-24 rounded bg-slate-200" /></td>
                           <td className="px-6 py-4"><div className="h-3 w-40 rounded bg-slate-200" /></td>
                           <td className="px-6 py-4"><div className="h-3 w-28 rounded bg-slate-200" /></td>
+                          <td className="px-6 py-4"><div className="h-3 w-28 rounded bg-slate-200" /></td>
                           <td className="px-6 py-4 text-right"><div className="ml-auto h-3 w-20 rounded bg-slate-200" /></td>
                           <td className="px-6 py-4 text-right"><div className="ml-auto h-3 w-20 rounded bg-slate-200" /></td>
                           <td className="px-6 py-4 text-center"><div className="mx-auto h-3 w-16 rounded bg-slate-200" /></td>
@@ -1721,7 +1738,7 @@ export default function PurchasingPage() {
                       ))
                     ) : sortedFilteredPos.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-slate-600">
+                        <td colSpan={8} className="px-6 py-12 text-center text-slate-600">
                           <div className="text-lg font-semibold text-slate-900">No purchase orders yet</div>
                           <div className="mt-2 text-sm text-slate-600">Create your first PO to start tracking purchasing.</div>
                           <div className="mt-4">
@@ -1740,6 +1757,7 @@ export default function PurchasingPage() {
                           <td className="px-6 py-3 font-medium text-slate-900">{po.po_number}</td>
                           <td className="px-6 py-3 text-slate-600">{po.vendor_name}</td>
                           <td className="px-6 py-3 text-slate-600">{formatDate(po.order_date)}</td>
+                          <td className="px-6 py-3 text-slate-600">{formatDate(po.expected_delivery)}</td>
                           <td className="px-6 py-3 text-right font-semibold text-slate-900">${money(computedTotal(po))}</td>
                           <td className="px-6 py-3 text-right font-semibold text-amber-700">${money(balance(po))}</td>
                           <td className="px-6 py-3 text-center">
@@ -1815,8 +1833,16 @@ export default function PurchasingPage() {
                           <span className="text-slate-700">{formatDate(po.order_date)}</span>
                         </div>
                         <div className="text-right">
+                          <span className="text-slate-500">Expected:</span>{" "}
+                          <span className="text-slate-700">{formatDate(po.expected_delivery)}</span>
+                        </div>
+                        <div>
                           <span className="text-slate-500">Total:</span>{" "}
                           <span className="font-semibold text-slate-900">${money(computedTotal(po))}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-slate-500">Balance:</span>{" "}
+                          <span className="font-semibold text-amber-700">${money(balance(po))}</span>
                         </div>
                       </div>
                       <div className="flex gap-2 pt-2 border-t border-slate-200">
