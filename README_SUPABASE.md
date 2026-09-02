@@ -112,9 +112,15 @@ VALUES
 
 1. Create app at [developer.intuit.com](https://developer.intuit.com)
 2. Get Client ID and Secret
-3. Set Redirect URI: `http://localhost:3000/api/qbo/callback`
-4. Add to `.env.local`
-5. Implement OAuth flow in `/api/qbo/auth` and `/api/qbo/callback`
+3. In Intuit, add the callback URL for each app environment. Local development uses `http://localhost:3003/api/qbo/callback`; production must use the deployed app origin followed by `/api/qbo/callback`.
+4. Add the matching values to `.env.local`:
+  ```env
+  QBO_CLIENT_ID=your-intuit-client-id
+  QBO_CLIENT_SECRET=your-intuit-client-secret
+  QBO_REDIRECT_URI=http://localhost:3003/api/qbo/callback
+  QBO_ENVIRONMENT=sandbox
+  ```
+5. The Settings page starts OAuth at `/api/qbo/connect`; Intuit returns to `/api/qbo/callback`, which stores the connection token in Supabase.
 
 ### 6. Setup Sync Cron Job
 

@@ -169,14 +169,8 @@ export default function SettingsPage() {
   };
 
   const handleConnectQbo = async () => {
-    try {
-      setError(null);
-      const res = await fetch('/api/qbo/connect');
-      if (!res.ok) throw new Error('Failed to connect QB');
-      // Redirect will happen from the API
-    } catch (err: any) {
-      setError(err.message || 'Failed to connect QuickBooks');
-    }
+    setError(null);
+    window.location.assign('/api/qbo/connect');
   };
 
   const handleConnectShopify = async () => {
