@@ -56,6 +56,28 @@ export async function GET() {
 
       return "Unknown";
     };
+    const getPaymentType = (payment: any, paymentMethod: string) => {
+      const normalizedMethod = String(paymentMethod || "").toLowerCase();
+      const privateNote = String(payment?.PrivateNote || "").toLowerCase();
+      if (normalizedMethod.includes("shopify") || normalizedMethod.includes("shop pay") || privateNote.includes("shopify")) {
+        return "recorded" as const;
+      }
+      if (payment?.CreditCardPayment || payment?.ProcessPayment) return "card-charge" as const;
+      return (
+        normalizedMethod.includes("quickbooks payments") ||
+        normalizedMethod.includes("visa") ||
+        normalizedMethod.includes("mastercard") ||
+        normalizedMethod.includes("master card") ||
+        normalizedMethod.includes("american express") ||
+        normalizedMethod.includes("amex") ||
+        normalizedMethod.includes("discover") ||
+        normalizedMethod.includes("credit card") ||
+        normalizedMethod.includes("debit card") ||
+        normalizedMethod.includes("charged online")
+      )
+        ? "card-charge"
+        : "recorded";
+    };
     const buildCustomerPayments = (
       payments: any[],
       paidInvoices: any[],
@@ -75,6 +97,8 @@ export async function GET() {
         const unapplied = Number(payment.UnappliedAmt) || 0;
         const applied = Math.max(total - unapplied, 0);
         if (applied <= 0) return;
+        const paymentMethod = normalizePaymentMethod(payment, paymentMethodNameById);
+        const paymentType = getPaymentType(payment, paymentMethod);
 
         let linkedAmount = 0;
         (Array.isArray(payment.Line) ? payment.Line : []).forEach((line: any, lineIndex: number) => {
@@ -99,7 +123,8 @@ export async function GET() {
               appliedAmount: lineAmount,
               totalAmount: lineAmount,
               txnDate: payment.TxnDate || fallbackDate,
-              paymentMethod: normalizePaymentMethod(payment, paymentMethodNameById),
+              paymentMethod,
+              paymentType,
               invoiceNumber: invoiceDocNumber,
             });
           });
@@ -113,7 +138,8 @@ export async function GET() {
             appliedAmount: unlinked,
             totalAmount: total,
             txnDate: payment.TxnDate || fallbackDate,
-            paymentMethod: normalizePaymentMethod(payment, paymentMethodNameById),
+            paymentMethod,
+            paymentType,
             invoiceNumber: "-",
           });
         }
@@ -133,6 +159,7 @@ export async function GET() {
           totalAmount: total,
           txnDate: inv.TxnDate || fallbackDate,
           paymentMethod: "Invoice Payment",
+          paymentType: "recorded",
           invoiceNumber: String(inv.DocNumber || inv.Id || "-").trim() || "-",
         });
       });

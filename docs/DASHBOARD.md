@@ -34,8 +34,8 @@ The top customer payments card on the dashboard includes three filter options:
 
 When the `Print Report` button is used from the customer payments modal on `src/app/page.tsx`, the print preview now includes:
 
-- `Charge New Card (Ran Through QuickBooks)` (first section): sourced from active dashboard payment rows where `Paid Via` indicates a card charge (for example Visa, American Express, Credit Card labels).
-- `Record Payment (Recorded in QuickBooks)` (second section): all remaining rows (including Shopify-style recorded payments) and includes `Invoice #` as a print-only column.
+- `Charge New Card (Ran Through QuickBooks)` (first section): sourced from active dashboard payment rows classified as a QBO card run. The report first uses QBO's `CreditCardPayment` or `ProcessPayment` transaction fields, then falls back to card-style `Paid Via` labels (for example Visa, American Express, Credit Card).
+- `Record Payment (Recorded in QuickBooks)` (second section): all remaining rows, including Shopify and Shop Pay payments. Shopify labels and private notes always take precedence over card-style text so recorded Shopify payments stay in this section; it includes `Invoice #` as a print-only column.
 
 This keeps the report to the two QuickBooks invoice payment actions only: card charge vs record payment.
 

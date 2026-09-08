@@ -76,6 +76,7 @@ interface CustomerPayment {
   totalAmount: number;
   txnDate: string;
   paymentMethod: string;
+  paymentType?: "card-charge" | "recorded";
   invoiceNumber?: string;
 }
 
@@ -416,6 +417,13 @@ export default function Dashboard() {
     );
   };
 
+  const getPaymentType = (payment: any, paymentMethod: string): CustomerPayment["paymentType"] => {
+    const privateNote = String(payment?.PrivateNote || "").toLowerCase();
+    if (isShopifyRecordedPayment(paymentMethod) || privateNote.includes("shopify")) return "recorded";
+    if (payment?.CreditCardPayment || payment?.ProcessPayment) return "card-charge";
+    return isCardChargePayment(paymentMethod) ? "card-charge" : "recorded";
+  };
+
   const handlePrintCustomerPayments = async () => {
     const rows = customerPaymentsActiveRows;
     if (rows.length === 0) {
@@ -432,8 +440,14 @@ export default function Dashboard() {
     const title = customerPaymentsHeading;
     const total = customerPaymentsActiveTotal;
     const generatedAt = new Date().toLocaleString();
-    const chargeNewCardRows = rows.filter((payment) => isCardChargePayment(payment.paymentMethod) && !isShopifyRecordedPayment(payment.paymentMethod));
-    const recordPaymentRows = rows.filter((payment) => !isCardChargePayment(payment.paymentMethod) || isShopifyRecordedPayment(payment.paymentMethod));
+    const chargeNewCardRows = rows.filter(
+      (payment) => payment.paymentType === "card-charge" ||
+        (payment.paymentType === undefined && isCardChargePayment(payment.paymentMethod) && !isShopifyRecordedPayment(payment.paymentMethod))
+    );
+    const recordPaymentRows = rows.filter(
+      (payment) => payment.paymentType === "recorded" ||
+        (payment.paymentType === undefined && (!isCardChargePayment(payment.paymentMethod) || isShopifyRecordedPayment(payment.paymentMethod)))
+    );
     const chargeNewCardTotal = chargeNewCardRows.reduce((sum, row) => sum + (Number(row.appliedAmount) || 0), 0);
     const recordPaymentTotal = recordPaymentRows.reduce((sum, row) => sum + (Number(row.appliedAmount) || 0), 0);
 
@@ -676,6 +690,7 @@ export default function Dashboard() {
               totalAmount,
               txnDate: payment.TxnDate || selectedPaymentsDate,
               paymentMethod,
+              paymentType: getPaymentType(payment, paymentMethod),
               invoiceNumber: extractLinkedInvoiceNumber(payment),
             };
           })
