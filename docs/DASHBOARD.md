@@ -22,6 +22,12 @@ Both sections use the same merge rules so totals stay consistent across the KPI 
 
 To avoid double counting, invoice fallback rows are skipped only when the invoice already appeared in linked payment rows.
 
+The `Payments Today` value in `src/components/TopBar.tsx` is supplied by
+`src/app/api/qbo/today-total/route.ts`. It uses these same event-level rules:
+each linked payment event is included, and fully paid invoices are included
+only as fallbacks. This keeps the top bar synchronized with the dashboard
+total without suppressing separate payments made against one invoice.
+
 The top customer payments card on the dashboard includes three filter options:
 
 - `Today`
